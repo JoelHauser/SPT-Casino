@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <!--
@@ -11,7 +11,7 @@
     <AssemblyName>Blackjack.Client</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <Version>0.2.0</Version>
+    <Version>1.0.0</Version>
 
     <!-- Everything below is referenced straight out of an install. -->
     <SPTPath Condition="'$(SPTPath)' == ''">H:\SPT4.1.X</SPTPath>

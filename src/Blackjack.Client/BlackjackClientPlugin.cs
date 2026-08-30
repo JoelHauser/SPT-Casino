@@ -18,8 +18,8 @@ namespace Blackjack.Client
     public class BlackjackClientPlugin : BaseUnityPlugin
     {
         public const string PluginGuid = "com.joelhauser.blackjack.client";
-        public const string PluginName = "Blackjack (client)";
-        public const string PluginVersion = "0.2.0";
+        public const string PluginName = "Blackjack";
+        public const string PluginVersion = "1.0.0";
 
         internal static ManualLogSource Log;
 

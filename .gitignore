@@ -6,3 +6,8 @@ obj/
 .idea/
 TestResults/
 dist/
+
+# Staged by tools/build-installer.py and embedded into the installer. Generated,
+# and five megabytes of it, so it is rebuilt rather than stored.
+tools/Blackjack.Installer/payload.zip
+dist-installer/

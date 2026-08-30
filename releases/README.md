@@ -2,10 +2,37 @@
 
 Packaged builds, laid out so the zip extracts straight into an SPT install.
 
-| Version | Built for | Layout | Notes |
+| Version | Built for | Form | Notes |
 | --- | --- | --- | --- |
-| 0.2.0 | SPT 4.1.3 | `SPT_Runtime/user/mods/Blackjack/` | First build proven against a real server. Server only -- no client plugin, so nothing to play in game yet. |
-| 0.1.0 | SPT 4.1.3 | `user/mods/Blackjack/` | Superseded. Wrong layout, and three money-path bugs -- do not install. |
+| 1.0 | SPT 4.1.3 | `Blackjack_V1.0.exe` | Installer. Both halves, the table and the card art. |
+| 0.2.0 | SPT 4.1.3 | zip | Server only, no client plugin. Superseded. |
+| 0.1.0 | SPT 4.1.3 | zip | Superseded. Wrong layout, and three money-path bugs -- do not install. |
+
+## The installer
+
+`Blackjack_V1.0.exe` carries the mod inside it and writes it into an SPT folder.
+Run it, and either point it at the folder or drop it in there first and let it
+find itself.
+
+It looks for `SPT_Runtime\SPT.Server.exe` before writing anything, and asks
+before proceeding if it cannot find one. Extracting into the wrong folder is the
+failure that looks exactly like the mod not working, so it is worth one question.
+
+It is around 40 MB, which is almost entirely a .NET runtime: SPT ships its own
+rather than installing one system-wide, so assuming a shared runtime is the
+assumption that fails on somebody else's machine. The mod itself is 5 MB of that,
+mostly the table photograph and 52 card faces.
+
+Rebuild it with:
+
+```
+python tools/build-installer.py
+dotnet publish tools/Blackjack.Installer/Blackjack.Installer.csproj -c Release -o dist-installer
+```
+
+The first step builds both halves and stages `payload.zip`; the second embeds it.
+That zip is generated and not committed, so the publish step alone will not work
+from a fresh clone.
 
 ## The layout matters
 
