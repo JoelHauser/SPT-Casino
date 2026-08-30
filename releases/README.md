@@ -4,9 +4,14 @@ Packaged builds, laid out so the zip extracts straight into an SPT install.
 
 | Version | Built for | Form | Notes |
 | --- | --- | --- | --- |
-| 1.0 | SPT 4.1.3 | `Blackjack_V1.0.exe` | Installer. Both halves, the table and the card art. |
-| 0.2.0 | SPT 4.1.3 | zip | Server only, no client plugin. Superseded. |
-| 0.1.0 | SPT 4.1.3 | zip | Superseded. Wrong layout, and three money-path bugs -- do not install. |
+| 1.0 | SPT 4.1.3 | `Blackjack_V1.0.exe` | Installer, 40 MB. Places both halves for you. |
+| 1.0 | SPT 4.1.3 | `Blackjack_V1.0.zip` | The same files, 5 MB. Extract into your SPT folder. |
+| 0.2.0 | SPT 4.1.3 | removed | Server only, no client plugin. Superseded, and removed so there is no wrong one to pick. |
+| 0.1.0 | SPT 4.1.3 | removed | Wrong layout and three money-path bugs. |
+
+Both 1.0 files contain exactly the same mod, built from the same payload by
+`tools/build-installer.py` and `tools/build-zip.py`, so they cannot drift apart.
+Take the zip if you would rather not run an executable; nothing is lost by it.
 
 ## The installer
 
