@@ -1,9 +1,11 @@
 # Blackjack
 
-A blackjack table for the SPT hideout. Wager roubles, dollars or euros against a
-server-dealt shoe.
+A blackjack table for SPT. Stake roubles, dollars, euros, GP coins, bitcoin or
+Lega medals against a server-dealt shoe.
 
-**Status:** engine complete and tested; server transport and client UI in progress.
+**Status: 1.0, working.** Both halves run against SPT 4.1.3 and have been played:
+hands dealt, split and doubled, money moved in both directions, balances landing
+on the arithmetic. 110 tests.
 
 ---
 
@@ -15,7 +17,7 @@ draws a card, and never decides an outcome.
 
 ```
 client (BepInEx plugin)                 server mod (.NET 10)
-  hideout interaction   ──POST──►  /blackjack/deal    { wallet, wager }
+  menu button           ──POST──►  /blackjack/deal    { wallet, wager }
                         ◄────────  RoundView + ItemEventRouterResponse
   hit / stand / double  ──POST──►  /blackjack/action  { action }
   / split               ◄────────  RoundView, settlement, money delta
@@ -33,10 +35,14 @@ locally dealing and reconciling.
 | --- | --- | --- |
 | `src/Blackjack.Game` | net10.0 | Rules engine. No SPT reference, no I/O, no randomness it does not own. |
 | `src/Blackjack.Server` | net10.0 | SPT server mod: routes, DI registration, currency. |
-| `tests/Blackjack.Game.Tests` | net10.0 | 50 tests over the engine. |
-| `tests/Blackjack.Server.Tests` | net10.0 | 19 tests over the money flow, using fakes. |
+| `tests/Blackjack.Game.Tests` | net10.0 | 52 tests over the engine. |
+| `tests/Blackjack.Server.Tests` | net10.0 | 58 tests over the money flow, using fakes. |
 | `tools/Blackjack.Console` | net10.0 | Terminal table -- plays the engine with no SPT install. |
-| `src/Blackjack.Client` | netstandard2.1 | *(not yet)* BepInEx plugin: UI and input. |
+| `src/Blackjack.Client` | net472 | BepInEx plugin: the menu button, the table, input. |
+| `tools/Blackjack.Installer` | net8.0 | Self-contained installer, with the mod embedded. |
+
+`Blackjack.Client` is the one project here that is not .NET 10, because it runs
+inside EFT's mono runtime rather than inside the server.
 
 `Blackjack.Game` is currency-agnostic on purpose -- it deals in `int` wagers and
 knows nothing about roubles. `Bank` in the server project is the only code that
@@ -51,57 +57,81 @@ The server project is split so the interesting half is testable:
 
 ## How the player reaches the table
 
-**Rest Space.** A blackjack table is added as an interactable object inside the
-existing Rest Space area -- walk up, interact, the panel opens.
+**A BLACKJACK entry on the main menu**, under EXIT. It works on a profile five
+minutes old, which is the whole reason it is there.
 
-It is *not* its own hideout station. `HideoutAreas` ends at `CircleOfCultists = 27`
-server-side, and the client carries a matching enum plus a Unity prefab baked into
-the hideout scene for every area. A new enum value has no model and no icon, and
-the client does not know it exists.
+The Rest Space was the original plan and it is worth writing down why it was
+dropped, because EFT has more in it than expected. `RestSpaceBehaviour` exposes
+`CanAcceptGameDisc`, `StartGame`, `ShowGameScreen` and `FocusGameZoneCamera`,
+there is a `RestSpaceGamePanel` with a play button, and a `DialogItem` node holds
+four game-disc items. It would have handed us camera framing and cursor handling
+for nothing.
 
-There is no hotkey. The table is the only way in, so the game cannot be reached
-during a raid -- the Rest Space does not exist on a raid map.
+It is gated too hard to be the only way in. Rest Space level 1 is nearly free --
+10,000 roubles, duct tape, matches, instant build -- but the disc player is level
+2: 75,000 roubles, a DVD drive, a magnet, two lamps, Generator 1, an hour of
+building, and the area needs the generator actually burning fuel before
+`CanPlayGame` goes true. That locks a new profile out of the mod entirely. The
+disc route remains a possible second entrance for players who have the area,
+rather than the front door.
 
-**The panel floats over the hideout** rather than taking the screen over: the room
-stays visible and dimmed behind it, so playing reads as something done in the
-hideout rather than a menu opened from anywhere. That is the same reasoning that
-removed the hotkey.
+It is *not* a new hideout area either. `EFT.EAreaType` ends at
+`CircleOfCultists = 27`, and every area has a baked prefab; a new value has no
+model and the client does not know it exists.
 
-This makes one thing a hard requirement rather than a nicety: **the interaction has
-to free the cursor and swallow player input while the panel is open**, or clicks
-and movement keys leak through to the character behind it. If that turns out to be
-impractical, the fallback is a fullscreen takeover, which matches how EFT presents
-its other hideout area screens.
+There is no hotkey. A key would be reachable from anywhere, including a raid. The
+menu button is the only way in, and it still checks rather than assuming.
 
-Two smaller decisions from the same pass: the lifetime record is a **tab in the
-panel header**, not a second interaction on the table; and **Leave table** sits
-beside Deal as well as the corner close, so a player who reconsiders on seeing
-their balance does not have to hunt for the exit.
+### Fitting alongside other menu mods
 
-### Panel design
+The button is a clone of one of the menu's own, installed at the end of the frame
+rather than immediately. That is the whole integration story.
 
-Approved mockups:
+MoxoPixel's Menu Overhaul restyles the main menu from a hardcoded list of five
+buttons, hiding each background, activating its icon and nudging it sideways by a
+per-button offset from its own config. A sixth button cannot be in that list and
+cannot ask to be added. Waiting a frame means the button being copied has already
+been restyled, so the copy inherits all of it. Nothing here names that mod or
+depends on it: anything that restyles the hideout button is inherited for free.
 
-- Panel states, including the record view:
-  <https://claude.ai/code/artifact/99573205-77e3-4c7e-860d-d4a10e713fb3>
-- The first frame on opening the table:
-  <https://claude.ai/code/artifact/f5f210b0-1748-4b56-a766-da4f4fcf0ad6>
+Two details that took a while to find:
 
-It renders from objects shaped like `RoundView`, so the layout is already checked
-against the payload the server sends rather than an imagined one. Three things it
-pins down that the plugin must preserve:
+- `DefaultUIButton` is **not** backed by a `UnityEngine.UI.Button`. It descends
+  from `ButtonFeedback`, which implements `IPointerClickHandler` itself and
+  exposes a plain `UnityEvent` field called `OnClick`. Looking for a Button
+  component finds nothing, and the button appears, looks right and does nothing.
+- Positions must be compared in **world space**. The exit entry is a group with
+  the button nested inside it, so its `anchoredPosition` is measured against that
+  group rather than the menu; comparing them as siblings puts the new button on
+  top of EXIT.
 
-- The dealer shows one card plus a drawn face-down back, and reads `10+` rather
-  than a total. The hole card is not received, so it cannot be rendered.
-- Buttons are enabled from `availableActions`. The client holds no rules.
-- The active-hand outline follows `activeHandIndex`, and only appears once a split
-  has created a second hand.
+### The table
 
-The currency selector stays with the bet controls and disappears once a round
-starts, because the wager locks the currency in for that round.
+Its own canvas over a dimmed backdrop, fading in and out. The cloth carries the
+dealer and the player's hands; the betting bar and buttons sit beneath the table
+rather than on it, because the table art is an oval and an oval has far less
+usable room than the rectangle around it -- measured, 1230 by 654, narrowing to
+58% of the width near the bottom edge.
 
-Still undecided: whether the result reads in the strip above the buttons or as an
-overlay across the felt.
+Everything below the cloth is laid out by stacks rather than by arithmetic. Every
+overlap during development came from positioning siblings by hand at heights that
+were each individually plausible.
+
+- The dealer shows one card and a drawn back, and reads `10 + ?` rather than a
+  total. The hole card is not in the response until the hand ends, so the client
+  could not reveal it if it wanted to.
+- Buttons come from `availableActions`, rendered in a fixed order so Hit and
+  Stand do not move when the legal set changes. The client holds no rules.
+- LEAVE TABLE and STATS disappear while a hand is live. The stake is gone and the
+  round is still owed.
+- Escape closes, in the order things are stacked: the all-in question, then the
+  stats sheet, then the table.
+
+Card art is loaded from PNGs beside the plugin, one per card, named for the code
+the server sends. Without them the client draws cards instead -- rounded face,
+rank in opposite corners, suit through the middle -- and it still draws the back
+either way, since the card set has none. Suits are shapes generated in code:
+EFT's UI font has no `♠♥♦♣` in it, so spelling them put a giant C on every club.
 
 ## What can be staked
 
@@ -150,6 +180,21 @@ separately in the stats either way.
 Bet limits live in `WalletInfo`, not `Rules`. The engine has no concept of a
 currency -- it takes an int -- so `TableStore` builds tables with deliberately wide
 engine limits and the per-wallet ones govern.
+
+**The maximum is the house's real protection**, and not for the reason it looks
+like. These rules -- six decks, dealer stands on soft 17, 3:2 naturals -- are
+about a 0.45% edge, which is invisible across a session. What stops a player
+compounding is being unable to cover a losing streak by doubling up, and a ceiling
+of five hundred times the minimum caps that at nine doubles. Tightening the rules
+instead barely helps: dealer hitting soft 17 is worth 0.22%, and even 6:5 naturals
+only reach about 1.9%, which an unbounded bet walks straight through.
+
+It can be turned off, in the BepInEx menu under **Table**. The client sends
+`IgnoreMaximum` and the server takes it at its word: this is single player, the
+person sending the request owns the server receiving it, and nothing is being
+defended against. The setting lives in F12 rather than a JSON file because that is
+where someone will look for it. The **minimum is not waivable** -- a bet of
+nothing is not a bet.
 
 ## Winning a hand
 
@@ -223,8 +268,22 @@ one, that the money the service moved equals the profit the engine reported.
 The suite was mutation-checked: collecting the full stake instead of the increase,
 and paying out on losing hands, each fail 7 tests.
 
-What remains unverified without a server: `Bank`'s own `InventoryHelper` calls, and
-whether `scripts/smoke.ps1` resolves the session correctly.
+Both of the things this could not reach have since been checked against a real
+4.1.3 server: `Bank`'s own `InventoryHelper` calls move money correctly, and
+`scripts/smoke.ps1` resolves the session and plays a hand over HTTP.
+
+Neither was clean first time, and the bugs are worth knowing because none were
+reachable from the tests:
+
+- `new ItemEventRouterResponse()` initialises nothing, and `RemoveItemByCount`
+  reaches into `output.ProfileChanges[sessionId]`. It threw **after** taking the
+  items, so the mod reported "not enough roubles" while the stake had left the
+  stash. Responses must come from `EventOutputHolder.GetOutput`.
+- SPT matches request properties **case-sensitively**. Lowercase JSON binds
+  nothing and every field takes its default.
+- Enums cross the wire as integers unless a `[JsonConverter]` sits on the
+  *property*. `options.Converters` outranks a type-level attribute, and SPT
+  registers `EftEnumConverterFactory` into it.
 
 ## Engine
 
@@ -286,13 +345,31 @@ Both transports call the same `BlackjackService`.
 ## Build and verify
 
 ```
-dotnet build                              # everything
-dotnet test                               # 69 tests, no SPT needed
+dotnet test                                    # 110 tests, no SPT needed
 dotnet run --project tools/Blackjack.Console   # play a hand in the terminal
+
+dotnet build src/Blackjack.Server/Blackjack.Server.csproj -c Release
+dotnet build src/Blackjack.Client/Blackjack.Client.csproj -c Release -p:SPTPath="H:\SPT4.1.X"
 ```
 
-The server mod output goes to `bin/<Config>/Blackjack.Server/`; copy that folder
-into `<game>/SPT/user/mods/`. Then, with the server running:
+The client must be built against the install it will run on: 4.1.3's
+`PluginValidator` reads a plugin's references to `spt-*` and requires the
+major.minor to match.
+
+Releases:
+
+```
+python tools/build-installer.py       # builds both halves, stages payload.zip
+python tools/build-zip.py             # the same payload as a plain archive
+dotnet publish tools/Blackjack.Installer/Blackjack.Installer.csproj -c Release -o dist-installer
+```
+
+The server mod goes to `SPT_Runtime/user/mods/Blackjack/` and the plugin to
+`BepInEx/plugins/Blackjack/`. Note `SPT_Runtime`, not `SPT` -- 4.0 used the
+latter, and an archive laid out for it extracts one level too high and is never
+scanned, which looks exactly like the mod failing to load.
+
+Then, with the server running:
 
 ```
 scripts\smoke.ps1 -SessionId <your-profile-id>
