@@ -8,7 +8,7 @@ namespace Blackjack.Server;
 /// </summary>
 public record ModMetadata : IModMetadata
 {
-    public string ModGuid { get; init; } = "com.joelhauser.blackjack";
+    public string ModGuid { get; init; } = "com.mybutthasarash.blackjack";
     public string Name { get; init; } = "Blackjack";
     public string Author { get; init; } = "JoelHauser";
     public List<string>? Contributors { get; init; }

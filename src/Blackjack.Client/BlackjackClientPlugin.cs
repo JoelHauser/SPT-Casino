@@ -17,7 +17,12 @@ namespace Blackjack.Client
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
     public class BlackjackClientPlugin : BaseUnityPlugin
     {
-        public const string PluginGuid = "com.joelhauser.blackjack.client";
+        // Deliberately identical to the server mod's ModGuid, and with no ".client"
+        // on the end. The Forge checks that both halves declare the GUID the mod is
+        // registered under, and rejects an upload where they differ. BepInEx keeps
+        // its own plugin registry and SPT's mod GUID lives in the server metadata,
+        // so the two identifiers never meet and there is nothing to collide with.
+        public const string PluginGuid = "com.mybutthasarash.blackjack";
         public const string PluginName = "Blackjack";
         public const string PluginVersion = "1.0.0";
 
