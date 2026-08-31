@@ -1,6 +1,7 @@
 # Blackjack 1.0.2
 
-One bug, reported from play: **ALL IN did not work.**
+One bug reported from play -- **ALL IN did not work** -- and the bet box now
+reads in thousands.
 
 ## What was wrong
 
@@ -41,6 +42,21 @@ ALL IN look broken. It is still clickable, so the refusal can explain itself.
 
 **Also:** ALL IN now says so when your balance is under the table *minimum*, rather
 than filling in an amount that cannot be bet.
+
+## The bet box has separators
+
+Typing a bet gave you `100000`, which you had to count to read. It gives you
+`100,000` now, formatted as you type rather than when you finish.
+
+Everywhere else already read this way -- the balance in the corner, the stake
+under each hand, the stats -- so the one number you actually enter was the one
+you had to count.
+
+Nothing to learn: type digits and the separators appear where they belong, and
+the caret stays where you put it, so you can still click into the middle of a
+number and edit it. Pasting `1,000,000` works -- it is stripped to digits and
+reformatted, so it cannot end up disagreeing with the bet that gets sent. The
+box takes digits only, as before; the separators are put in for you.
 
 ## Updating
 

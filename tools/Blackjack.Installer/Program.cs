@@ -15,7 +15,7 @@ namespace Blackjack.Installer;
 /// </summary>
 internal static class Program
 {
-    private const string Version = "1.0.3";
+    private const string Version = "1.0.2";
 
     private static int Main(string[] args)
     {
