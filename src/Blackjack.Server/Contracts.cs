@@ -137,3 +137,10 @@ public record BlackjackPlayAction : BaseInteractionRequestData
 {
     public string Move { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Carries nothing, because it asks for nothing. The client sends this when it
+/// needs the profile changes the server has been holding for it, and the reply
+/// carries them by virtue of being an item-event reply at all.
+/// </summary>
+public record BlackjackSyncAction : BaseInteractionRequestData;

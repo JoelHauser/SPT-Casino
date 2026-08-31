@@ -1,4 +1,4 @@
-using SPTarkov.DI.Annotations;
+﻿using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.ItemEvent;
 
@@ -46,6 +46,20 @@ public class BlackjackItemEventCallbacks(BlackjackService service, BlackjackLog 
             output);
 
         return Attach(output, result);
+    }
+
+    /// <summary>
+    /// Touches nothing and returns the response as it stands.
+    ///
+    /// The point is the reply, not the request. SPT accumulates the profile changes a
+    /// session has pending and hands them over on its next item-event response, so an
+    /// event that does nothing at all is enough to get the client's inventory caught
+    /// up with money the table has already moved through its own routes.
+    /// </summary>
+    public ItemEventRouterResponse Sync(MongoId sessionId, ItemEventRouterResponse output)
+    {
+        log.Detail($"-> event sync [{sessionId}]");
+        return output;
     }
 
     private ItemEventRouterResponse Attach(ItemEventRouterResponse output, BlackjackResponse result)

@@ -1,6 +1,7 @@
-using SPTarkov.DI.Annotations;
+﻿using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
 using SPTarkov.Server.Core.DI.Routing;
+using SPTarkov.Server.Core.Models.Eft.ItemEvent;
 
 namespace Blackjack.Server;
 
@@ -10,6 +11,13 @@ public static class BlackjackActions
     public const string Deal = "BlackjackDeal";
 
     public const string Play = "BlackjackPlay";
+
+    /// <summary>
+    /// Does nothing. Exists so the client has something harmless to send when it
+    /// needs the profile changes SPT has been holding for it -- see
+    /// <see cref="BlackjackItemEventCallbacks.Sync"/>.
+    /// </summary>
+    public const string Sync = "BlackjackSync";
 }
 
 /// <summary>
@@ -36,6 +44,11 @@ public sealed class BlackjackItemEventRouter(BlackjackItemEventCallbacks callbac
             BlackjackActions.Play,
             async (url, pmcData, body, sessionId, output, cancellationToken) =>
                 await callbacks.Play(body, sessionId, output)),
+
+        new ItemRouteAction<BlackjackSyncAction>(
+            BlackjackActions.Sync,
+            (url, pmcData, body, sessionId, output, cancellationToken) =>
+                new ValueTask<ItemEventRouterResponse>(callbacks.Sync(sessionId, output))),
     ])
 {
 }

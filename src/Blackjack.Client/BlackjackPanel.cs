@@ -267,6 +267,10 @@ namespace Blackjack.Client
             {
                 _root.SetActive(false);
             }
+
+            // An abandoned stake is refunded server-side, so closing the table can
+            // itself have moved money.
+            ProfileSync.Request();
         }
 
         // ------------------------------------------------------------------- actions
@@ -300,9 +304,21 @@ namespace Blackjack.Client
             HideStats();
 
             Render(BlackjackApi.Deal(_wallet, _wager));
+
+            // The stake is taken before the first card, so the game is already out of
+            // date by the time the hand is on screen.
+            ProfileSync.Request();
         }
 
-        private static void Act(string action) => Render(BlackjackApi.Act(action));
+        private static void Act(string action)
+        {
+            Render(BlackjackApi.Act(action));
+
+            // Double and Split take more money mid-hand, and standing or busting
+            // settles the round. All of them move items, so all of them need the game
+            // told; sending it on every action is cheaper than working out which.
+            ProfileSync.Request();
+        }
 
         private static void ChooseWallet(string wallet)
         {

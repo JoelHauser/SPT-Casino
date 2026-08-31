@@ -1,9 +1,30 @@
 # Blackjack 1.0.2
 
-Two things about placing a bet: **ALL IN did not work**, and the bet box made you
-count digits.
+**The stash now updates when you win or lose**, ALL IN works, and the bet box
+reads in thousands.
 
-Nothing about the rules, the payouts or the money changed.
+Nothing about the rules or the payouts changed.
+
+## The stash keeps up with the table
+
+Money moved when you won or lost a hand, and the game did not notice. Your stash
+went on showing the roubles you had before the bet, and the balance only caught up
+when you next reloaded.
+
+Nothing was ever lost — the money moved correctly and was saved every time; the
+game just was not told.
+
+It mattered more than a wrong number, though. The game also went on believing in
+stacks that were no longer there, so dragging one in your stash afterwards could
+put this in the server log:
+
+```
+Unable to merge stacks as destination item: ... cannot be found
+```
+
+The table now tells the game to pick up what changed, after every deal, every
+action, and on leaving the table. The stash reads correctly straight away, and
+that error goes with it.
 
 ## ALL IN now means the most the table will take
 
