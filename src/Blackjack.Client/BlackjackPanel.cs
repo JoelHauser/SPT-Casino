@@ -35,9 +35,17 @@ namespace Blackjack.Client
         private static readonly Color Gold = new Color(0.78f, 0.68f, 0.38f, 0.90f);
         private static readonly Color Good = new Color(0.55f, 0.82f, 0.45f, 1f);
         private static readonly Color Bad = new Color(0.92f, 0.42f, 0.36f, 1f);
-        private static readonly Color ChipFace = new Color(0.13f, 0.14f, 0.15f, 0.96f);
-        private static readonly Color ChipEdge = new Color(0.32f, 0.33f, 0.34f, 1f);
-        private static readonly Color ChipOn = new Color(0.62f, 0.50f, 0.14f, 1f);
+        // Buttons are described by two stops and an edge rather than one flat colour,
+        // because a flat rectangle beside a photograph of a table reads as a dialog box
+        // that wandered in from another program.
+        private static readonly Color ChipTop = new Color(0.17f, 0.18f, 0.19f, 0.97f);
+        private static readonly Color ChipBottom = new Color(0.09f, 0.10f, 0.11f, 0.97f);
+        private static readonly Color ChipEdge = new Color(0.30f, 0.28f, 0.24f, 1f);
+
+        // Brass, matching the cup holders and fittings on the table itself.
+        private static readonly Color BrassTop = new Color(0.55f, 0.43f, 0.16f, 1f);
+        private static readonly Color BrassBottom = new Color(0.33f, 0.25f, 0.08f, 1f);
+        private static readonly Color BrassEdge = new Color(0.72f, 0.58f, 0.26f, 1f);
 
         private static GameObject _root;
         private static TMP_FontAsset _font;
@@ -553,7 +561,34 @@ namespace Blackjack.Client
                 return;
             }
 
-            Chip(_actionRow, "DEAL", 200f, Deal);
+            // The only button here that starts a round, so the only one in brass.
+            // Everything else is a choice within a hand that is already running.
+            var deal = Chip(_actionRow, "DEAL", 200f, Deal, primary: true);
+
+            // Greyed when the bet cannot be placed, rather than looking ready and then
+            // refusing. Still clickable, because the refusal explains itself and a
+            // button that silently does nothing is worse than one that answers.
+            var affordable = !Balances.TryGetValue(_wallet, out var held) || (_wager > 0 && _wager <= held);
+            if (affordable)
+            {
+                return;
+            }
+
+            var face = deal.GetComponent<Image>();
+            if (face != null)
+            {
+                face.sprite = Textures.ButtonFace(
+                    8,
+                    new Color(0.13f, 0.12f, 0.11f, 0.96f),
+                    new Color(0.08f, 0.08f, 0.08f, 0.96f),
+                    new Color(0.26f, 0.22f, 0.18f, 1f));
+            }
+
+            var dealLabel = deal.GetComponentInChildren<TextMeshProUGUI>();
+            if (dealLabel != null)
+            {
+                dealLabel.color = new Color(0.50f, 0.48f, 0.46f, 1f);
+            }
         }
 
         private static void Say(string text, Color colour)
@@ -1063,7 +1098,9 @@ namespace Blackjack.Client
 
         private static void BuildBetting(RectTransform parent)
         {
-            var holder = NewBox("Betting", parent, new Color(0f, 0f, 0f, 0.26f), 12, new Color(1f, 1f, 1f, 0.06f), 2);
+            // A warm edge rather than a grey one, so the bar reads as part of the same
+            // furniture as the table above it rather than a dialog parked underneath.
+            var holder = NewBox("Betting", parent, new Color(0.04f, 0.05f, 0.04f, 0.74f), 12, new Color(0.31f, 0.20f, 0.11f, 0.85f), 2);
             SetSize(holder, 1340f, 118f);
             _betControls = holder.gameObject;
 
@@ -1107,7 +1144,11 @@ namespace Blackjack.Client
         /// </summary>
         private static void BuildWagerInput(Transform parent)
         {
-            var frame = NewBox("WagerInput", parent, new Color(0.08f, 0.09f, 0.09f, 1f), 8, ChipEdge, 2);
+            // Recessed rather than raised: the gradient runs the other way, so the field
+            // reads as a slot cut into the bar while the buttons sit proud of it.
+            var frame = NewBox("WagerInput", parent, new Color(0.06f, 0.06f, 0.07f, 1f), 8, ChipEdge, 2);
+            frame.GetComponent<Image>().sprite = Textures.ButtonFace(
+                8, new Color(0.05f, 0.05f, 0.06f, 1f), new Color(0.11f, 0.11f, 0.12f, 1f), ChipEdge);
             SetSize(frame, 340f, 44f);
 
             var viewport = new GameObject("TextArea", typeof(RectTransform), typeof(RectMask2D));
@@ -1186,7 +1227,15 @@ namespace Blackjack.Client
 
                 // Restyled rather than recoloured, so the chosen wallet keeps its hover
                 // and pressed states instead of losing them the moment it is selected.
-                StyleChip(chip, wallet == _wallet ? ChipOn : ChipFace);
+                StyleChip(chip, wallet == _wallet);
+
+                // A lit brass face wants dark text on it; pale text on brass is the one
+                // combination that does not read.
+                var label = chip.GetComponentInChildren<TextMeshProUGUI>();
+                if (label != null)
+                {
+                    label.color = wallet == _wallet ? new Color(0.10f, 0.09f, 0.06f, 1f) : Ink;
+                }
             }
         }
 
@@ -1201,19 +1250,24 @@ namespace Blackjack.Client
             _ => wallet.ToUpperInvariant(),
         };
 
-        private static GameObject Chip(Transform parent, string text, float width, Action onClick)
+        private static GameObject Chip(Transform parent, string text, float width, Action onClick, bool primary = false)
         {
-            var rect = NewBox("Chip_" + text, parent, ChipFace, 8, ChipEdge, 2);
+            var rect = NewBox("Chip_" + text, parent, ChipTop, 8, ChipEdge, 2);
             SetSize(rect, width, 44f);
 
-            var label = Label(rect, text, 21f, Ink, TextAlignmentOptions.Center);
+            // Letter-spaced, which is how a label is engraved onto a control rather
+            // than printed near it.
+            // Dark on brass, pale on steel. Light text on a lit brass face is the one
+            // combination that stops reading, and the wallet chips already do this.
+            var label = Label(rect, text, 19f, primary ? new Color(0.10f, 0.09f, 0.06f, 1f) : Ink, TextAlignmentOptions.Center);
+            label.characterSpacing = 6f;
             Stretch(label.rectTransform);
 
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = rect.GetComponent<Image>();
             button.onClick.AddListener(() => onClick());
 
-            StyleChip(rect.gameObject, ChipFace);
+            StyleChip(rect.gameObject, primary);
 
             return rect.gameObject;
         }
@@ -1231,7 +1285,7 @@ namespace Blackjack.Client
         /// than merely different, and matches the gold already used for the table's own
         /// markings.
         /// </summary>
-        private static void StyleChip(GameObject chip, Color fill)
+        private static void StyleChip(GameObject chip, bool primary)
         {
             var image = chip.GetComponent<Image>();
             var button = chip.GetComponent<Button>();
@@ -1240,9 +1294,16 @@ namespace Blackjack.Client
                 return;
             }
 
-            var normal = Textures.RoundedBox(8, fill, ChipEdge, 2);
-            var hover = Textures.RoundedBox(8, Lift(fill, 0.10f), Gold, 2);
-            var pressed = Textures.RoundedBox(8, Lift(fill, -0.05f), Gold, 2);
+            var top = primary ? BrassTop : ChipTop;
+            var bottom = primary ? BrassBottom : ChipBottom;
+            var edge = primary ? BrassEdge : ChipEdge;
+
+            // Hovering lifts both stops and lights the edge gold; pressing darkens and
+            // flattens them, which reads as the face going in rather than merely
+            // changing colour.
+            var normal = Textures.ButtonFace(8, top, bottom, edge);
+            var hover = Textures.ButtonFace(8, Lift(top, 0.09f), Lift(bottom, 0.07f), Gold);
+            var pressed = Textures.ButtonFace(8, Lift(bottom, 0.02f), Lift(bottom, -0.02f), Gold);
 
             image.sprite = normal;
             image.type = Image.Type.Sliced;

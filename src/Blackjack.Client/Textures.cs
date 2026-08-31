@@ -76,6 +76,85 @@ namespace Blackjack.Client
         }
 
         /// <summary>
+        /// A button face: rounded, with a vertical gradient and a lit top edge.
+        ///
+        /// Flat rectangles were the problem. Beside a photograph of a real table they
+        /// read as a debug panel, because nothing in the world is one flat colour --
+        /// a physical key catches light along its top and loses it underneath. That
+        /// is the whole trick here: two stops, a pale line across the top, a dark one
+        /// along the bottom.
+        ///
+        /// Nine-sliced like the plain box, so the gradient runs the full height at any
+        /// size the button is asked to be.
+        /// </summary>
+        internal static Sprite ButtonFace(int radius, Color top, Color bottom, Color border, int borderWidth = 2)
+        {
+            var key = $"btn:{radius}:{top}:{bottom}:{border}:{borderWidth}";
+            if (Cache.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            var size = radius * 4;
+            var texture = NewTexture(size, size);
+            var pixels = new Color[size * size];
+
+            for (var y = 0; y < size; y++)
+            {
+                // y runs bottom to top in a texture, so the gradient is read upwards.
+                var up = y / (float)(size - 1);
+                var fill = Color.Lerp(bottom, top, up);
+
+                for (var x = 0; x < size; x++)
+                {
+                    var distance = CornerDistance(x, y, size, radius);
+                    var alpha = Mathf.Clamp01(radius - distance + 0.5f);
+                    var colour = fill;
+
+                    if (borderWidth > 0 && distance > radius - borderWidth - 0.5f)
+                    {
+                        colour = border;
+
+                        // A highlight along the top and a shadow along the bottom, so
+                        // the edge itself is lit rather than being one drawn outline.
+                        if (y > size - radius)
+                        {
+                            colour = Color.Lerp(colour, Lighten(border, 0.22f), 0.85f);
+                        }
+                        else if (y < radius)
+                        {
+                            colour = Color.Lerp(colour, Lighten(border, -0.16f), 0.85f);
+                        }
+                    }
+
+                    colour.a *= alpha;
+                    pixels[(y * size) + x] = colour;
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+
+            var sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, size, size),
+                new Vector2(0.5f, 0.5f),
+                100f,
+                0,
+                SpriteMeshType.FullRect,
+                new Vector4(radius, radius, radius, radius));
+
+            Cache[key] = sprite;
+            return sprite;
+        }
+
+        private static Color Lighten(Color colour, float amount) => new Color(
+            Mathf.Clamp01(colour.r + amount),
+            Mathf.Clamp01(colour.g + amount),
+            Mathf.Clamp01(colour.b + amount),
+            colour.a);
+
+        /// <summary>
         /// A soft dark vignette, laid over the felt so the table is lit from the middle
         /// rather than being one flat colour. This is the single cheapest thing that
         /// stops a green rectangle reading as a green rectangle.
