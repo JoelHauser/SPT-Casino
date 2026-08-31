@@ -95,6 +95,13 @@ namespace Blackjack.Client
         private static long _pendingStake;
 
         /// <summary>
+        /// Set while the wager box is being rewritten with its separators, so the
+        /// change notification that rewriting raises does not come back round and
+        /// rewrite it again.
+        /// </summary>
+        private static bool _rewriting;
+
+        /// <summary>
         /// Left, top, right, bottom padding between the table's edge and the cloth it
         /// is safe to put things on, as a fraction of the table's size.
         ///
@@ -754,19 +761,99 @@ namespace Blackjack.Client
 
         private static void SetWagerText()
         {
-            if (_wagerInput != null)
+            if (_wagerInput == null)
             {
-                _wagerInput.SetTextWithoutNotify(_wager.ToString());
+                return;
             }
+
+            _rewriting = true;
+            _wagerInput.SetTextWithoutNotify(_wager.ToString("N0"));
+            _rewriting = false;
         }
 
+        /// <summary>
+        /// Rewrites the box as it is typed in, so a six-figure bet reads as 100,000
+        /// rather than 100000 -- the difference between a number that can be checked
+        /// at a glance and one that has to be counted.
+        ///
+        /// The separators are put in by this, never typed: the field only accepts
+        /// digits, and anything pasted in is stripped down to its digits first. So the
+        /// text and the amount cannot disagree, whatever arrives.
+        /// </summary>
         private static void OnWagerTyped(string typed)
         {
+            if (_rewriting)
+            {
+                return;
+            }
+
+            // Where the caret sits, counted in digits rather than characters. Inserting
+            // a separator to its left shifts every character after it, so a caret kept
+            // by character index walks backwards a place each time the number crosses a
+            // thousand -- which is exactly when someone is still typing.
+            var caret = _wagerInput != null ? _wagerInput.stringPosition : typed.Length;
+            var digitsBefore = DigitsWithin(typed, caret);
+
+            var digits = new string(typed.Where(char.IsDigit).ToArray());
+
             // An empty or half-typed box is not an error worth shouting about; it is
             // simply not a bet yet. Parsed as long, because a stash holds more than an
             // int and refusing to let someone type their own balance would be absurd.
-            _wager = long.TryParse(typed, out var value) && value > 0 ? value : 0;
+            _wager = long.TryParse(digits, out var value) && value > 0 ? value : 0;
+
+            var formatted = digits.Length == 0 ? string.Empty : _wager.ToString("N0");
+
+            if (_wagerInput != null && formatted != typed)
+            {
+                _rewriting = true;
+                _wagerInput.SetTextWithoutNotify(formatted);
+                _wagerInput.stringPosition = AfterDigits(formatted, digitsBefore);
+                _rewriting = false;
+            }
+
             UpdateHeld();
+        }
+
+        /// <summary>How many digits lie in the first <paramref name="count"/> characters.</summary>
+        private static int DigitsWithin(string text, int count)
+        {
+            var seen = 0;
+            var limit = Math.Min(count, text.Length);
+
+            for (var i = 0; i < limit; i++)
+            {
+                if (char.IsDigit(text[i]))
+                {
+                    seen++;
+                }
+            }
+
+            return seen;
+        }
+
+        /// <summary>
+        /// The character index just past the <paramref name="count"/>th digit, which is
+        /// where a caret that was sitting after that many digits belongs once the
+        /// separators have moved.
+        /// </summary>
+        private static int AfterDigits(string text, int count)
+        {
+            if (count <= 0)
+            {
+                return 0;
+            }
+
+            var seen = 0;
+
+            for (var i = 0; i < text.Length; i++)
+            {
+                if (char.IsDigit(text[i]) && ++seen == count)
+                {
+                    return i + 1;
+                }
+            }
+
+            return text.Length;
         }
 
         // ------------------------------------------------------------------ building
@@ -1275,13 +1362,19 @@ namespace Blackjack.Client
             input.textComponent = text;
             input.fontAsset = _font;
             input.pointSize = 22f;
-            input.contentType = TMP_InputField.ContentType.IntegerNumber;
+            // Standard rather than IntegerNumber, because the box holds separators
+            // now and integer validation would refuse to display them. Digits are
+            // enforced by the validator below instead, which does the same job and
+            // leaves the text this can write to it alone.
+            input.contentType = TMP_InputField.ContentType.Standard;
+            input.onValidateInput = (current, index, character) => char.IsDigit(character) ? character : '\0';
 
-            // Long enough for any stash. No cap here on purpose: what counts as a legal
-            // bet is the server's business, not this field's.
-            input.characterLimit = 15;
+            // Long enough for any stash: fifteen digits plus the four separators that
+            // many digits attract. No cap here on purpose -- what counts as a legal bet
+            // is the server's business, not this field's.
+            input.characterLimit = 19;
             input.restoreOriginalTextOnEscape = true;
-            input.text = _wager.ToString();
+            input.text = _wager.ToString("N0");
             input.onValueChanged.AddListener(OnWagerTyped);
 
             // The field is a Selectable too, so it can carry the same states as the
