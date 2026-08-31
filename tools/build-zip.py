@@ -8,7 +8,7 @@ import os, shutil, zipfile
 
 REPO = r'H:\SPTMods\Blackjack'
 PAYLOAD = os.path.join(REPO, r'tools\Blackjack.Installer\payload.zip')
-VERSION = '1.0'
+VERSION = '1.0.1'
 OUT = os.path.join(REPO, 'releases', 'Blackjack_V%s.zip' % VERSION)
 
 README = """Blackjack %s -- for SPT 4.1.x

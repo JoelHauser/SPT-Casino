@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Reflection;
 
 namespace Blackjack.Installer;
@@ -15,7 +15,7 @@ namespace Blackjack.Installer;
 /// </summary>
 internal static class Program
 {
-    private const string Version = "1.0";
+    private const string Version = "1.0.1";
 
     private static int Main(string[] args)
     {

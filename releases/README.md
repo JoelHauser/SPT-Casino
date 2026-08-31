@@ -4,8 +4,9 @@ Packaged builds, laid out so the zip extracts straight into an SPT install.
 
 | Version | Built for | Form | Notes |
 | --- | --- | --- | --- |
-| 1.0 | SPT 4.1.3 | `Blackjack_V1.0.exe` | Installer, 40 MB. Places both halves for you. |
-| 1.0 | SPT 4.1.3 | `Blackjack_V1.0.zip` | The same files, 5 MB. Extract into your SPT folder. |
+| 1.0.1 | SPT 4.1.3 | `Blackjack_V1.0.1.zip` | 5 MB. Extract into your SPT folder. |
+| 1.0.1 | SPT 4.1.3 | `Blackjack_V1.0.1.exe` | Installer, 40 MB. Places both halves for you. |
+| 1.0 | SPT 4.1.3 | removed | Superseded by 1.0.1, which changes only how the controls look. |
 | 0.2.0 | SPT 4.1.3 | removed | Server only, no client plugin. Superseded, and removed so there is no wrong one to pick. |
 | 0.1.0 | SPT 4.1.3 | removed | Wrong layout and three money-path bugs. |
 
