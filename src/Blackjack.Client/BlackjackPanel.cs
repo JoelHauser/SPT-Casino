@@ -1070,7 +1070,7 @@ namespace Blackjack.Client
         private static void BuildBottom(RectTransform parent)
         {
             var stack = NewBox("Bottom", parent, new Color(0f, 0f, 0f, 0f), 0, default, 0);
-            SetSize(stack, 1360f, 254f);
+            SetSize(stack, 900f, 254f);
 
             var column = stack.gameObject.AddComponent<VerticalLayoutGroup>();
             column.childAlignment = TextAnchor.UpperCenter;
@@ -1083,13 +1083,13 @@ namespace Blackjack.Client
             BuildBetting(stack);
 
             _message = Label(stack, "", 20f, Faint, TextAlignmentOptions.Center);
-            SetSize(_message.rectTransform, 1340f, 26f);
+            SetSize(_message.rectTransform, 880f, 26f);
 
             _actionRow = NewRow("Actions", stack, 14f);
-            SetSize(_actionRow, 1340f, 48f);
+            SetSize(_actionRow, 880f, 48f);
 
             var footer = NewRow("Footer", stack, 14f);
-            SetSize(footer, 1340f, 44f);
+            SetSize(footer, 880f, 44f);
 
             _statsButton = Chip(footer, "STATS", 180f, ToggleStats);
 
@@ -1101,7 +1101,11 @@ namespace Blackjack.Client
             // A warm edge rather than a grey one, so the bar reads as part of the same
             // furniture as the table above it rather than a dialog parked underneath.
             var holder = NewBox("Betting", parent, new Color(0.04f, 0.05f, 0.04f, 0.74f), 12, new Color(0.31f, 0.20f, 0.11f, 0.85f), 2);
-            SetSize(holder, 1340f, 118f);
+            // Sized to its contents rather than to the table above it. The rows come
+            // to 832 for the wallets and 852 for the bet; at 1340 the box carried 460
+            // of empty space on either side of them, which is what made it look like a
+            // panel the controls had been dropped into rather than one built for them.
+            SetSize(holder, 880f, 118f);
             _betControls = holder.gameObject;
 
             var column = holder.gameObject.AddComponent<VerticalLayoutGroup>();
@@ -1114,7 +1118,7 @@ namespace Blackjack.Client
             column.childControlHeight = false;
 
             var walletRow = NewRow("Wallets", holder, 8f);
-            SetSize(walletRow, 1300f, 44f);
+            SetSize(walletRow, 832f, 44f);
 
             foreach (var wallet in new[] { "Roubles", "Dollars", "Euros", "GpCoins", "Bitcoin", "LegaMedals" })
             {
@@ -1123,14 +1127,14 @@ namespace Blackjack.Client
             }
 
             var betRow = NewRow("Bet", holder, 12f);
-            SetSize(betRow, 1300f, 46f);
+            SetSize(betRow, 852f, 46f);
 
             SetSize(Label(betRow, "BET", 20f, Faint, TextAlignmentOptions.Right).rectTransform, 56f, 32f);
             BuildWagerInput(betRow);
             Chip(betRow, "ALL IN", 120f, AskBetEverything);
 
             _held = Label(betRow, "", 19f, Faint, TextAlignmentOptions.Left);
-            SetSize(_held.rectTransform, 360f, 32f);
+            SetSize(_held.rectTransform, 300f, 32f);
 
             HighlightWallet();
         }
