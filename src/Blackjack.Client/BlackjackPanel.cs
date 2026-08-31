@@ -71,6 +71,7 @@ namespace Blackjack.Client
         private static TextMeshProUGUI _statsEmpty;
         private static GameObject _confirm;
         private static TextMeshProUGUI _confirmText;
+        private static TextMeshProUGUI _confirmAccept;
 
         private static readonly List<(string Wallet, GameObject Chip)> Wallets = new List<(string, GameObject)>();
 
@@ -80,6 +81,18 @@ namespace Blackjack.Client
         /// sent. The server checks again regardless.
         /// </summary>
         private static readonly Dictionary<string, long> Balances = new Dictionary<string, long>();
+
+        /// <summary>
+        /// What the table will take, per wallet, as the server reports it. Empty until
+        /// the first ping answers, and treated as no ceiling while it is: the server is
+        /// the authority, so a guess here could only refuse a bet it would have taken.
+        /// </summary>
+        private static readonly Dictionary<string, long> Maximums = new Dictionary<string, long>();
+
+        private static readonly Dictionary<string, long> Minimums = new Dictionary<string, long>();
+
+        /// <summary>The amount the confirmation sheet is currently offering to stake.</summary>
+        private static long _pendingStake;
 
         /// <summary>
         /// Left, top, right, bottom padding between the table's edge and the cloth it
@@ -300,8 +313,38 @@ namespace Blackjack.Client
             wallet == "Bitcoin" || wallet == "LegaMedals" || wallet == "GpCoins";
 
         /// <summary>
+        /// The table's ceiling for a wallet, or 0 for none. Zero covers both "the
+        /// server has not said yet" and "the player has switched the ceiling off",
+        /// and the answer in either case is the same: cap nothing here.
+        /// </summary>
+        private static long CeilingFor(string wallet)
+        {
+            if (BlackjackClientPlugin.EnforceTableMaximum?.Value == false)
+            {
+                return 0;
+            }
+
+            return Maximums.TryGetValue(wallet, out var max) && max > 0 ? max : 0;
+        }
+
+        /// <summary>
+        /// The largest bet that would actually be accepted: everything held, unless
+        /// the table takes less than that.
+        /// </summary>
+        private static long MostBettable(string wallet, long held)
+        {
+            var ceiling = CeilingFor(wallet);
+            return ceiling > 0 && held > ceiling ? ceiling : held;
+        }
+
+        /// <summary>
         /// Asks before staking the lot. Every other control here is recoverable; this
         /// one is a single click beside the field the player was already aiming at.
+        ///
+        /// All in means the most the table will take, not the whole balance. A player
+        /// holding 200 GP coins at a table that takes 50 was handed a wager of 200 and
+        /// a refusal when they pressed DEAL, which reads as a button that does not
+        /// work rather than as a house rule.
         /// </summary>
         private static void AskBetEverything()
         {
@@ -311,7 +354,26 @@ namespace Blackjack.Client
                 return;
             }
 
-            _confirmText.text = $"Bet everything?\n\n<size=32>{held:N0}  {Short(_wallet)}</size>";
+            if (Minimums.TryGetValue(_wallet, out var min) && held < min)
+            {
+                Say($"The smallest {Short(_wallet)} bet is {min:N0}, and you have {held:N0}.", Bad);
+                return;
+            }
+
+            _pendingStake = MostBettable(_wallet, held);
+
+            var capped = _pendingStake < held;
+
+            _confirmText.text = capped
+                ? $"Bet the table maximum?\n\n<size=32>{_pendingStake:N0}  {Short(_wallet)}</size>"
+                    + $"\n\n<size=17>you are carrying {held:N0}</size>"
+                : $"Bet everything?\n\n<size=32>{_pendingStake:N0}  {Short(_wallet)}</size>";
+
+            if (_confirmAccept != null)
+            {
+                _confirmAccept.text = capped ? "BET MAXIMUM" : "BET IT ALL";
+            }
+
             _confirm.SetActive(true);
             _confirm.transform.SetAsLastSibling();
         }
@@ -322,9 +384,9 @@ namespace Blackjack.Client
         {
             _confirm.SetActive(false);
 
-            if (Balances.TryGetValue(_wallet, out var held) && held > 0)
+            if (_pendingStake > 0)
             {
-                _wager = held;
+                _wager = _pendingStake;
                 SetWagerText();
                 UpdateHeld();
             }
@@ -568,7 +630,10 @@ namespace Blackjack.Client
             // Greyed when the bet cannot be placed, rather than looking ready and then
             // refusing. Still clickable, because the refusal explains itself and a
             // button that silently does nothing is worse than one that answers.
-            var affordable = !Balances.TryGetValue(_wallet, out var held) || (_wager > 0 && _wager <= held);
+            var ceiling = CeilingFor(_wallet);
+            var withinTable = ceiling <= 0 || _wager <= ceiling;
+            var affordable = withinTable
+                && (!Balances.TryGetValue(_wallet, out var held) || (_wager > 0 && _wager <= held));
             if (affordable)
             {
                 return;
@@ -604,7 +669,11 @@ namespace Blackjack.Client
 
         private static void RefreshBalances()
         {
-            var balances = BlackjackApi.Ping()?["Balances"];
+            // One call, read twice: the limits ride along with the balances, and
+            // asking again would be a second round trip for an answer already in hand.
+            var ping = BlackjackApi.Ping();
+
+            var balances = ping?["Balances"];
             if (balances == null)
             {
                 return;
@@ -616,7 +685,31 @@ namespace Blackjack.Client
                 Balances[entry.Name] = entry.Value.ToObject<long>();
             }
 
+            ReadLimits(ping);
             UpdateHeld();
+        }
+
+        /// <summary>
+        /// The table's limits, as the server reports them. Left alone if the response
+        /// carries none, so an older server answering a newer client leaves the
+        /// ceiling where it belongs -- with the server -- rather than inventing one.
+        /// </summary>
+        private static void ReadLimits(JObject ping)
+        {
+            var limits = ping?["Limits"];
+            if (limits == null)
+            {
+                return;
+            }
+
+            Maximums.Clear();
+            Minimums.Clear();
+
+            foreach (var entry in limits.Children<JProperty>())
+            {
+                Maximums[entry.Name] = entry.Value?["Max"]?.ToObject<long>() ?? 0;
+                Minimums[entry.Name] = entry.Value?["Min"]?.ToObject<long>() ?? 0;
+            }
         }
 
         /// <summary>
@@ -640,6 +733,17 @@ namespace Blackjack.Client
             if (!known)
             {
                 _held.text = "";
+                return;
+            }
+
+            // Two different refusals, and saying which one is the point of the line:
+            // one is fixed by betting less, the other by holding more.
+            var ceiling = CeilingFor(_wallet);
+
+            if (ceiling > 0 && _wager > ceiling)
+            {
+                _held.text = $"the table takes up to {ceiling:N0}";
+                _held.color = Bad;
                 return;
             }
 
@@ -1212,7 +1316,8 @@ namespace Blackjack.Client
             var buttons = NewRow("Buttons", box, 16f);
             Anchor(buttons, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 46f), new Vector2(540f, 46f));
 
-            Chip(buttons, "BET IT ALL", 210f, ConfirmBetEverything);
+            var accept = Chip(buttons, "BET IT ALL", 230f, ConfirmBetEverything);
+            _confirmAccept = accept.GetComponentInChildren<TextMeshProUGUI>();
             Chip(buttons, "CANCEL", 170f, CancelConfirm);
 
             _confirm.SetActive(false);

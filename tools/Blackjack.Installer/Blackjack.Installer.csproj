@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Blackjack.Installer</RootNamespace>
-    <AssemblyName>Blackjack_V1.0.1</AssemblyName>
-    <Version>1.0.1</Version>
+    <AssemblyName>Blackjack_V1.0.2</AssemblyName>
+    <Version>1.0.2</Version>
 
     <!--
       Self-contained, so it runs on a machine with no .NET installed. SPT ships its

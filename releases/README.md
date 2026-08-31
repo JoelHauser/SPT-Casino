@@ -4,21 +4,21 @@ Packaged builds, laid out so the zip extracts straight into an SPT install.
 
 | Version | Built for | Form | Notes |
 | --- | --- | --- | --- |
-| 1.0.1 | SPT 4.1.3 | `Blackjack_V1.0.1.zip` | 5 MB. Extract into your SPT folder. |
-| 1.0.1 | SPT 4.1.3 | `Blackjack_V1.0.1.exe` | Installer, 40 MB. Places both halves for you. |
-| 1.0 | SPT 4.1.3 | removed | Superseded by 1.0.1, which changes only how the controls look. |
+| 1.0.2 | SPT 4.1.3 | `Blackjack_V1.0.2.zip` | 5 MB. Extract into your SPT folder. |
+| 1.0.1 | SPT 4.1.3 | removed | Superseded by 1.0.2, which fixes ALL IN. |
+| 1.0 | SPT 4.1.3 | removed | Superseded by 1.0.1, which changed only how the controls look. |
 | 0.2.0 | SPT 4.1.3 | removed | Server only, no client plugin. Superseded, and removed so there is no wrong one to pick. |
 | 0.1.0 | SPT 4.1.3 | removed | Wrong layout and three money-path bugs. |
 
-Both 1.0 files contain exactly the same mod, built from the same payload by
-`tools/build-installer.py` and `tools/build-zip.py`, so they cannot drift apart.
-Take the zip if you would rather not run an executable; nothing is lost by it.
-
 ## The installer
 
-`Blackjack_V1.0.exe` carries the mod inside it and writes it into an SPT folder.
-Run it, and either point it at the folder or drop it in there first and let it
-find itself.
+No installer ships with 1.0.2. The mod page describes the zip only, and a 40 MB
+executable nobody is pointed at is a stale copy waiting to be found -- so the
+1.0.1 one was removed rather than left beside a newer zip. It remains in git
+history, and `tools/Blackjack.Installer/` still builds.
+
+Built, it carries the mod inside it and writes it into an SPT folder: run it, and
+either point it at the folder or drop it in there first and let it find itself.
 
 It looks for `SPT_Runtime\SPT.Server.exe` before writing anything, and asks
 before proceeding if it cannot find one. Extracting into the wrong folder is the
@@ -27,9 +27,10 @@ failure that looks exactly like the mod not working, so it is worth one question
 It is around 40 MB, which is almost entirely a .NET runtime: SPT ships its own
 rather than installing one system-wide, so assuming a shared runtime is the
 assumption that fails on somebody else's machine. The mod itself is 5 MB of that,
-mostly the table photograph and 52 card faces.
+mostly the table photograph and 52 card faces. That ratio is most of why it is not
+worth shipping.
 
-Rebuild it with:
+Build it with:
 
 ```
 python tools/build-installer.py
@@ -78,7 +79,13 @@ Then stage the five files under `SPT_Runtime/user/mods/Blackjack/` and zip them.
 backslash entries, which extract as one literal filename on Linux. Pack with
 `System.IO.Compression` or Python's `zipfile` instead.
 
-The version lives in **two** places and they must agree:
-`Blackjack.Server.csproj` `<Version>` and `ModMetadata.Version`. `SptVersion` in
-that same record is a hard load gate -- outside its range the server loads nothing
-and logs nothing.
+The version lives in **seven** places and they must all agree: both csprojs'
+`<Version>`, `BlackjackClientPlugin.PluginVersion`, `ModMetadata.Version`, the
+installer's `<AssemblyName>` and `<Version>`, its `Program.Version` banner, and
+`VERSION` in `tools/build-zip.py`. `SptVersion` in `ModMetadata` is a hard load
+gate -- outside its range the server loads nothing and logs nothing.
+
+**Bump the version before building, not after.** `build-zip.py` copies a payload
+staged by `build-installer.py`; bumping in between packages the previous build's
+binaries under the new name, and the zip then disagrees with itself. Read the
+version back out of the packaged DLLs rather than trusting the filename.

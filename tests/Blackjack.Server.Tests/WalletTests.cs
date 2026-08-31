@@ -39,6 +39,39 @@ public class WalletTests
         }
     }
 
+    /// <summary>
+    /// The ping carries the table's limits as well as the player's money, because the
+    /// client has to be able to offer a legal bet rather than one the table is about
+    /// to refuse -- an ALL IN of 200 GP coins at a table that takes 50 reads as a
+    /// broken button, not as a rule.
+    ///
+    /// The limits are the house's, so they are reported whether or not the session
+    /// resolved to a profile.
+    /// </summary>
+    [Fact]
+    public void ThePingReportsWhatTheTableWillTake()
+    {
+        var service = WithDeal("KS KH 9D 7C");
+
+        foreach (var known in new[] { true, false })
+        {
+            _profiles.Exists = known;
+
+            var ping = service.Ping(_session);
+
+            Assert.Equal(Enum.GetValues<Wallet>().Length, ping.Limits.Count);
+
+            foreach (var wallet in Enum.GetValues<Wallet>())
+            {
+                var info = WalletInfo.For(wallet);
+                var limits = ping.Limits[wallet.ToString()];
+
+                Assert.Equal(info.MinBet, limits.Min);
+                Assert.Equal(info.MaxBet, limits.Max);
+            }
+        }
+    }
+
     [Fact]
     public void CurrencyAndValuablesAreSeparateSets()
     {

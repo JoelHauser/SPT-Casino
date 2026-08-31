@@ -24,7 +24,7 @@ namespace Blackjack.Client
         // so the two identifiers never meet and there is nothing to collide with.
         public const string PluginGuid = "com.mybutthasarash.blackjack";
         public const string PluginName = "Blackjack";
-        public const string PluginVersion = "1.0.1";
+        public const string PluginVersion = "1.0.2";
 
         internal static ManualLogSource Log;
 

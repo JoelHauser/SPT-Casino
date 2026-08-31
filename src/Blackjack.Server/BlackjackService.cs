@@ -189,6 +189,13 @@ public class BlackjackService(
             Balances = known
                 ? Enum.GetValues<Wallet>().ToDictionary(w => w.ToString(), w => bank.GetBalance(sessionId, w))
                 : [],
+
+            // Not gated on the profile: the limits belong to the table, not to the
+            // player, and a client that cannot read them has no way to keep a bet
+            // legal before sending it.
+            Limits = WalletInfo.All.ToDictionary(
+                w => w.Wallet.ToString(),
+                w => new BetLimits { Min = w.MinBet, Max = w.MaxBet }),
         };
     }
 

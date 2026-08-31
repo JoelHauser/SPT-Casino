@@ -11,7 +11,7 @@
     <AssemblyName>Blackjack.Client</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
 
     <!-- Everything below is referenced straight out of an install. -->
     <SPTPath Condition="'$(SPTPath)' == ''">H:\SPT4.1.X</SPTPath>

@@ -52,6 +52,25 @@ public record PingResponse
     public bool HasProfile { get; init; }
 
     public Dictionary<string, int> Balances { get; init; } = [];
+
+    /// <summary>
+    /// What each wallet will take in a hand. Sent with the balances because the
+    /// client has to be able to offer a legal bet: without these it can only offer
+    /// the whole balance and let the table refuse it, which reads as a broken button
+    /// rather than as a rule.
+    /// </summary>
+    public Dictionary<string, BetLimits> Limits { get; init; } = [];
+}
+
+/// <summary>
+/// The table's ceiling and floor for one wallet. The player's own holdings are not
+/// part of this -- these are the house's rules and are the same for everyone.
+/// </summary>
+public record BetLimits
+{
+    public int Min { get; init; }
+
+    public int Max { get; init; }
 }
 
 /// <summary>
