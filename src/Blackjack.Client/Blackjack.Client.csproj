@@ -11,7 +11,7 @@
     <AssemblyName>Blackjack.Client</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
 
     <!--
       Everything below is referenced straight out of an install, and which install
