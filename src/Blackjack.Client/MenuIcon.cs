@@ -64,6 +64,11 @@ namespace Blackjack.Client
             {
                 var rect = icon.rectTransform;
 
+                // The footprint the icon we are replacing occupies, read before the
+                // swap. See Pin: the sprite going in is a different size and a layout
+                // group will believe it.
+                var was = rect.rect.size;
+
                 // Whatever the borrowed icon was, it may have been rotated or mirrored
                 // to suit its own artwork, and a spade inherits that and comes out
                 // upside down. Reported as well as reset, because a rotation here is
@@ -85,7 +90,56 @@ namespace Blackjack.Client
                 icon.color = Color.white;
                 icon.sprite = pip;
                 icon.preserveAspect = true;
+
+                Pin(icon, was);
             }
+        }
+
+        /// <summary>
+        /// Holds the icon to the footprint of the one it replaced.
+        ///
+        /// **An Image reports its sprite's native size as its layout-preferred size**,
+        /// and a layout group believes it. The pip is drawn 160 pixels square against a
+        /// canvas at 100 reference pixels per unit, so it asks for 160 units where the
+        /// hideout's own icon asked for 25 -- and both of this mod's entrances were
+        /// misshapen by that one number, in ways that looked unrelated:
+        ///
+        /// - The task-bar tab came out **230 wide against the game's 112**, which read as
+        ///   a font or padding fault and cost a round of fixes aimed at both. The label
+        ///   was innocent throughout: 16pt on the template and 16pt on ours, and ours the
+        ///   narrower of the two. It took logging the widths to say so.
+        /// - The menu button's icon **blew up on hover**, when whatever the hover state
+        ///   dirties let the Image have the width it had been asking for all along. A
+        ///   diamond magnified sixfold and cropped to its middle is a band rather than a
+        ///   rhombus, which is why the icon looked pulled apart.
+        ///
+        /// Pinned both ways because the two entrances are laid out differently: a
+        /// LayoutElement for the parent that measures, an explicit size for the one that
+        /// does not. A footprint that has not been laid out yet is left alone -- pinning
+        /// zero would hide the icon rather than size it.
+        /// </summary>
+        private static void Pin(Image icon, Vector2 was)
+        {
+            if (was.x <= 1f || was.y <= 1f)
+            {
+                return;
+            }
+
+            var hold = icon.GetComponent<LayoutElement>();
+            if (hold == null)
+            {
+                hold = icon.gameObject.AddComponent<LayoutElement>();
+            }
+
+            hold.preferredWidth = was.x;
+            hold.preferredHeight = was.y;
+
+            // SetSizeWithCurrentAnchors rather than sizeDelta, which does not mean a size
+            // at all on a rect that stretches with its parent -- and an icon anchored
+            // that way would be inflated by the padding rather than pinned.
+            var rect = icon.rectTransform;
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, was.x);
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, was.y);
         }
 
         /// <summary>

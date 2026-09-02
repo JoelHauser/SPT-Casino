@@ -190,26 +190,36 @@ on the right -- and every one of these was a guess before it was checked.
   `SetButtonsInteractable`), which a grafted-on tab is not in. Mirroring a neighbour's
   `interactable` is how ours dims and stops answering at the same moments as the rest.
 
-### A cloned tab does not automatically look like the tabs beside it
+### The pip is 160 units wide, and that one number broke both entrances
 
 Seen at last on a real screen, with Poker installed alongside: **both mods' tabs were
-visibly wider than the game's own, and set in type nothing else on the bar used.** The
-same three faults in each, because Poker's tab is a port of this one. Each is invisible
-alone; it took two of them side by side to notice.
+about twice the width of the game's own**, and the menu button's icon pulled apart into
+two shapes on hover. One cause, wearing two disguises.
 
-- **TMP auto-sizing rescales the letters rather than the box.** The borrowed label is
-  set up to fill the rect its old name needed, so given a different word it grows or
-  shrinks the *type* until it fits again. Copy the template's `fontSize` and switch
-  `enableAutoSizing` off -- there is no other way for the two to match.
-- **The size was only ever allowed to grow.** `Relabel` widened a tab whose name no
-  longer fitted and did nothing when it fitted with room to spare, so the tab kept the
-  width of whatever it was cloned from. Both directions.
-- **The chrome was counted twice.** Padding measured from the whole tab, then added to
-  a `LayoutElement` already sitting inside that padding, which pushes the label away
-  from the icon. Measure it on the template -- its tab width less its own label width
-  -- so the number means the same thing on both sides.
+**An `Image` reports its sprite's native size as its layout-preferred size, and a
+layout group believes it.** `Textures.Suit` draws 160 pixels square, and the canvas is
+at 100 reference pixels per unit, so the pip asks for **160 units where the hideout's
+own icon asked for 25**. The tab measured 230 wide against the game's 112; on the menu
+button the icon was normal until the hover state dirtied the layout and let the Image
+have the width it had been asking for all along, and a diamond magnified sixfold and
+cropped to its middle is a band rather than a rhombus.
 
-And one that is not about size: **an `Animator` is a `Behaviour`, not a
+`MenuIcon.Pin` holds the icon to the footprint of the one it replaced -- read off the
+rect *before* the swap -- with a `LayoutElement` for the parent that measures and
+`SetSizeWithCurrentAnchors` for the one that does not. Not `sizeDelta`: on a rect that
+stretches with its parent that is not a size at all.
+
+**The label was innocent, and this is the reason to distrust a plausible story.** A tab
+twice the width of its neighbours points straight at text fitting, and three real
+faults were duly found in `Relabel` -- auto-sizing rescaling the letters rather than
+the box, growth allowed in one direction only, chrome counted twice. All three are
+worth fixing and **none of them was happening**: the template's label measured 16pt at
+64.6 wide and the clone's 16pt at 48.3, so the clone's label was the *narrower*. They
+are kept as defence and the comment on `Relabel` says so. What settled it was Poker
+logging the two tabs' geometry side by side; one line reading `Icon w=25` against
+`Icon w=160` ended the argument.
+
+Separately, and not about size: **an `Animator` is a `Behaviour`, not a
 `MonoBehaviour`.** `Neuter` sweeps `GetComponentsInChildren<MonoBehaviour>` and so
 never saw the one the tab clones, which then went on animating a tab whose toggle no
 longer drove it. Frozen instead -- `Instantiate` copied the template's current values
@@ -469,13 +479,14 @@ the server half, deliberately, because so much of it has still only run once.
 **Update this section as work completes.**
 
 - Working branch **`test`**, level with `main`.
-- **1.1.0 is the current build**: `releases/Blackjack_V1.1.0.zip`, both halves in one
-  zip.
+- **1.1.1 is the current build**: `releases/Blackjack_V1.1.1.zip`, both halves in one
+  zip. It is 1.1.0 plus the tab and icon sizing below, and it is **a test build --
+  installed and not yet looked at.** 1.1.0 is the last one anybody else has.
 - **The task-bar tab has now been seen**, on the home box with Poker installed
-  alongside, and it came out the wrong size -- wider than the game's own tabs and set
-  in rescaled type. Fixed, built and deployed to `H:\SPT4.1.X`; **the fix itself has
-  not been seen, and no zip has been cut for it.** See "A cloned tab does not
-  automatically look like the tabs beside it".
+  alongside, and it came out about twice the width of the game's own tabs -- the pip
+  sizing itself from its own sprite. The same number made the menu button's icon pull
+  apart on hover. Fixed, built and deployed to `H:\SPT4.1.X`; **the fix itself has not
+  been seen.** See "The pip is 160 units wide".
 - Server mod is feature-complete: rules, six wallets, money, stats, escrow, logging,
   both transports. **111 tests green** (52 engine, 59 money).
 - Client plugin exists and works: the panel, the table art, the card faces, the
@@ -500,10 +511,10 @@ exercised by betting until some are added.
 
 - ~~**The task-bar tab compiles but has never run.**~~ It runs, and BLACKJACK is on
   the bar beside MAIN MENU and HIDEOUT with Poker's tab next to it. What that first
-  sighting found was three sizing faults, now fixed -- see "A cloned tab does not
-  automatically look like the tabs beside it". **The fix has been deployed to
-  `H:\SPT4.1.X` and not yet looked at**, and no release zip has been cut for it, so
-  1.1.0 as shipped still has the oversized tab.
+  sighting found was the icon sizing itself from its own sprite -- see "The pip is 160
+  units wide". **Fixed, packed as 1.1.1 and not yet looked at.** 1.1.0 is what anybody
+  else has, and it still has the oversized tab; whether 1.1.1 goes out is a separate
+  decision from having built it.
 - **The tab closes the table when a raid starts.** The panel's canvas is
   `DontDestroyOnLoad`, so nothing else would. It matters most in co-op, where the raid
   is started by the host and a player can be pulled out of the lobby with the table

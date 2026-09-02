@@ -12,7 +12,7 @@ public record ModMetadata : IModMetadata
     public string Name { get; init; } = "Blackjack";
     public string Author { get; init; } = "JoelHauser";
     public List<string>? Contributors { get; init; }
-    public SemanticVersioning.Version Version { get; init; } = new("1.1.0");
+    public SemanticVersioning.Version Version { get; init; } = new("1.1.1");
 
     // Targets SPT 4.1.3. "~4.1.3" is >=4.1.3 <4.2.0, so it also covers later 4.1
     // patches. This is a hard gate -- the server refuses to load a mod whose range
