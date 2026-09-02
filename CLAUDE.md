@@ -190,6 +190,38 @@ on the right -- and every one of these was a guess before it was checked.
   `SetButtonsInteractable`), which a grafted-on tab is not in. Mirroring a neighbour's
   `interactable` is how ours dims and stops answering at the same moments as the rest.
 
+### A cloned tab does not automatically look like the tabs beside it
+
+Seen at last on a real screen, with Poker installed alongside: **both mods' tabs were
+visibly wider than the game's own, and set in type nothing else on the bar used.** The
+same three faults in each, because Poker's tab is a port of this one. Each is invisible
+alone; it took two of them side by side to notice.
+
+- **TMP auto-sizing rescales the letters rather than the box.** The borrowed label is
+  set up to fill the rect its old name needed, so given a different word it grows or
+  shrinks the *type* until it fits again. Copy the template's `fontSize` and switch
+  `enableAutoSizing` off -- there is no other way for the two to match.
+- **The size was only ever allowed to grow.** `Relabel` widened a tab whose name no
+  longer fitted and did nothing when it fitted with room to spare, so the tab kept the
+  width of whatever it was cloned from. Both directions.
+- **The chrome was counted twice.** Padding measured from the whole tab, then added to
+  a `LayoutElement` already sitting inside that padding, which pushes the label away
+  from the icon. Measure it on the template -- its tab width less its own label width
+  -- so the number means the same thing on both sides.
+
+And one that is not about size: **an `Animator` is a `Behaviour`, not a
+`MonoBehaviour`.** `Neuter` sweeps `GetComponentsInChildren<MonoBehaviour>` and so
+never saw the one the tab clones, which then went on animating a tab whose toggle no
+longer drove it. Frozen instead -- `Instantiate` copied the template's current values
+and the template is picked unselected, so freezing keeps exactly the resting look.
+
+**The menu button is a separate story and it is left alone deliberately.** It still
+creeps a row per menu when another mod places itself the same way, which is this
+file's long-standing open item -- but Poker now measures only the buttons `MenuScreen`
+declares as its own and holds the row directly under EXIT, so ours settles one row
+under it and stays put. If both mods claimed the row under EXIT they would land on top
+of each other, so the fix is not symmetrical and should not be ported.
+
 ## Things that will bite you
 
 Each of these cost real time. None are hypothetical.
@@ -438,7 +470,12 @@ the server half, deliberately, because so much of it has still only run once.
 
 - Working branch **`test`**, level with `main`.
 - **1.1.0 is the current build**: `releases/Blackjack_V1.1.0.zip`, both halves in one
-  zip. Its one new feature -- the task-bar tab -- has never been seen running.
+  zip.
+- **The task-bar tab has now been seen**, on the home box with Poker installed
+  alongside, and it came out the wrong size -- wider than the game's own tabs and set
+  in rescaled type. Fixed, built and deployed to `H:\SPT4.1.X`; **the fix itself has
+  not been seen, and no zip has been cut for it.** See "A cloned tab does not
+  automatically look like the tabs beside it".
 - Server mod is feature-complete: rules, six wallets, money, stats, escrow, logging,
   both transports. **111 tests green** (52 engine, 59 money).
 - Client plugin exists and works: the panel, the table art, the card faces, the
@@ -447,7 +484,7 @@ the server half, deliberately, because so much of it has still only run once.
   profile in both directions, including doubles and splits, each landing on the exact
   expected balance with escrow empty afterwards.
 - **Untested still:** valuables (bitcoin and Lega are at zero in the test profile),
-  the full-stash shortfall-to-mail path, a restart mid-round, and the task-bar tab.
+  the full-stash shortfall-to-mail path, a restart mid-round, and the tab-sizing fix.
 
 ### Testing on Joel's box
 
@@ -461,12 +498,12 @@ exercised by betting until some are added.
 
 ### Open items
 
-- **The task-bar tab compiles but has never run.** `TaskBarTab.cs` adds BLACKJACK to
-  the row along the bottom of the menu, so the table opens from the hideout or the flea
-  market and not just the main menu. Every type it names was checked against
-  `C:\HUH` -- see "The task bar, as it actually is" -- and it builds clean, but no
-  frame of it has been drawn. It logs the tabs it found and the components it switched
-  off on the first install; that log is the verification.
+- ~~**The task-bar tab compiles but has never run.**~~ It runs, and BLACKJACK is on
+  the bar beside MAIN MENU and HIDEOUT with Poker's tab next to it. What that first
+  sighting found was three sizing faults, now fixed -- see "A cloned tab does not
+  automatically look like the tabs beside it". **The fix has been deployed to
+  `H:\SPT4.1.X` and not yet looked at**, and no release zip has been cut for it, so
+  1.1.0 as shipped still has the oversized tab.
 - **The tab closes the table when a raid starts.** The panel's canvas is
   `DontDestroyOnLoad`, so nothing else would. It matters most in co-op, where the raid
   is started by the host and a player can be pulled out of the lobby with the table

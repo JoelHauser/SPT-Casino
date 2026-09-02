@@ -257,7 +257,7 @@ namespace Blackjack.Client
 
             Neuter(clone);
             Silence(bar, from, clone.transform);
-            Relabel(clone, "BLACKJACK");
+            Relabel(clone, from, "BLACKJACK");
             MenuIcon.Diamond(clone.transform);
             Hover(clone);
 
@@ -462,6 +462,22 @@ namespace Blackjack.Client
         {
             var stopped = new List<string>();
 
+            // An Animator is a Behaviour and not a MonoBehaviour, so the loop below never
+            // saw it and it went on running on a tab whose toggle no longer drives it.
+            // What it animates on this bar is the tab's own look -- and on a copy with
+            // nothing telling it which state to be in, it settles wherever its default
+            // state puts it rather than where an unselected tab sits. Frozen instead:
+            // Instantiate copied the template's current values, and the template is
+            // picked unselected, so freezing keeps exactly the resting look. The hover
+            // highlight below is what gives the tab its feedback back.
+            foreach (var animator in clone.GetComponentsInChildren<Animator>(true))
+            {
+                if (animator != null)
+                {
+                    animator.enabled = false;
+                }
+            }
+
             foreach (var component in clone.GetComponentsInChildren<MonoBehaviour>(true))
             {
                 if (component == null)
@@ -639,23 +655,48 @@ namespace Blackjack.Client
         }
 
         /// <summary>
-        /// Renames the tab, and widens it if the name no longer fits.
+        /// Renames the tab and sizes it to the name, so BLACKJACK takes a BLACKJACK-sized
+        /// slot on the bar rather than the slot of whatever it was cloned from.
         ///
         /// The label is driven by a LocalizedText that <see cref="Neuter"/> has already
-        /// switched off, which is what stops the text reverting to HANDBOOK the next time
+        /// switched off, which is what stops the text reverting to HIDEOUT the next time
         /// the bar is shown or the language is changed.
         ///
-        /// BLACKJACK is longer than most of what is up there. A bar that sizes its tabs
-        /// from their contents needs only the width hint corrected; one that does not
-        /// needs the tab itself made wider, or the label runs out past its own background
-        /// and over the neighbour.
+        /// **Three separate things made the tab the wrong size**, and they are worth
+        /// naming because each is invisible alone and obvious together. Poker is what
+        /// made them visible: two mod tabs side by side, both wider than the game's own
+        /// and both set in type nothing else on the bar used.
+        ///
+        /// - **TMP auto-sizing rescales the letters rather than the box.** The label
+        ///   arrives set up to fill the rect its old name needed, and given a different
+        ///   word it grows or shrinks the type until it fits again. The template's own
+        ///   font size is copied and auto-sizing switched off, which is the only way the
+        ///   two can match.
+        /// - **The size was only ever allowed to grow.** A name that fitted with room to
+        ///   spare left the tab at the width of the tab it was copied from.
+        /// - **The chrome was counted twice.** The old arithmetic measured the padding
+        ///   from the whole tab and then added it to a hint that already sat inside that
+        ///   padding, which pushed the label away from the icon. Measured on the template
+        ///   -- its tab width less its own label width -- so it means the same thing on
+        ///   both sides of the comparison.
         /// </summary>
-        private static void Relabel(GameObject clone, string text)
+        private static void Relabel(GameObject clone, Transform template, string text)
         {
             var label = clone.GetComponentInChildren<TextMeshProUGUI>(true);
             if (label == null)
             {
                 return;
+            }
+
+            var original = template.GetComponentInChildren<TextMeshProUGUI>(true);
+
+            // Read from the template before our own text is set, because auto-sizing
+            // rewrites fontSize as it fits and reading it afterwards reads whatever this
+            // label had just decided for BLACKJACK rather than what the bar is set in.
+            if (original != null && original.fontSize > 0f)
+            {
+                label.enableAutoSizing = false;
+                label.fontSize = original.fontSize;
             }
 
             label.text = text;
@@ -664,24 +705,28 @@ namespace Blackjack.Client
             var root = (RectTransform)clone.transform;
             var rect = label.rectTransform;
 
-            // The tab is wider than its label by whatever padding and icon sit around it,
-            // and that margin has to survive the widening.
-            var chrome = Mathf.Max(0f, root.rect.width - rect.rect.width);
+            // What the tab is wider than its label by: the icon, the gaps and the
+            // padding. Taken from the template, where both numbers describe a tab the
+            // bar has actually laid out.
+            var theirs = original != null ? original.rectTransform.rect.width : 0f;
+            var chrome = Mathf.Max(0f, ((RectTransform)template).rect.width - theirs);
             var needed = label.GetPreferredValues(text).x;
+            var wanted = needed + chrome;
 
             // On the button the label sits on, not on the tab: the wrapper's own
-            // LayoutElement, where there is one, belongs to the badges.
+            // LayoutElement, where there is one, belongs to the badges. Set in both
+            // directions -- a hint left at the old name's width is exactly the bug.
             var hint = label.GetComponentInParent<LayoutElement>();
             if (hint != null)
             {
-                if (hint.preferredWidth > 0f && hint.preferredWidth < needed + chrome)
+                if (hint.preferredWidth > 0f)
                 {
-                    hint.preferredWidth = needed + chrome;
+                    hint.preferredWidth = wanted;
                 }
 
-                if (hint.minWidth > 0f && hint.minWidth < needed + chrome)
+                if (hint.minWidth > 0f)
                 {
-                    hint.minWidth = needed + chrome;
+                    hint.minWidth = wanted;
                 }
             }
 
@@ -693,14 +738,8 @@ namespace Blackjack.Client
                 return;
             }
 
-            var extra = needed - rect.rect.width;
-            if (extra <= 1f)
-            {
-                return;
-            }
-
-            rect.sizeDelta = new Vector2(rect.sizeDelta.x + extra, rect.sizeDelta.y);
-            root.sizeDelta = new Vector2(root.sizeDelta.x + extra, root.sizeDelta.y);
+            rect.sizeDelta = new Vector2(rect.sizeDelta.x + (needed - rect.rect.width), rect.sizeDelta.y);
+            root.sizeDelta = new Vector2(root.sizeDelta.x + (wanted - root.rect.width), root.sizeDelta.y);
         }
 
         /// <summary>

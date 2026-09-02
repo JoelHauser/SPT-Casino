@@ -68,6 +68,15 @@
       <HintPath>$(GameManaged)\UnityEngine.UIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!--
+      For Animator alone: the task-bar tab freezes the one it clones, because an
+      Animator is a Behaviour rather than a MonoBehaviour and so slips past the sweep
+      that switches the rest of the borrowed tab off.
+    -->
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(GameManaged)\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
       <HintPath>$(GameManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
