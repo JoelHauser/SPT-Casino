@@ -11,9 +11,14 @@
     <AssemblyName>Blackjack.Client</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <Version>1.0.2</Version>
+    <Version>1.1.0</Version>
 
-    <!-- Everything below is referenced straight out of an install. -->
+    <!--
+      Everything below is referenced straight out of an install, and which install
+      depends on the machine. Pass -p:SPTPath=... for one that is not listed.
+    -->
+    <SPTPath Condition="'$(SPTPath)' == '' AND Exists('H:\SPT4.1.X')">H:\SPT4.1.X</SPTPath>
+    <SPTPath Condition="'$(SPTPath)' == '' AND Exists('C:\HUH')">C:\HUH</SPTPath>
     <SPTPath Condition="'$(SPTPath)' == ''">H:\SPT4.1.X</SPTPath>
     <GameManaged>$(SPTPath)\EscapeFromTarkov_Data\Managed</GameManaged>
     <SptPlugins>$(SPTPath)\BepInEx\plugins\spt</SptPlugins>

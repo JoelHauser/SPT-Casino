@@ -4,7 +4,8 @@ Packaged builds, laid out so the zip extracts straight into an SPT install.
 
 | Version | Built for | Form | Notes |
 | --- | --- | --- | --- |
-| 1.0.2 | SPT 4.1.3 | `Blackjack_V1.0.2.zip` | 5 MB. Extract into your SPT folder. |
+| 1.1.0 | SPT 4.1.3 | `Blackjack_V1.1.0.zip` | 5 MB. Extract into your SPT folder. Adds the task-bar tab, which had not yet been seen running when it was packed. |
+| 1.0.2 | SPT 4.1.3 | `Blackjack_V1.0.2.zip` | 5 MB. Kept as the last build with nothing unproven in it. |
 | 1.0.1 | SPT 4.1.3 | removed | Superseded by 1.0.2, which fixed ALL IN. |
 | 1.0 | SPT 4.1.3 | removed | Superseded by 1.0.1, which changed only how the controls look. |
 | 0.2.0 | SPT 4.1.3 | removed | Server only, no client plugin. Superseded, and removed so there is no wrong one to pick. |

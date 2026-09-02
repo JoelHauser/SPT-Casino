@@ -25,7 +25,7 @@ namespace Blackjack.Client
     /// </summary>
     internal static class BlackjackPanel
     {
-        private const string RootName = "BlackjackPanel";
+        internal const string RootName = "BlackjackPanel";
 
         private static readonly Color Felt = new Color(0.055f, 0.30f, 0.17f, 1f);
         private static readonly Color FeltEdge = new Color(0.21f, 0.13f, 0.07f, 1f);

@@ -27,6 +27,7 @@ are .NET 10 class libraries referencing `SPTarkov.Server.Core`, with an
 | --- | --- |
 | `src/Blackjack.Game` | Rules engine. No SPT reference, no I/O, no clock. |
 | `src/Blackjack.Server` | The mod: routes, DI, currency, stats, escrow, logging. |
+| `src/Blackjack.Client` | The BepInEx plugin: the menu button, the task-bar tab, the table. net472, and the one project that needs an install to build. |
 | `tests/Blackjack.Game.Tests` | 52 tests over the engine. |
 | `tests/Blackjack.Server.Tests` | 51 tests over the money flow, on fakes. |
 | `tools/Blackjack.Console` | Terminal table. Plays the engine with no SPT install. |
@@ -42,8 +43,13 @@ This repo is worked on from more than one machine. Check before assuming:
 
 | Machine | Installs |
 | --- | --- |
-| The one this file was written on | none |
+| The one this file was written on | `C:\HUH` -- SPT 4.1.3, **EFT 0.16.9.5-40743** |
 | Joel's Windows box | `H:\SPT4.1.X` (4.1.3) and `H:\SPT2026` (4.0.13) |
+
+`Blackjack.Client.csproj` picks whichever of those exists; `-p:SPTPath=...` for
+anything else. **The two installs are not the same game build**, and the client
+plugin is compiled against the game, not just against SPT -- see the MenuScreen note
+under "Things that will bite you".
 
 **With an install present**, three things the rest of this file calls unverifiable
 become checkable, and all three have now been done -- see "What the install
@@ -105,6 +111,85 @@ None of it required running the server.
 
   A comment in `Bank.cs` claimed roubles cap at 500,000. They cap at 1,000,000.
 
+## The task bar, as it actually is
+
+Read out of `C:\HUH`'s `Assembly-CSharp.dll` with Mono.Cecil. This is the row along
+the bottom of the menu -- MAIN MENU, HIDEOUT on the left, CHARACTER through WATCHLIST
+on the right -- and every one of these was a guess before it was checked.
+
+- **`EFT.UI.PreloaderUI.MenuTaskBar`** is the bar, a public field on a
+  `MonoBehaviourSingleton`. So `PreloaderUI.Instantiated` then
+  `PreloaderUI.Instance.MenuTaskBar`, and there is never any need to search the scene
+  for it.
+- **It belongs to PreloaderUI, which outlives a raid.** The bar is hidden in a raid,
+  not destroyed, so "the bar is gone" is not a test for anything. `Singleton<GameWorld>.Instantiated`
+  is.
+- **The tabs are `EFT.UI.AnimatedToggle`, which is a `UnityEngine.UI.Toggle`** -- not a
+  button, and not a `DefaultUIButton` like the main menu's. A clone therefore handles
+  its own click with no listener to clear, and joining the toggle group would deselect
+  whatever screen the player is looking at. Disabling the component settles both:
+  the event system skips a disabled Behaviour, and `Toggle.OnDisable` leaves the group.
+- **They live in a private `_toggleButtons`**, a `Dictionary<EMenuType, AnimatedToggle>`,
+  Odin-serialized from the prefab. `EMenuType` is the key worth having: MainMenu=100,
+  Play=0, Player=1, Trade=3, Chat=4, Handbook=5, Settings=6, Exit=7, Logout=8,
+  HideScreen=9, EditBuild=10, Hideout=11, Reconnect=12, RagFair=13, GoInRaid=14,
+  ToggleGameMode=15, NewsHub=16. PRESETS is EditBuild; CHARACTER is Player.
+- **The labels are `CustomTextMeshProUGUI`** -- BSG's own subclass of
+  `TextMeshProUGUI`, in **no namespace at all**. Anything that decides what to switch
+  off on a cloned tab by namespace switches the tab's own text off with it. Test the
+  type, not the namespace.
+- **The text is driven by an `EFT.UI.LocalizedText`** that re-applies its key on
+  `OnEnable`, so a renamed clone reverts to HANDBOOK unless that component is disabled.
+- **The unread badges are fields on the bar**, one per kind: `_newInformation`
+  (an array), `_producedItemsObject`, `_failedItemsObject`, `_newMessagesObject`,
+  `_newAttachmentsMessagesObject`, `_newFriendRequestsObject`, `_newNodesObject`,
+  `_newNewsObject`. The bar drives them on the originals only, so a clone freezes
+  whatever it copied -- a hideout tab cloned mid-craft keeps that badge until restart.
+- **`EFT.UI.HoverTooltipArea.SetMessageText(string, bool rawText)` is public**, and the
+  clone keeps a working reference to the shared `SimpleTooltip`, so a cloned tab gets a
+  real tooltip for the price of one call.
+- **The row lays itself out, and the gap in the middle is an object.** From the prefab
+  in `EscapeFromTarkov_Data/sharedassets49.assets`:
+
+  ```
+  TaskBar                 MenuTaskBar, Animator, VerticalLayoutGroup
+    Tabs                  HorizontalLayoutGroup, ToggleGroup
+      MainMenu            wrapper: HorizontalLayoutGroup, ToggleGroup, CanvasGroup, HoverTooltipArea
+        MainMenuButton    Image, HorizontalLayoutGroup, Animator, AnimatedToggle, LayoutElement
+          Icon            Image
+          Text            LocalizedText, CustomTextMeshProUGUI
+        NewInformation    the unread badges
+      Hideout             ... same shape
+      GroupPanel
+      Spacer              the empty middle, a layout element rather than a coincidence
+      Character, Merchants, FleaMarket, EditBuild, Handbook, Chat, Watchlist, News, Settings
+  ```
+
+  Every tab is sized (0,0) in the prefab, so nothing is positioned by hand and adding
+  one is a sibling index: before Spacer for the left group, after it for the right.
+- **The toggle is on a child of a tab, not on the tab.** `_toggleButtons` hands back the
+  AnimatedToggle, which lives on the *button* inside the wrapper. Cloning that object
+  and parenting it where it sits puts BLACKJACK **inside** the hideout tab, sharing its
+  slot. The wrapper is what gets cloned.
+- **Another mod's tab costs this one nothing.** The layout group measures the row every
+  time it is dirtied, so a second added tab shifts everything along and removing it
+  reflows -- neither mod has to know about the other. Two things follow for anyone
+  writing the other mod: take the template from `_toggleButtons`, which holds only the
+  game's own tabs, or a mod that picks one geometrically eventually clones *our* tab and
+  inherits a diamond and a pile of disabled components; and split the row on the
+  spacer's `flexibleWidth` rather than on the widest gap, because added tabs eat that
+  gap until measuring says the row is one group and puts the new tab beside SETTINGS.
+- **A tab's CanvasGroup ships at alpha 0.3 with `interactable` false** -- the
+  locked-feature look, which MenuTaskBar turns on per tab as a profile unlocks things.
+  It does not know about a grafted-on tab, so a clone stays greyed out *and swallows its
+  own clicks* until both are set by hand.
+- **The wrapper is a HorizontalLayoutGroup too**, so a highlight added as a child gets
+  laid out as one more item in the row and shoves the button sideways. `LayoutElement.ignoreLayout`
+  is what keeps an overlay an overlay.
+- **The bar greys itself out through its own dictionary** (`SetTaskBarInteractable`,
+  `SetButtonsInteractable`), which a grafted-on tab is not in. Mirroring a neighbour's
+  `interactable` is how ours dims and stops answering at the same moments as the rest.
+
 ## Things that will bite you
 
 Each of these cost real time. None are hypothetical.
@@ -139,6 +224,14 @@ Each of these cost real time. None are hypothetical.
 - **`/blackjack/state` is called before any hand exists.** `DealerView` used to
   read `_dealer.Cards[0]` unconditionally and threw on a fresh table -- every visit
   to the panel would have failed. An empty dealer hand must describe itself.
+- **The client plugin is compiled against the game, not just against SPT.** Two
+  installs on the same SPT 4.1.3 can be different EFT builds, and `EFT.UI` moves. On
+  0.16.9.5 `MenuScreen.Awake` is private and `Show`'s controller argument is an
+  obfuscated nested type, so `[HarmonyPatch(typeof(MenuScreen), nameof(MenuScreen.Awake))]`
+  -- which compiled on the other box -- does not compile at all here. Harmony only ever
+  wanted a `MethodBase`: `TargetMethods()` with `AccessTools.Method(..., "Awake")` binds
+  by name at runtime and is indifferent to both. `PatchAll` is wrapped in a try/catch
+  for the same reason -- a patch that will not apply must not take the rest down.
 - **Naming a property `Path` shadows `System.IO.Path`** inside the same class and
   breaks every `Path.Combine`. `StatsStore.FilePath` is named that for this reason.
 - **`OnLoadOrder` has no `PostDBModLoader`.** The values are `Watermark`, `Preload`,
@@ -152,6 +245,31 @@ Each of these cost real time. None are hypothetical.
   `cat <<'EOF'` produces broken escapes. Use the Write tool for those files.
 - **`Compress-Archive` writes backslash zip entries**, which extract as one literal
   filename on Linux. Pack releases with `System.IO.Compression` instead.
+
+## Reading the game's UI without launching it
+
+The assemblies say what the code does; the prefabs say what the screen looks like, and
+that is where the layout questions get answered. `UnityPy` reads them straight out of
+the install -- no AssetStudio, no game running:
+
+```python
+# pip install UnityPy
+import UnityPy
+env = UnityPy.load(r"C:\HUH\EscapeFromTarkov_Data\sharedassets49.assets",
+                   r"C:\HUH\EscapeFromTarkov_Data\globalgamemanagers.assets")
+# GameObject / RectTransform / CanvasGroup read in full;
+# a MonoBehaviour gives up its m_Script, and m_Script.deref().read().m_ClassName is
+# the component's real name -- HorizontalLayoutGroup, AnimatedToggle, LocalizedText.
+```
+
+- **The menu UI is `sharedassets49.assets`** (~700 GameObjects). `globalgamemanagers.assets`
+  is 359MB of MonoScript and nothing else -- it is the script registry, which is why a
+  raw search for a class name lands there and finds no objects.
+- **Type trees are stripped for MonoBehaviours**, so a component's *fields* are not
+  readable -- no spacing values, no LayoutElement widths. Its identity is. Unity's own
+  types (RectTransform, CanvasGroup, GameObject) read completely.
+- A raw byte search for a class name across `*.assets` is the fast way to find which
+  file to open.
 
 ## Talking to the server without a game client
 
@@ -287,12 +405,30 @@ resolved and the profile can be read.
 
 ## Releasing
 
-`releases/Blackjack-<ver>.zip`, laid out as `user/mods/Blackjack/` so it extracts
-into an SPT install. The version lives in **two** places and they must agree:
-`Blackjack.Server.csproj` `<Version>` and `ModMetadata.Version`.
+`releases/Blackjack_V<ver>.zip`, holding both halves and laid out to extract straight
+into an SPT folder:
+
+```
+SPT_Runtime/user/mods/Blackjack/    Blackjack.Server.dll + .pdb, Blackjack.Game.dll + .pdb, config.json
+BepInEx/plugins/Blackjack/          Blackjack.Client.dll, table.png, cards/*.png
+README.txt
+```
+
+**`SPT_Runtime/` is part of the path**, not the folder you extract into -- the server
+mod lives under it in a 4.x install. Dropping that prefix produces a zip that looks
+right and installs nothing.
+
+The version lives in **four** places and they must agree: `Blackjack.Server.csproj`
+`<Version>`, `ModMetadata.Version`, `Blackjack.Client.csproj` `<Version>` and
+`BlackjackClientPlugin.PluginVersion`. The Forge rejects an upload whose two halves
+disagree about the GUID; a version they disagree about is the same kind of trap.
+
+Pack with `System.IO.Compression` -- `Compress-Archive` writes backslash entries,
+which extract on Linux as one file with slashes in its name. `scripts/pack.ps1` does
+it correctly and rebuilds Release first.
 
 SPT's own assemblies are not bundled -- the server provides them. Symbols ship for
-now, deliberately, because nothing has run for real yet.
+the server half, deliberately, because so much of it has still only run once.
 
 ---
 
@@ -300,30 +436,18 @@ now, deliberately, because nothing has run for real yet.
 
 **Update this section as work completes.**
 
-- Working branch **`test`**; `main` is behind by three commits, a clean
-  fast-forward, and needs a merge before release.
+- Working branch **`test`**, level with `main`.
+- **1.1.0 is the current build**: `releases/Blackjack_V1.1.0.zip`, both halves in one
+  zip. Its one new feature -- the task-bar tab -- has never been seen running.
 - Server mod is feature-complete: rules, six wallets, money, stats, escrow, logging,
-  both transports. 103 tests green, re-run on Joel's box.
-- **Statically verified against a real 4.1.3 install** -- every API the mod calls
-  exists with the signature it expects, and every wallet template exists with the
-  stack limit the code reads. See "What the install settled".
-- **It loads and answers.** On a real 4.1.3 server the mod appears in the mod list,
-  writes its data file, registers its routes, and `smoke.ps1 -PingOnly` resolves the
-  session and reads all six balances back. That is the first time any of this has
-  run outside a test double.
-- **Money moves correctly.** Hands have been dealt, played and settled against a real
-  profile in both directions. A win credited 20,000 against a 10,000 stake and a loss
-  took 25,000, each landing on the exact expected balance, with escrow empty and stats
-  written afterwards. `Bank.Debit`, `Bank.Credit`, escrow and settlement have all now
-  run for real.
-- **Split and double both work.** A doubled hand took its second stake and pushed,
-  returning exactly the doubled amount; a split took a second stake, settled two
-  hands independently and paid both. Every balance landed on the arithmetic.
+  both transports. **111 tests green** (52 engine, 59 money).
+- Client plugin exists and works: the panel, the table art, the card faces, the
+  main-menu button, and now a tab on the bottom bar.
+- **Money moves correctly, for real.** Hands dealt, played and settled against a real
+  profile in both directions, including doubles and splits, each landing on the exact
+  expected balance with escrow empty afterwards.
 - **Untested still:** valuables (bitcoin and Lega are at zero in the test profile),
-  the full-stash shortfall-to-mail path, a restart mid-round, and the item-event
-  transport -- everything so far went through the static routes.
-- `releases/Blackjack-0.2.0-SPT4.1.zip` is the current build. 0.1.0 is superseded --
-  wrong layout and three money-path bugs -- and was removed rather than kept.
+  the full-stash shortfall-to-mail path, a restart mid-round, and the task-bar tab.
 
 ### Testing on Joel's box
 
@@ -337,18 +461,27 @@ exercised by betting until some are added.
 
 ### Open items
 
-- **The client plugin does not exist.** No longer blocked: on Joel's box
-  `H:\SPT4.1.X` has `EscapeFromTarkov_Data/Managed/Assembly-CSharp.dll` and the SPT
-  client DLLs under `BepInEx/plugins/spt/`. This is the largest remaining piece and
-  the only thing standing between the mod and a first real test.
-  Note 4.1.3's `PluginValidator` reads a plugin's references to `spt-*` and requires
-  a major.minor match, so the plugin must be built against this install, not an
-  older one.
+- **The task-bar tab compiles but has never run.** `TaskBarTab.cs` adds BLACKJACK to
+  the row along the bottom of the menu, so the table opens from the hideout or the flea
+  market and not just the main menu. Every type it names was checked against
+  `C:\HUH` -- see "The task bar, as it actually is" -- and it builds clean, but no
+  frame of it has been drawn. It logs the tabs it found and the components it switched
+  off on the first install; that log is the verification.
+- **The tab closes the table when a raid starts.** The panel's canvas is
+  `DontDestroyOnLoad`, so nothing else would. It matters most in co-op, where the raid
+  is started by the host and a player can be pulled out of the lobby with the table
+  open.
+
+- **Which install the client is built against matters.** 4.1.3's `PluginValidator`
+  reads a plugin's references to `spt-*` and requires a major.minor match, and the
+  game half has to match too: `C:\HUH` is EFT 0.16.9.5 and is not the same build as
+  `H:\SPT4.1.X`. If a build made on one machine misbehaves on the other, rebuild it
+  there -- `dotnet build src/Blackjack.Client -p:SPTPath=<install>`.
 - **`smoke.ps1` works** against a real server, as of the first run on Joel's box.
   The PHPSESSID assumption was right; three things around it were wrong. See
   "Talking to the server without a game client".
-- **Make the wire enums strings** before the client plugin is written. See the
-  integers note above.
+- **Make the wire enums strings.** The client hardcodes the integers today. See the
+  note above.
 - **Mail attachments are unverified** -- SPT may expect `ParentId`/`SlotId` set on
   them in ways not checked here.
 - **`ExtensionData` serialisation is unverified**, as is whether the client accepts

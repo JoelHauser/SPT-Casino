@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using EFT.UI;
 using HarmonyLib;
 using TMPro;
@@ -23,19 +24,42 @@ namespace Blackjack.Client
     /// The button is a clone of one of the menu's own, and that is what makes it fit
     /// alongside other menu mods rather than in spite of them. See <see cref="Install"/>.
     /// </summary>
+    [HarmonyPatch]
     internal static class MenuButtonPatch
     {
         private const string ButtonName = "BlackjackButton";
 
-        [HarmonyPatch(typeof(MenuScreen), nameof(MenuScreen.Awake))]
-        [HarmonyPostfix]
-        // ReSharper disable once InconsistentNaming
-        private static void AfterAwake(MenuScreen __instance) => Schedule(__instance);
+        /// <summary>
+        /// Both of the moments the menu is built, looked up by name at load rather than
+        /// named in an attribute.
+        ///
+        /// <c>nameof(MenuScreen.Awake)</c> does not compile against every EFT build: on
+        /// 0.16.9.5 Awake is private and Show's controller argument is an obfuscated
+        /// nested type with no name to write down. Neither is a problem for Harmony,
+        /// which is happy with a MethodBase -- it was only ever a problem for the
+        /// compiler. Asking at runtime also means a build that renames one of them
+        /// costs the button rather than the whole plugin.
+        /// </summary>
+        private static IEnumerable<MethodBase> TargetMethods()
+        {
+            var awake = AccessTools.Method(typeof(MenuScreen), "Awake");
+            if (awake != null)
+            {
+                yield return awake;
+            }
 
-        [HarmonyPatch(typeof(MenuScreen), nameof(MenuScreen.Show), typeof(MenuScreen.MainMenuBaseScreenController))]
+            // Every overload: which one the game calls varies by build, and patching a
+            // Show that is never called costs nothing.
+            foreach (var show in AccessTools.GetDeclaredMethods(typeof(MenuScreen))
+                         .Where(m => m.Name == "Show"))
+            {
+                yield return show;
+            }
+        }
+
         [HarmonyPostfix]
         // ReSharper disable once InconsistentNaming
-        private static void AfterShow(MenuScreen __instance) => Schedule(__instance);
+        private static void AfterScreenBuilt(MenuScreen __instance) => Schedule(__instance);
 
         /// <summary>
         /// Rebuilds at the end of the frame rather than immediately.
@@ -119,7 +143,7 @@ namespace Blackjack.Client
             }
 
             Relabel(button, "BLACKJACK");
-            ReplaceIcon(button);
+            MenuIcon.Diamond(button);
             button.Interactable = true;
             Wire(button);
             Follow(button, template);
@@ -144,62 +168,6 @@ namespace Blackjack.Client
             if (label != null && size > 0f)
             {
                 label.fontSize = size;
-            }
-        }
-
-        /// <summary>
-        /// Swaps the borrowed icon for a diamond.
-        ///
-        /// A clone wears whatever icon it copied, so without this the BLACKJACK button
-        /// carries the hideout's. Blanking it is not the answer either: with a menu mod
-        /// installed the icon is the button's main visual and the others would all have
-        /// one, leaving ours conspicuously bare. A suit is drawn by the same code that
-        /// draws the cards, so it needs no art shipped and looks deliberate either way.
-        ///
-        /// The diamond specifically, because it is the only suit with no up or down. A
-        /// spade inheriting a mirrored or rotated transform from the icon it replaced
-        /// comes out looking like a trophy; a rhombus cannot.
-        ///
-        /// The container is left alone whatever happens, because its size is part of
-        /// the row's spacing.
-        /// </summary>
-        private static void ReplaceIcon(DefaultUIButton button)
-        {
-            var icons = button.GetComponentsInChildren<Image>(true)
-                .Where(i => i != null && i.name.IndexOf("icon", StringComparison.OrdinalIgnoreCase) >= 0)
-                .ToList();
-
-            if (icons.Count == 0)
-            {
-                return;
-            }
-
-            var pip = Textures.Suit('D', Color.white);
-
-            foreach (var icon in icons)
-            {
-                var rect = icon.rectTransform;
-
-                // Whatever the borrowed icon was, it may have been rotated or mirrored
-                // to suit its own artwork, and a spade inherits that and comes out
-                // upside down. Reported as well as reset, because a rotation here is
-                // worth knowing about rather than silently undoing.
-                if (rect.localRotation != Quaternion.identity ||
-                    rect.localScale.x < 0f || rect.localScale.y < 0f)
-                {
-                    BlackjackClientPlugin.Log.LogInfo(
-                        $"[Blackjack] icon '{icon.name}' had rotation {rect.localEulerAngles} " +
-                        $"scale {rect.localScale}; normalising.");
-                }
-
-                rect.localRotation = Quaternion.identity;
-                rect.localScale = new Vector3(
-                    Mathf.Abs(rect.localScale.x),
-                    Mathf.Abs(rect.localScale.y),
-                    Mathf.Abs(rect.localScale.z));
-
-                icon.sprite = pip;
-                icon.preserveAspect = true;
             }
         }
 

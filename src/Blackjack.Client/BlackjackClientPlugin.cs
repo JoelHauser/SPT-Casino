@@ -24,7 +24,7 @@ namespace Blackjack.Client
         // so the two identifiers never meet and there is nothing to collide with.
         public const string PluginGuid = "com.mybutthasarash.blackjack";
         public const string PluginName = "Blackjack";
-        public const string PluginVersion = "1.0.2";
+        public const string PluginVersion = "1.1.0";
 
         internal static ManualLogSource Log;
 
@@ -49,6 +49,27 @@ namespace Blackjack.Client
         /// </summary>
         internal static ConfigEntry<bool> EnforceTableMaximum;
 
+        /// <summary>
+        /// Whether the table gets a tab on the bar along the bottom of the menu.
+        ///
+        /// On by default, because it is the only way in that works from the hideout, the
+        /// flea market or a trader screen -- the main-menu button is only on the main
+        /// menu. It is a switch rather than a certainty because the tab is grafted onto
+        /// a row this mod does not own: another mod could fill that row with its own
+        /// entries, and a player who does not want ours there should not have to choose
+        /// between the tab and the mod.
+        /// </summary>
+        internal static ConfigEntry<bool> ShowTaskBarTab;
+
+        /// <summary>
+        /// Which end of the bar the tab sits on: with MAIN MENU and HIDEOUT on the left,
+        /// or with CHARACTER and the rest on the right.
+        ///
+        /// Left by default. Those two are places you go, which is what the table is; the
+        /// right-hand group is things you look at while you are somewhere.
+        /// </summary>
+        internal static ConfigEntry<bool> TabOnRight;
+
         private void Awake()
         {
             Instance = this;
@@ -62,7 +83,36 @@ namespace Blackjack.Client
                 + "50 GP, 10 bitcoin, 5 Lega. Turn this off to bet as much as you are carrying. "
                 + "The minimum always applies.");
 
-            new Harmony(PluginGuid).PatchAll(typeof(MenuButtonPatch));
+            ShowTaskBarTab = Config.Bind(
+                "Menu",
+                "Show the task-bar tab",
+                true,
+                "Adds BLACKJACK to the bar along the bottom of the menu, so the table opens "
+                + "from the hideout, the flea market or a trader screen and not just the main menu.");
+
+            TabOnRight = Config.Bind(
+                "Menu",
+                "Put the tab on the right",
+                false,
+                "Sits the tab with CHARACTER and the rest instead of beside MAIN MENU and HIDEOUT. "
+                + "The tab moves a second or two after this is changed.");
+
+            try
+            {
+                new Harmony(PluginGuid).PatchAll(typeof(MenuButtonPatch));
+            }
+            catch (System.Exception ex)
+            {
+                // The menu button is the second way in, not the only one. A patch that
+                // will not apply on this build must not take the task-bar tab down with
+                // it, and the tab is not a patch at all.
+                Log.LogError("[Blackjack] the main-menu button could not be installed: " + ex.Message);
+            }
+
+            // The tab is not a patch. It watches for the bar instead, because the bar has
+            // to be found again after every raid and after any mod that rebuilds the row,
+            // and a poll notices both without naming a method that could be renamed.
+            StartCoroutine(TaskBarTab.Heartbeat());
 
             Log.LogInfo("[Blackjack] client loaded");
         }
