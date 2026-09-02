@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
@@ -60,14 +60,31 @@ namespace Blackjack.Client
 
             var pip = Textures.Suit('D', Color.white);
 
+            // **A DefaultUIButton carries two icons, not one** -- `_iconImage` and
+            // `_iconIdleImage`, swapped by its own PointerEnter and PointerExit handlers.
+            // Both are replaced, which is why the idle pip looked right; the hover one is
+            // hidden when this runs, has never been through a layout pass, and reports a
+            // rect it will never be drawn at. Sized from that, the pip stretched across it
+            // -- which is what "the icon splits and becomes two" was.
+            //
+            // A square is what both get, and squareness rather than a size is the point:
+            // a square sprite in a square rect cannot be stretched by anything, whatever
+            // an Image or its parents do about aspect. The side is the smaller dimension
+            // of whichever icon the layout has actually measured, so the pip fits the slot
+            // the borrowed icon had rather than growing into it.
+            var side = 0f;
+            foreach (var icon in icons)
+            {
+                var size = icon.rectTransform.rect.size;
+                if (size.x > 1f && size.y > 1f)
+                {
+                    side = Mathf.Max(side, Mathf.Min(size.x, size.y));
+                }
+            }
+
             foreach (var icon in icons)
             {
                 var rect = icon.rectTransform;
-
-                // The footprint the icon we are replacing occupies, read before the
-                // swap. See Pin: the sprite going in is a different size and a layout
-                // group will believe it.
-                var was = rect.rect.size;
 
                 // Whatever the borrowed icon was, it may have been rotated or mirrored
                 // to suit its own artwork, and a spade inherits that and comes out
@@ -89,9 +106,15 @@ namespace Blackjack.Client
 
                 icon.color = Color.white;
                 icon.sprite = pip;
+
+                // Simple before preserveAspect, because preserveAspect is ignored outright
+                // on a Sliced or Tiled Image -- which is the only way a square sprite in a
+                // square rect could still come out the wrong shape. A pip has no
+                // nine-slice border to lose by saying so.
+                icon.type = Image.Type.Simple;
                 icon.preserveAspect = true;
 
-                Pin(icon, was);
+                Pin(icon, side);
             }
         }
 
@@ -108,19 +131,19 @@ namespace Blackjack.Client
         ///   a font or padding fault and cost a round of fixes aimed at both. The label
         ///   was innocent throughout: 16pt on the template and 16pt on ours, and ours the
         ///   narrower of the two. It took logging the widths to say so.
-        /// - The menu button's icon **blew up on hover**, when whatever the hover state
-        ///   dirties let the Image have the width it had been asking for all along. A
-        ///   diamond magnified sixfold and cropped to its middle is a band rather than a
-        ///   rhombus, which is why the icon looked pulled apart.
+        /// - The menu button's icon **blew up on hover**, when the hover state swapped in
+        ///   the second Image, which had never been measured and so had never been held
+        ///   to anything.
         ///
         /// Pinned both ways because the two entrances are laid out differently: a
         /// LayoutElement for the parent that measures, an explicit size for the one that
-        /// does not. A footprint that has not been laid out yet is left alone -- pinning
-        /// zero would hide the icon rather than size it.
+        /// does not. Square, so that nothing downstream can stretch the pip -- see
+        /// <see cref="Diamond"/>. A button whose icons have none of them been laid out yet
+        /// is left alone: pinning zero would hide the pip rather than size it.
         /// </summary>
-        private static void Pin(Image icon, Vector2 was)
+        private static void Pin(Image icon, float side)
         {
-            if (was.x <= 1f || was.y <= 1f)
+            if (side <= 1f)
             {
                 return;
             }
@@ -131,15 +154,15 @@ namespace Blackjack.Client
                 hold = icon.gameObject.AddComponent<LayoutElement>();
             }
 
-            hold.preferredWidth = was.x;
-            hold.preferredHeight = was.y;
+            hold.preferredWidth = side;
+            hold.preferredHeight = side;
 
             // SetSizeWithCurrentAnchors rather than sizeDelta, which does not mean a size
             // at all on a rect that stretches with its parent -- and an icon anchored
             // that way would be inflated by the padding rather than pinned.
             var rect = icon.rectTransform;
-            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, was.x);
-            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, was.y);
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, side);
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, side);
         }
 
         /// <summary>
