@@ -70,6 +70,22 @@ namespace Blackjack.Client
         /// </summary>
         internal static ConfigEntry<bool> TabOnRight;
 
+        /// <summary>
+        /// Whether BLACKJACK also appears in the main menu's own list of buttons.
+        ///
+        /// **Off by default**, and the tab is the whole reason. The button only exists on
+        /// the main menu, reaches the same table, and adding an entry to a list of five
+        /// puts a card game among ESCAPE FROM TARKOV and EXIT -- with Poker installed as
+        /// well the list grows by 40%. The bar along the bottom is where the game already
+        /// keeps "places you can go", it is on every out-of-raid screen, and it costs the
+        /// menu nothing.
+        ///
+        /// Kept rather than deleted because it is a working second way in and the code has
+        /// already been paid for. It is a Harmony patch, so unlike the tab it is applied
+        /// once at load: changing this takes a restart rather than a second.
+        /// </summary>
+        internal static ConfigEntry<bool> ShowMenuButton;
+
         private void Awake()
         {
             Instance = this;
@@ -97,16 +113,27 @@ namespace Blackjack.Client
                 "Sits the tab with CHARACTER and the rest instead of beside MAIN MENU and HIDEOUT. "
                 + "The tab moves a second or two after this is changed.");
 
-            try
+            ShowMenuButton = Config.Bind(
+                "Menu",
+                "Show the main-menu button",
+                false,
+                "Adds BLACKJACK to the main menu's own list, under EXIT, as well as to the task bar. "
+                + "Off because the tab reaches the same table from everywhere and keeps the menu "
+                + "list to the game's own five entries. Takes effect on the next restart.");
+
+            if (ShowMenuButton.Value)
             {
-                new Harmony(PluginGuid).PatchAll(typeof(MenuButtonPatch));
-            }
-            catch (System.Exception ex)
-            {
-                // The menu button is the second way in, not the only one. A patch that
-                // will not apply on this build must not take the task-bar tab down with
-                // it, and the tab is not a patch at all.
-                Log.LogError("[Blackjack] the main-menu button could not be installed: " + ex.Message);
+                try
+                {
+                    new Harmony(PluginGuid).PatchAll(typeof(MenuButtonPatch));
+                }
+                catch (System.Exception ex)
+                {
+                    // The menu button is the second way in, not the only one. A patch that
+                    // will not apply on this build must not take the task-bar tab down with
+                    // it, and the tab is not a patch at all.
+                    Log.LogError("[Blackjack] the main-menu button could not be installed: " + ex.Message);
+                }
             }
 
             // The tab is not a patch. It watches for the bar instead, because the bar has

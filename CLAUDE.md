@@ -394,9 +394,16 @@ Two transports, one service. Do not put game logic in either adapter.
 
   The disc route stays on the table as an optional second entrance later, for players
   who have the area built. It is flavour, not the front door.
-- **The entry point is a button on `EFT.UI.MenuScreen`**, cloned from one of the
-  `DefaultUIButton` fields already there (`_hideoutButton`, `_playButton`,
-  `_tradeButton`, ...). `Awake` and `Show` are the patch points.
+- ~~**The entry point is a button on `EFT.UI.MenuScreen`**~~ -- **the entry point is the
+  task-bar tab**, and the button is off by default behind `ShowMenuButton`. Seen beside
+  Poker's, the button was the weaker entrance twice over: it exists only on the main
+  menu, where the tab is on every out-of-raid screen, and it adds a card game to a list
+  of five that reads ESCAPE FROM TARKOV, CHARACTER, TRADING, HIDEOUT, EXIT -- with both
+  mods installed that list grew by 40% and the card games were the loudest thing on it.
+  The code is kept, not deleted: still cloned from one of the `DefaultUIButton` fields
+  already there (`_hideoutButton`, `_playButton`, `_tradeButton`, ...), still patched on
+  `Awake` and `Show`. It is a patch applied once at load, so unlike the tab's setting
+  this one takes a restart.
 - **Guarding against play-in-raid is now this mod's job.** The old design got that for
   free, since the Rest Space does not exist on a raid map. A main-menu button is not
   reachable mid-raid either, but nothing enforces that any more -- so whatever opens
@@ -489,8 +496,9 @@ the server half, deliberately, because so much of it has still only run once.
   been seen.** See "The pip is 160 units wide".
 - Server mod is feature-complete: rules, six wallets, money, stats, escrow, logging,
   both transports. **111 tests green** (52 engine, 59 money).
-- Client plugin exists and works: the panel, the table art, the card faces, the
-  main-menu button, and now a tab on the bottom bar.
+- Client plugin exists and works: the panel, the table art, the card faces, and the tab
+  on the bottom bar, which is now the way in. The main-menu button is still there and
+  off by default -- see the entry-point note above.
 - **Money moves correctly, for real.** Hands dealt, played and settled against a real
   profile in both directions, including doubles and splits, each landing on the exact
   expected balance with escrow empty afterwards.
