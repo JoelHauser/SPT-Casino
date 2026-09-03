@@ -545,25 +545,28 @@ the server half, deliberately, because so much of it has still only run once.
 
 **Update this section as work completes.**
 
-- Working branch **`test`**, level with `main`.
+- Working branch **`test`**, pushed. `main` has not been moved onto it.
 - **1.1.1 is the current build**: `releases/Blackjack_V1.1.1.zip`, both halves in one
-  zip. It is 1.1.0 plus the tab and icon sizing below, and it is **a test build --
-  installed and not yet looked at.** 1.1.0 is the last one anybody else has.
-- **The task-bar tab has now been seen**, on the home box with Poker installed
-  alongside, and it came out about twice the width of the game's own tabs -- the pip
-  sizing itself from its own sprite. The same number made the menu button's icon pull
-  apart on hover. Fixed, built and deployed to `H:\SPT4.1.X`; **the fix itself has not
-  been seen.** See "The pip is 160 units wide".
+  zip, with `releases/CHANGELOG-1.1.1.md` and `releases/mod-page.md` beside it. 1.1.0 is
+  the last one anybody else has.
+- **The tab has been seen and is right**: correct width, a clean diamond that no longer
+  distorts on hover, sitting beside Poker's spade. See "The pip is 160 units wide".
+- **The main-menu button is gone**, along with the F12 setting that briefly hid it. The
+  plugin no longer patches `MenuScreen` at all. See the entry-point note above.
+- **Escape closes the table and nothing else**, and the table has been played from the
+  hideout and the flea market rather than only the main menu. See "Escape, and why
+  watching the key was never enough".
 - Server mod is feature-complete: rules, six wallets, money, stats, escrow, logging,
   both transports. **111 tests green** (52 engine, 59 money).
 - Client plugin exists and works: the panel, the table art, the card faces, and the tab
-  on the bottom bar, which is now the way in. The main-menu button is still there and
-  off by default -- see the entry-point note above.
-- **Money moves correctly, for real.** Hands dealt, played and settled against a real
-  profile in both directions, including doubles and splits, each landing on the exact
-  expected balance with escrow empty afterwards.
+  on the bottom bar, which is the only way in.
+- **Money moves correctly, for real**, and again on 3 Sep 2026 alongside Poker on the
+  same profile -- credits of 25,000 and 20,000 roubles landing on the exact expected
+  balance, `StackMaxSize` read live as 20,000,000 because that install runs
+  BarterItemsStacks. Hands dealt, played and settled in both directions, including
+  doubles and splits, with escrow empty afterwards.
 - **Untested still:** valuables (bitcoin and Lega are at zero in the test profile),
-  the full-stash shortfall-to-mail path, a restart mid-round, and the tab-sizing fix.
+  the full-stash shortfall-to-mail path, and a restart mid-round.
 
 ### Testing on Joel's box
 
