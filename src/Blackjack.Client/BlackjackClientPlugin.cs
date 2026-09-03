@@ -174,17 +174,17 @@ namespace Blackjack.Client
                 BlackjackPanel.OnEscape();
             }
 
-            // The table is deliberately available while a raid loads -- matchmaking and
-            // the loading screen leave the task bar up, the player can already open their
-            // character there, and a few hands is a better use of that wait than watching
-            // a progress bar. `GameWorld` is what draws the line: it does not exist until
-            // the raid world itself does, so everything before deployment is fair game.
+            // Closed at the first hint of a raid, and closed here rather than in the tab's
+            // once-a-second heartbeat, which is what it used to rely on. A poll can be up
+            // to a second late, and late here is not a cosmetic fault: the panel's canvas
+            // is at sorting order 30000 with a nearly opaque backdrop that swallows every
+            // click, so a table that outlives the menu locks the player out of their own
+            // raid. In co-op the moment is not even theirs to choose -- the host starts
+            // the raid and pulls them out of the lobby with the table open.
             //
-            // Checked here rather than in the tab's once-a-second heartbeat, which is what
-            // it used to rely on. A poll can be up to a second late, and being late here
-            // means a blackjack table on a canvas at sorting order 30000 sitting over the
-            // start of a raid. In co-op it is not even the player's decision when that
-            // moment comes -- the host starts the raid and pulls them out of the lobby.
+            // See TaskBarTab.InRaid for why the test is the earliest signal rather than
+            // the most accurate one, and for the attempt at playing on through the
+            // loading screen that had to be taken out.
             if (BlackjackPanel.IsOpen && TaskBarTab.InRaid)
             {
                 BlackjackPanel.OnEscape();

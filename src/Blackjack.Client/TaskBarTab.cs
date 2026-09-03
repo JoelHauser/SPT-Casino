@@ -80,23 +80,26 @@ namespace Blackjack.Client
         /// The bar is not destroyed when a raid starts -- it belongs to PreloaderUI,
         /// which outlives everything -- so its absence cannot be the test.
         ///
-        /// **`Singleton&lt;GameWorld&gt;.Instantiated` alone is not the test either**, which
-        /// is what this used to be. `GameWorld` is created when the raid *starts loading*,
-        /// not when it starts, so the table was being shut the moment the player queued --
-        /// which is precisely the wait it is most wanted for. Playing while a raid loads is
-        /// deliberate: matchmaking and the loading screen leave the task bar up, the player
-        /// can already open their character there, and a few hands beats a progress bar.
+        /// `GameWorld` existing is the test, and it is deliberately the **earliest**
+        /// signal available rather than the most accurate one.
         ///
-        /// Two signals, either of which means the raid is genuinely under way, because
-        /// being late here is worse than being early: a table on a canvas at sorting order
-        /// 30000 over a live raid. `GameWorld.MainPlayer` is filled in when the player is
-        /// actually spawned into the world, and `AbstractGame.Status` reaches `Started`
-        /// when the raid is running -- during loading it is `Starting`.
+        /// **Playing on while a raid loads was tried and taken out.** It looked free:
+        /// `GameWorld` is created when a raid starts *loading*, so testing it shuts the
+        /// table the moment the player queues, and the obvious refinement was to wait for
+        /// something that means the raid has actually begun -- `GameWorld.MainPlayer`
+        /// being filled in, or `AbstractGame.Status` reaching `Started`. Neither fired.
+        /// The table stayed up **into the raid**, and because the panel's backdrop is
+        /// nearly opaque and swallows every click, that is not a cosmetic fault: it locks
+        /// the player out of their own game.
+        ///
+        /// So the rule here is not "close when the raid starts", it is **close at the
+        /// first hint of one**. Being early costs a few hands of a card game. Being late
+        /// costs the raid. Do not trade one for the other again without a way to prove
+        /// the replacement signal fires -- and note that neither of those two was
+        /// guesswork, both were read out of the installed assembly, and they still did
+        /// not work.
         /// </summary>
-        internal static bool InRaid =>
-            (Singleton<GameWorld>.Instantiated && Singleton<GameWorld>.Instance?.MainPlayer != null)
-            || (Singleton<AbstractGame>.Instantiated &&
-                Singleton<AbstractGame>.Instance?.Status == GameStatus.Started);
+        internal static bool InRaid => Singleton<GameWorld>.Instantiated;
 
         private static MenuTaskBar Bar =>
             PreloaderUI.Instantiated ? PreloaderUI.Instance?.MenuTaskBar : null;

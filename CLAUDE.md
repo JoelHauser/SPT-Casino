@@ -122,9 +122,9 @@ on the right -- and every one of these was a guess before it was checked.
   `PreloaderUI.Instance.MenuTaskBar`, and there is never any need to search the scene
   for it.
 - **It belongs to PreloaderUI, which outlives a raid.** The bar is hidden in a raid,
-  not destroyed, so "the bar is gone" is not a test for anything. Nor is
-  `Singleton<GameWorld>.Instantiated`, which is true from the moment a raid starts
-  *loading* -- see "Playing while a raid loads".
+  not destroyed, so "the bar is gone" is not a test for anything.
+  `Singleton<GameWorld>.Instantiated` is -- and it goes true from the moment a raid
+  starts *loading*, which is deliberately early. See "Playing while a raid loads".
 - **The tabs are `EFT.UI.AnimatedToggle`, which is a `UnityEngine.UI.Toggle`** -- not a
   button, and not a `DefaultUIButton` like the main menu's. A clone therefore handles
   its own click with no listener to clear, and joining the toggle group would deselect
@@ -264,27 +264,34 @@ table that cannot be closed is worse than one that closes the screen behind it -
 Poker patches the same method. Two prefixes on one method is ordinary Harmony, and only
 the mod whose table is open answers.
 
-## Playing while a raid loads
+## Playing while a raid loads, and why it is not allowed
 
-**Deliberate.** Matchmaking and the loading screen leave the task bar up -- the player
-can open their character there -- so the tab is reachable and a few hands is a better use
-of that wait than a progress bar.
+**Tried, shipped, and taken straight back out.** It reads like a free win: the task bar
+stays up through matchmaking and the loading screen, the player can already open their
+character there, and a few hands beats watching a progress bar.
 
-**`Singleton<GameWorld>.Instantiated` is not that line, though it reads like it.**
-`GameWorld` is created when the raid *starts loading*, not when it starts, so testing it
-shut the table the moment the player queued -- which is exactly the wait the table is
-most wanted for.
+What made it look easy is that `Singleton<GameWorld>.Instantiated` -- the raid test both
+mods have always used -- is true from the moment a raid starts *loading*, not when it
+starts. So the table was being shut the instant the player queued, and the obvious
+refinement was to wait for a signal meaning the raid had actually begun:
+`GameWorld.MainPlayer` being filled in, or `AbstractGame.Status` reaching `Started`.
+Both were read out of the installed assembly rather than guessed. **Neither fired.** The
+table stayed up into the raid, and the panel's backdrop is nearly opaque and swallows
+every click, so it did not merely look wrong -- it locked the player out of their own
+game.
 
-Two signals now, either of which means the raid is genuinely under way, because being
-late here is worse than being early: a table on a canvas at sorting order 30000 over a
-live raid. `GameWorld.MainPlayer` is filled in when the player is actually spawned, and
-`AbstractGame.Status` reaches `Started` when the raid is running -- during loading it is
-`Starting`. Both are `Comfort.Common.Singleton` types the game itself registers.
+The rule is therefore not "close when the raid starts" but **close at the first hint of
+one**. Being early costs a few hands of cards. Being late costs the raid. `GameWorld`
+existing is the earliest signal there is, and that is exactly why it is the one used.
 
 It is checked every frame in the plugin's `Update` rather than in the tab's
-once-a-second heartbeat, because a poll can be a second late. In co-op the moment is not
-even the player's to choose: the host starts the raid and pulls them out of the lobby
-with the table open.
+once-a-second heartbeat, because a poll can be a second late and a second is enough. In
+co-op the moment is not even the player's to choose: the host starts the raid and pulls
+them out of the lobby with the table open.
+
+**If this is ever reopened**, the thing to establish first is a signal that can be shown
+to fire -- log it through a real raid before anything depends on it. Two plausible ones
+already failed silently.
 
 ## Things that will bite you
 
