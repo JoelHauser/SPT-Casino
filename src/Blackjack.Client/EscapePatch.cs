@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Reflection;
 using EFT.InputSystem;
 using HarmonyLib;
@@ -11,26 +12,30 @@ namespace Blackjack.Client
     /// no idea it exists. Watching for the key in `Update` closed the table but did not
     /// stop the key: the stash or the flea market underneath took the same escape on the
     /// same frame and backed out too, so closing the table also left the screen it was
-    /// opened from and dropped the player on the main menu. From the hideout it looked
-    /// like the mod was throwing you out of the hideout.
+    /// opened from. From the hideout it read as the mod throwing you out of the hideout.
     ///
-    /// **The fix is to consume the command, not to be quicker than it.** EFT routes menu
-    /// input through an `EFT.InputSystem` tree of `InputNode`s, and every UI screen hangs
-    /// under `UIInputRoot`. A prefix on the root's `TranslateCommand` that returns false
-    /// means the root never runs and no screen below it is ever offered the command --
-    /// one patch, covering the stash, the flea market, the hideout, a trader screen and
-    /// anything a future build adds, because they all hang off the same root.
+    /// **The command has to be taken out of the frame's list, not answered.** EFT's input
+    /// system is a tree of `InputNode`s under an `InputTree`, and
+    /// `InputNodeAbstract.TranslateInput(commands, ref axes, ref cursor)` is what walks
+    /// it: each node is handed the same `List&lt;ECommand&gt;` and recurses into its
+    /// children. Removing Escape from that list before the root recurses means no screen
+    /// below is ever offered it.
     ///
-    /// `BlockAll` rather than `Block` as the answer we leave behind: the table is a modal
-    /// window over the whole screen, so while it is up nothing underneath should be
-    /// acting on input at all.
+    /// `InputTree` is the root and does **not** override `TranslateInput`, so patching the
+    /// abstract base's implementation is patching the root -- one patch for the stash, the
+    /// flea market, the hideout, a trader screen and anything a future build adds. Nodes
+    /// that do override it are reached afterwards, by which point the command is gone.
     ///
-    /// Escape is `ECommand.Escape`, and `ETranslateResult` is nested inside `InputNode`.
-    /// Both were read out of the installed `Assembly-CSharp.dll` rather than guessed.
+    /// **The first attempt patched `UIInputRoot.TranslateCommand` and did nothing at all**,
+    /// which is worth writing down because it looked like the obvious hook: it is the root
+    /// of the UI input tree and its name says it translates commands. Its entire body is
+    /// `return ETranslateResult.Ignore` -- a stub. Nothing calls it to any effect, so the
+    /// patch applied cleanly, logged no error, and left escape working exactly as before
+    /// while disabling the key-watching fallback that had at least been closing the table.
+    /// **Read the IL of a method before hanging behaviour off its name.**
     ///
     /// Poker patches the same method. Two prefixes on one method is ordinary Harmony, and
-    /// only the mod whose table is open answers -- the other sees a closed panel and lets
-    /// the command through untouched.
+    /// only the mod whose table is open takes the command.
     /// </summary>
     [HarmonyPatch]
     internal static class EscapePatch
@@ -44,22 +49,25 @@ namespace Blackjack.Client
         internal static bool Applied;
 
         private static MethodBase TargetMethod() =>
-            AccessTools.Method(typeof(UIInputRoot), nameof(UIInputRoot.TranslateCommand));
+            AccessTools.Method(typeof(InputNodeAbstract), nameof(InputNodeAbstract.TranslateInput));
 
         [HarmonyPrefix]
         [HarmonyPriority(Priority.First)]
-        // ReSharper disable once InconsistentNaming
-        private static bool BeforeCommand(ECommand command, ref InputNode.ETranslateResult __result)
+        private static void BeforeInput(List<ECommand> commands)
         {
-            if (command != ECommand.Escape || !BlackjackPanel.IsOpen)
+            if (commands == null || !BlackjackPanel.IsOpen)
             {
-                return true;
+                return;
+            }
+
+            // Remove reports whether it was there, which is also what stops this firing
+            // twice: the root strips it, and every node reached afterwards finds nothing.
+            if (!commands.Remove(ECommand.Escape))
+            {
+                return;
             }
 
             BlackjackPanel.OnEscape();
-
-            __result = InputNode.ETranslateResult.BlockAll;
-            return false;
         }
     }
 }

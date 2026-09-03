@@ -78,10 +78,25 @@ namespace Blackjack.Client
         /// A raid, as far as anything on this side is concerned.
         ///
         /// The bar is not destroyed when a raid starts -- it belongs to PreloaderUI,
-        /// which outlives everything -- so its absence cannot be the test. This is the
-        /// same check the rest of the game uses.
+        /// which outlives everything -- so its absence cannot be the test.
+        ///
+        /// **`Singleton&lt;GameWorld&gt;.Instantiated` alone is not the test either**, which
+        /// is what this used to be. `GameWorld` is created when the raid *starts loading*,
+        /// not when it starts, so the table was being shut the moment the player queued --
+        /// which is precisely the wait it is most wanted for. Playing while a raid loads is
+        /// deliberate: matchmaking and the loading screen leave the task bar up, the player
+        /// can already open their character there, and a few hands beats a progress bar.
+        ///
+        /// Two signals, either of which means the raid is genuinely under way, because
+        /// being late here is worse than being early: a table on a canvas at sorting order
+        /// 30000 over a live raid. `GameWorld.MainPlayer` is filled in when the player is
+        /// actually spawned into the world, and `AbstractGame.Status` reaches `Started`
+        /// when the raid is running -- during loading it is `Starting`.
         /// </summary>
-        internal static bool InRaid => Singleton<GameWorld>.Instantiated;
+        internal static bool InRaid =>
+            (Singleton<GameWorld>.Instantiated && Singleton<GameWorld>.Instance?.MainPlayer != null)
+            || (Singleton<AbstractGame>.Instantiated &&
+                Singleton<AbstractGame>.Instance?.Status == GameStatus.Started);
 
         private static MenuTaskBar Bar =>
             PreloaderUI.Instantiated ? PreloaderUI.Instance?.MenuTaskBar : null;

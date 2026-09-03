@@ -122,8 +122,9 @@ on the right -- and every one of these was a guess before it was checked.
   `PreloaderUI.Instance.MenuTaskBar`, and there is never any need to search the scene
   for it.
 - **It belongs to PreloaderUI, which outlives a raid.** The bar is hidden in a raid,
-  not destroyed, so "the bar is gone" is not a test for anything. `Singleton<GameWorld>.Instantiated`
-  is.
+  not destroyed, so "the bar is gone" is not a test for anything. Nor is
+  `Singleton<GameWorld>.Instantiated`, which is true from the moment a raid starts
+  *loading* -- see "Playing while a raid loads".
 - **The tabs are `EFT.UI.AnimatedToggle`, which is a `UnityEngine.UI.Toggle`** -- not a
   button, and not a `DefaultUIButton` like the main menu's. A clone therefore handles
   its own click with no listener to clear, and joining the toggle group would deselect
@@ -240,20 +241,25 @@ it: the stash or the flea market underneath took the same escape on the same fra
 backed out too, so closing the table also left the screen it was opened from. From the
 hideout it read as the mod throwing you out of the hideout.
 
-**Consume the command, do not race it.** EFT routes menu input through an
-`EFT.InputSystem` tree of `InputNode`s and every UI screen hangs under `UIInputRoot`. A
-Harmony prefix on that root's `TranslateCommand` returning false means the root never
-runs and nothing below it is offered the command -- one patch covering the stash, the
-flea market, the hideout, a trader screen and whatever a future build adds, because they
-all hang off the same root. `EscapePatch` answers `ETranslateResult.BlockAll`, since a
-modal table over the whole screen should not be leaving anything underneath acting on
-input.
+**Take the command out of the frame's list; do not answer it.** EFT's input system is a
+tree of `InputNode`s under an `InputTree`, and
+`InputNodeAbstract.TranslateInput(commands, ref axes, ref cursor)` is what walks it:
+every node is handed the same `List<ECommand>` and recurses into its children. Removing
+`ECommand.Escape` from that list before the root recurses means nothing below is ever
+offered it. `InputTree` is the root and does **not** override `TranslateInput`, so
+patching the abstract base's implementation *is* patching the root -- one patch for the
+stash, the flea market, the hideout, a trader screen and whatever a future build adds.
 
-`ECommand.Escape` is 55 and `ETranslateResult` is nested inside `InputNode`; both were
-read out of the installed `Assembly-CSharp.dll`. The `Update` poll survives as a
-fallback for a build where the patch will not apply -- a table that cannot be closed is
-worse than one that closes the screen behind it -- and `EscapePatch.Applied` is what
-keeps the two from both firing.
+**The obvious hook is a stub, and it cost a round trip.** `UIInputRoot.TranslateCommand`
+is the root of the UI input tree and its name says it translates commands. Its entire
+body is `return ETranslateResult.Ignore`. Patching it applied cleanly, logged no error,
+changed nothing -- and disabled the key-watching fallback that had at least been closing
+the table, so escape went from half working to not working at all. **Read a method's IL
+before hanging behaviour off its name.**
+
+The `Update` poll survives as a fallback for a build where the patch will not apply -- a
+table that cannot be closed is worse than one that closes the screen behind it -- and
+`EscapePatch.Applied` is what keeps the two from both firing.
 
 Poker patches the same method. Two prefixes on one method is ordinary Harmony, and only
 the mod whose table is open answers.
@@ -264,15 +270,21 @@ the mod whose table is open answers.
 can open their character there -- so the tab is reachable and a few hands is a better use
 of that wait than a progress bar.
 
-`Singleton<GameWorld>.Instantiated` is the line, and it is the right one: `GameWorld`
-does not exist until the raid world itself does, so everything up to deployment is fair
-game and the moment the raid starts is unambiguous.
+**`Singleton<GameWorld>.Instantiated` is not that line, though it reads like it.**
+`GameWorld` is created when the raid *starts loading*, not when it starts, so testing it
+shut the table the moment the player queued -- which is exactly the wait the table is
+most wanted for.
 
-It is checked **every frame** in the plugin's `Update`, not in the tab's once-a-second
-heartbeat, which is what it used to rely on. A poll can be a second late, and being late
-here means a table on a canvas at sorting order 30000 sitting over the start of a raid.
-In co-op the moment is not even the player's to choose: the host starts the raid and
-pulls them out of the lobby with the table open.
+Two signals now, either of which means the raid is genuinely under way, because being
+late here is worse than being early: a table on a canvas at sorting order 30000 over a
+live raid. `GameWorld.MainPlayer` is filled in when the player is actually spawned, and
+`AbstractGame.Status` reaches `Started` when the raid is running -- during loading it is
+`Starting`. Both are `Comfort.Common.Singleton` types the game itself registers.
+
+It is checked every frame in the plugin's `Update` rather than in the tab's
+once-a-second heartbeat, because a poll can be a second late. In co-op the moment is not
+even the player's to choose: the host starts the raid and pulls them out of the lobby
+with the table open.
 
 ## Things that will bite you
 
