@@ -232,6 +232,48 @@ declares as its own and holds the row directly under EXIT, so ours settles one r
 under it and stays put. If both mods claimed the row under EXIT they would land on top
 of each other, so the fix is not symmetrical and should not be ported.
 
+## Escape, and why watching the key was never enough
+
+The table is our window floating over one of the game's screens, and the game has no
+idea it exists. Watching for the key in `Update` closed the table but did not *stop*
+it: the stash or the flea market underneath took the same escape on the same frame and
+backed out too, so closing the table also left the screen it was opened from. From the
+hideout it read as the mod throwing you out of the hideout.
+
+**Consume the command, do not race it.** EFT routes menu input through an
+`EFT.InputSystem` tree of `InputNode`s and every UI screen hangs under `UIInputRoot`. A
+Harmony prefix on that root's `TranslateCommand` returning false means the root never
+runs and nothing below it is offered the command -- one patch covering the stash, the
+flea market, the hideout, a trader screen and whatever a future build adds, because they
+all hang off the same root. `EscapePatch` answers `ETranslateResult.BlockAll`, since a
+modal table over the whole screen should not be leaving anything underneath acting on
+input.
+
+`ECommand.Escape` is 55 and `ETranslateResult` is nested inside `InputNode`; both were
+read out of the installed `Assembly-CSharp.dll`. The `Update` poll survives as a
+fallback for a build where the patch will not apply -- a table that cannot be closed is
+worse than one that closes the screen behind it -- and `EscapePatch.Applied` is what
+keeps the two from both firing.
+
+Poker patches the same method. Two prefixes on one method is ordinary Harmony, and only
+the mod whose table is open answers.
+
+## Playing while a raid loads
+
+**Deliberate.** Matchmaking and the loading screen leave the task bar up -- the player
+can open their character there -- so the tab is reachable and a few hands is a better use
+of that wait than a progress bar.
+
+`Singleton<GameWorld>.Instantiated` is the line, and it is the right one: `GameWorld`
+does not exist until the raid world itself does, so everything up to deployment is fair
+game and the moment the raid starts is unambiguous.
+
+It is checked **every frame** in the plugin's `Update`, not in the tab's once-a-second
+heartbeat, which is what it used to rely on. A poll can be a second late, and being late
+here means a table on a canvas at sorting order 30000 sitting over the start of a raid.
+In co-op the moment is not even the player's to choose: the host starts the raid and
+pulls them out of the lobby with the table open.
+
 ## Things that will bite you
 
 Each of these cost real time. None are hypothetical.

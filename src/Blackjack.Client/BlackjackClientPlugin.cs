@@ -121,6 +121,19 @@ namespace Blackjack.Client
                 + "Off because the tab reaches the same table from everywhere and keeps the menu "
                 + "list to the game's own five entries. Takes effect on the next restart.");
 
+            try
+            {
+                new Harmony(PluginGuid).PatchAll(typeof(EscapePatch));
+                EscapePatch.Applied = true;
+            }
+            catch (System.Exception ex)
+            {
+                // Escape still closes the table without this -- Update below watches for
+                // the key. What is lost is swallowing it, so the screen underneath backs
+                // out as well.
+                Log.LogError("[Blackjack] escape will also close the screen behind the table: " + ex.Message);
+            }
+
             if (ShowMenuButton.Value)
             {
                 try
@@ -145,16 +158,34 @@ namespace Blackjack.Client
         }
 
         /// <summary>
-        /// Escape closes the table.
+        /// Escape closes the table -- the fallback path only.
         ///
-        /// Watched here rather than patched into EFT's own input handling: the table
-        /// is our window, not one of the game's screens, so nothing in the game knows
-        /// to close it. The key is only acted on while the table is open, so this
-        /// cannot interfere with escape anywhere else.
+        /// <see cref="EscapePatch"/> is how this normally happens, and it is better,
+        /// because a patch on the input tree consumes the command where watching the key
+        /// merely races it: the screen underneath took the same escape on the same frame
+        /// and backed out, so closing the table also left the stash or the hideout. This
+        /// only runs if the patch would not apply, where closing the screen behind is
+        /// still better than a table that cannot be closed at all.
         /// </summary>
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (!EscapePatch.Applied && Input.GetKeyDown(KeyCode.Escape))
+            {
+                BlackjackPanel.OnEscape();
+            }
+
+            // The table is deliberately available while a raid loads -- matchmaking and
+            // the loading screen leave the task bar up, the player can already open their
+            // character there, and a few hands is a better use of that wait than watching
+            // a progress bar. `GameWorld` is what draws the line: it does not exist until
+            // the raid world itself does, so everything before deployment is fair game.
+            //
+            // Checked here rather than in the tab's once-a-second heartbeat, which is what
+            // it used to rely on. A poll can be up to a second late, and being late here
+            // means a blackjack table on a canvas at sorting order 30000 sitting over the
+            // start of a raid. In co-op it is not even the player's decision when that
+            // moment comes -- the host starts the raid and pulls them out of the lobby.
+            if (BlackjackPanel.IsOpen && TaskBarTab.InRaid)
             {
                 BlackjackPanel.OnEscape();
             }
