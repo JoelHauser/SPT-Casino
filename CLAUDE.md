@@ -27,7 +27,7 @@ are .NET 10 class libraries referencing `SPTarkov.Server.Core`, with an
 | --- | --- |
 | `src/Blackjack.Game` | Rules engine. No SPT reference, no I/O, no clock. |
 | `src/Blackjack.Server` | The mod: routes, DI, currency, stats, escrow, logging. |
-| `src/Blackjack.Client` | The BepInEx plugin: the menu button, the task-bar tab, the table. net472, and the one project that needs an install to build. |
+| `src/Blackjack.Client` | The BepInEx plugin: the task-bar tab, the table. net472, and the one project that needs an install to build. |
 | `tests/Blackjack.Game.Tests` | 52 tests over the engine. |
 | `tests/Blackjack.Server.Tests` | 51 tests over the money flow, on fakes. |
 | `tools/Blackjack.Console` | Terminal table. Plays the engine with no SPT install. |
@@ -456,15 +456,14 @@ Two transports, one service. Do not put game logic in either adapter.
   The disc route stays on the table as an optional second entrance later, for players
   who have the area built. It is flavour, not the front door.
 - ~~**The entry point is a button on `EFT.UI.MenuScreen`**~~ -- **the entry point is the
-  task-bar tab**, and the button is off by default behind `ShowMenuButton`. Seen beside
-  Poker's, the button was the weaker entrance twice over: it exists only on the main
-  menu, where the tab is on every out-of-raid screen, and it adds a card game to a list
-  of five that reads ESCAPE FROM TARKOV, CHARACTER, TRADING, HIDEOUT, EXIT -- with both
-  mods installed that list grew by 40% and the card games were the loudest thing on it.
-  The code is kept, not deleted: still cloned from one of the `DefaultUIButton` fields
-  already there (`_hideoutButton`, `_playButton`, `_tradeButton`, ...), still patched on
-  `Awake` and `Show`. It is a patch applied once at load, so unlike the tab's setting
-  this one takes a restart.
+  task-bar tab, and `MenuButtonPatch` has been deleted.** Seen beside Poker's, the button
+  was the weaker entrance twice over: it existed only on the main menu, where the tab is
+  on every out-of-raid screen, and it added a card game to a list of five reading ESCAPE
+  FROM TARKOV, CHARACTER, TRADING, HIDEOUT, EXIT -- with both mods installed that list
+  grew by 40%. It was hidden behind an F12 setting first, which was the wrong shape of
+  answer: a setting promises that turning it on works, and that one was never exercised
+  again after being disabled. **A dead option is worse than no option.** The history is
+  in git if a second entrance is ever wanted.
 - **Guarding against play-in-raid is now this mod's job.** The old design got that for
   free, since the Rest Space does not exist on a raid map. A main-menu button is not
   reachable mid-raid either, but nothing enforces that any more -- so whatever opens

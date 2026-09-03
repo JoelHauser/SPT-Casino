@@ -30,8 +30,7 @@ namespace Blackjack.Client
 
         /// <summary>
         /// The plugin itself, so code that is not a MonoBehaviour can still start a
-        /// coroutine. The menu button needs one to wait a frame for other menu mods to
-        /// finish before it copies what they left behind.
+        /// coroutine -- the task-bar tab's heartbeat.
         /// </summary>
         internal static BlackjackClientPlugin Instance;
 
@@ -52,9 +51,9 @@ namespace Blackjack.Client
         /// <summary>
         /// Whether the table gets a tab on the bar along the bottom of the menu.
         ///
-        /// On by default, because it is the only way in that works from the hideout, the
-        /// flea market or a trader screen -- the main-menu button is only on the main
-        /// menu. It is a switch rather than a certainty because the tab is grafted onto
+        /// On by default, and it is now the only way in at all -- the main-menu button
+        /// has been removed. It is a switch rather than a certainty because the tab is
+        /// grafted onto
         /// a row this mod does not own: another mod could fill that row with its own
         /// entries, and a player who does not want ours there should not have to choose
         /// between the tab and the mod.
@@ -69,22 +68,6 @@ namespace Blackjack.Client
         /// right-hand group is things you look at while you are somewhere.
         /// </summary>
         internal static ConfigEntry<bool> TabOnRight;
-
-        /// <summary>
-        /// Whether BLACKJACK also appears in the main menu's own list of buttons.
-        ///
-        /// **Off by default**, and the tab is the whole reason. The button only exists on
-        /// the main menu, reaches the same table, and adding an entry to a list of five
-        /// puts a card game among ESCAPE FROM TARKOV and EXIT -- with Poker installed as
-        /// well the list grows by 40%. The bar along the bottom is where the game already
-        /// keeps "places you can go", it is on every out-of-raid screen, and it costs the
-        /// menu nothing.
-        ///
-        /// Kept rather than deleted because it is a working second way in and the code has
-        /// already been paid for. It is a Harmony patch, so unlike the tab it is applied
-        /// once at load: changing this takes a restart rather than a second.
-        /// </summary>
-        internal static ConfigEntry<bool> ShowMenuButton;
 
         private void Awake()
         {
@@ -113,14 +96,6 @@ namespace Blackjack.Client
                 "Sits the tab with CHARACTER and the rest instead of beside MAIN MENU and HIDEOUT. "
                 + "The tab moves a second or two after this is changed.");
 
-            ShowMenuButton = Config.Bind(
-                "Menu",
-                "Show the main-menu button",
-                false,
-                "Adds BLACKJACK to the main menu's own list, under EXIT, as well as to the task bar. "
-                + "Off because the tab reaches the same table from everywhere and keeps the menu "
-                + "list to the game's own five entries. Takes effect on the next restart.");
-
             try
             {
                 new Harmony(PluginGuid).PatchAll(typeof(EscapePatch));
@@ -132,21 +107,6 @@ namespace Blackjack.Client
                 // the key. What is lost is swallowing it, so the screen underneath backs
                 // out as well.
                 Log.LogError("[Blackjack] escape will also close the screen behind the table: " + ex.Message);
-            }
-
-            if (ShowMenuButton.Value)
-            {
-                try
-                {
-                    new Harmony(PluginGuid).PatchAll(typeof(MenuButtonPatch));
-                }
-                catch (System.Exception ex)
-                {
-                    // The menu button is the second way in, not the only one. A patch that
-                    // will not apply on this build must not take the task-bar tab down with
-                    // it, and the tab is not a patch at all.
-                    Log.LogError("[Blackjack] the main-menu button could not be installed: " + ex.Message);
-                }
             }
 
             // The tab is not a patch. It watches for the bar instead, because the bar has

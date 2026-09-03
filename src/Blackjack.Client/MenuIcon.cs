@@ -6,10 +6,12 @@ using UnityEngine.UI;
 namespace Blackjack.Client
 {
     /// <summary>
-    /// Puts a card suit on a button cloned from one of EFT's own.
+    /// Puts a card suit on the task-bar tab, which is a clone of one of the game's own
+    /// and therefore arrives wearing somebody else's icon.
     ///
-    /// Shared by the main-menu button and the task-bar tab, because both are copies of
-    /// a neighbour and both therefore arrive wearing somebody else's icon.
+    /// It used to serve a main-menu button as well; that entrance has been removed, and
+    /// the defensive shape and size handling below is written as if there were still two
+    /// callers because it was two callers that found every bug in it.
     /// </summary>
     internal static class MenuIcon
     {
