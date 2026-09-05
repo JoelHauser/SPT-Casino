@@ -23,7 +23,11 @@
 [CmdletBinding()]
 param(
     [string]$SPTPath = 'H:\SPT4.1.X',
-    [string]$InstallPath
+    [string]$InstallPath,
+
+    # Writes releases/casino/SPT_CasinoV<version>.zip, laid out relative to the SPT
+    # folder so it extracts straight over an install.
+    [switch]$Zip
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,6 +36,11 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 $version = '1.0.0'
+
+# What the download is called. Deliberately not $version: the plugin carries a
+# three-part version because BepInEx expects one, and the release is named the way it
+# is published.
+$release = '1.0'
 $tables = @('Blackjack', 'Poker', 'Roulette')
 $plugin = Join-Path $root 'src\Casino.Client\Casino.Client.csproj'
 $stage = Join-Path $root 'dist\casino'
@@ -90,10 +99,51 @@ foreach ($table in $tables) {
     Write-Host "  staged the $table server mod" -ForegroundColor DarkGray
 }
 
+# --- zip ---------------------------------------------------------------------------
+if ($Zip) {
+    $releases = Join-Path $root 'releases\casino'
+    New-Item -ItemType Directory -Force -Path $releases | Out-Null
+
+    $archive = Join-Path $releases "SPT_CasinoV$release.zip"
+    if (Test-Path $archive) { Remove-Item $archive -Force }
+
+    # Entries are written one at a time, with forward slashes, deliberately.
+    #
+    # Compress-Archive writes backslash entry names, which extract on Linux as a single
+    # file literally called "SPT_Runtime\user\mods\Roulette\config.json". That much was
+    # already known. What was not is that ZipFile::CreateFromDirectory does exactly the
+    # same on Windows, so the documented fix is not one. The zip spec says forward
+    # slashes, and only writing the entries by hand guarantees them.
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+    $zipFile = [System.IO.Compression.ZipFile]::Open($archive, 'Create')
+    try {
+        foreach ($file in Get-ChildItem $stage -Recurse -File) {
+            $relative = $file.FullName.Substring($stage.Length).TrimStart([char]92, [char]47)
+            $relative = $relative.Replace([char]92, [char]47)
+
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $zipFile, $file.FullName, $relative) | Out-Null
+        }
+    }
+    finally {
+        $zipFile.Dispose()
+    }
+
+    $mb = (Get-Item $archive).Length / 1MB
+    Write-Host ("Packed {0} ({1:N1} MB)" -f $archive, $mb) -ForegroundColor Green
+
+    # No README at the top of the zip, decided for Blackjack 1.1.2 and kept: this is
+    # extracted *over* an SPT folder, so a loose file at its root lands in the install
+    # root beside the game's own, where it is litter rather than documentation.
+}
+
 # --- install ---------------------------------------------------------------------
 if (-not $InstallPath) {
     Write-Host ''
     Write-Host 'Not installed. Pass -InstallPath to put it in a real SPT folder.' -ForegroundColor Yellow
+    Write-Host 'Pass -Zip to write a release archive instead.' -ForegroundColor Yellow
     return
 }
 
