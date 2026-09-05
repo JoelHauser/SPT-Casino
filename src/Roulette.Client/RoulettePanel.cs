@@ -625,7 +625,7 @@ namespace Roulette.Client
             _balance = NewText("Balance", canvasObject.transform, string.Empty, 20f, TextAlignmentOptions.Center);
             _balance.rectTransform.anchorMin = _balance.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             _balance.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            _balance.rectTransform.sizeDelta = new Vector2(ClothView.Width, 28f);
+            _balance.rectTransform.sizeDelta = new Vector2(ClothView.Framed, 28f);
             _balance.rectTransform.anchoredPosition =
                 new Vector2(clothX, 70f + ClothView.Reach + 30f);
             _balance.color = Gold;
@@ -635,7 +635,7 @@ namespace Roulette.Client
             _chipTray = NewBox("ChipTray", canvasObject.transform, Color.clear);
             _chipTray.anchorMin = _chipTray.anchorMax = new Vector2(0.5f, 0.5f);
             _chipTray.pivot = new Vector2(0.5f, 0.5f);
-            _chipTray.sizeDelta = new Vector2(ClothView.Width, 62f);
+            _chipTray.sizeDelta = new Vector2(ClothView.Framed, 62f);
             _chipTray.anchoredPosition = new Vector2(clothX, 70f - ClothView.Reach - 52f);
 
             var tray = _chipTray.gameObject.AddComponent<HorizontalLayoutGroup>();

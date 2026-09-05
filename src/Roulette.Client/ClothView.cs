@@ -37,6 +37,21 @@ namespace Roulette.Client
         /// <summary>How wide one number cell is. Everything else is measured off it.</summary>
         private const float Cell = 66f;
 
+        /// <summary>
+        /// How much bigger the whole cloth is drawn than it is laid out.
+        ///
+        /// Applied as a scale on the root rather than by growing every constant, so the
+        /// cells, the fonts, the line-bet dots and the chips all keep their proportions
+        /// and there is exactly one number to change.
+        ///
+        /// It exists to make the value printed on a chip readable. The art is 440x440
+        /// and the figure on it is only about 70 pixels tall -- 16% of the diameter --
+        /// so at a 56-unit chip it lands around 9 pixels on a 1080p screen. The wheel
+        /// and cloth together came to 1598 of the 1920 available, so the 322 spare were
+        /// going to waste; this spends them.
+        /// </summary>
+        private const float Scale = 1.27f;
+
         private const float Rows = 3f;
         private const float Columns = 12f;
 
@@ -48,6 +63,21 @@ namespace Roulette.Client
 
         /// <summary>How much wooden rail there is around the felt.</summary>
         private const float Surround = 22f;
+
+        /// <summary>
+        /// How big a chip is drawn on a number.
+        ///
+        /// Sized to be readable rather than to be tidy. The chip art is 440x440 with
+        /// its value printed on the face, and at the 42 units this used to draw at, that
+        /// value came out about ten pixels tall and unreadable -- which is what made a
+        /// second number painted over the top look necessary. A number cell is 66 wide
+        /// with a 3-unit gap, so 56 nearly fills it, the way a real chip nearly fills
+        /// the square it is put on.
+        /// </summary>
+        private const float ChipOnNumber = 56f;
+
+        /// <summary>Breathing room between a chip and the edge of the box it sits in.</summary>
+        private const float ChipInset = 6f;
 
         private static readonly Color Felt = new Color(0.055f, 0.24f, 0.145f, 1f);
         private static readonly Color FeltEdge = new Color(0.72f, 0.62f, 0.34f, 1f);
@@ -75,6 +105,14 @@ namespace Roulette.Client
         private static readonly Dictionary<string, RectTransform> Stacks = new Dictionary<string, RectTransform>();
 
         /// <summary>
+        /// How big a chip may be drawn on each spot.
+        ///
+        /// Not one number for the whole cloth: the outside rows are 46 units tall, so a
+        /// chip sized for a number would hang out of them top and bottom.
+        /// </summary>
+        private static readonly Dictionary<string, float> ChipSizes = new Dictionary<string, float>();
+
+        /// <summary>
         /// The printed number on each square, so it can be hidden under a chip.
         ///
         /// A real chip sits on top of the number and covers it. Leaving it showing round
@@ -95,10 +133,10 @@ namespace Roulette.Client
         /// is the mistake the first pass made: the balance line and the chip tray were
         /// both measured off the felt and so ended up sitting on the wood.
         /// </summary>
-        internal static float Framed => Width + (2f * Surround);
+        internal static float Framed => (Width + (2f * Surround)) * Scale;
 
         /// <summary>Framed height. Its half is <see cref="Reach"/>.</summary>
-        internal static float FramedHeight => Height + (2f * Surround);
+        internal static float FramedHeight => (Height + (2f * Surround)) * Scale;
 
         /// <summary>How far the table reaches above and below its centre.</summary>
         internal static float Reach => FramedHeight * 0.5f;
@@ -119,12 +157,14 @@ namespace Roulette.Client
             _onLift = onLift;
             Stacks.Clear();
             Labels.Clear();
+            ChipSizes.Clear();
 
             // A wooden surround with the felt inset into it, rather than a green
             // rectangle with a line round it. The frame is what makes it read as a
             // table you are standing at instead of a control panel.
             var root = NewBox("Cloth", parent, Color.white);
             root.sizeDelta = new Vector2(Width + (2f * Surround), Height + (2f * Surround));
+            root.localScale = Vector3.one * Scale;
 
             var frame = root.GetComponent<Image>();
             frame.sprite = Textures.RoundedBox(14, Rail, RailEdge, 3);
@@ -180,7 +220,11 @@ namespace Roulette.Client
 
                 if (Stacks.TryGetValue(key, out var stack))
                 {
-                    ChipView.BuildOnCloth(stack, bet.Amount, _font, size: 42f);
+                    ChipView.BuildOnCloth(
+                        stack,
+                        bet.Amount,
+                        _font,
+                        ChipSizes.TryGetValue(key, out var size) ? size : ChipOnNumber);
                 }
 
                 // The chip covers the number, as it would on a cloth.
@@ -450,16 +494,27 @@ namespace Roulette.Client
             spot.Kind = kind;
             spot.Selection = selection;
 
+            // As big as the box allows, up to a chip on a number. The line-bet targets
+            // are 19-unit dots and are the exception: a chip straddling a join is the
+            // same chip as one on a number, so it is sized as one rather than shrunk to
+            // its target.
+            // Anything much smaller than a cell is a line-bet dot rather than a box.
+            var box = cell.sizeDelta;
+            var chipSize = box.x < Cell * 0.5f
+                ? ChipOnNumber
+                : Mathf.Min(ChipOnNumber, box.x - ChipInset, box.y - ChipInset);
+
             // A plain centred square, deliberately with no layout group on it. The
             // first version used a horizontal group the width of the whole cell, which
             // is what pushed every pile off its spot and let the figure overflow into
             // the neighbouring square.
             var stack = NewBox("Chips", cell, new Color(0f, 0f, 0f, 0f));
-            stack.sizeDelta = new Vector2(42f, 42f);
+            stack.sizeDelta = new Vector2(chipSize, chipSize);
             stack.GetComponent<Image>().raycastTarget = false;
 
             var key = Key(kind, selection);
             Stacks[key] = stack;
+            ChipSizes[key] = chipSize;
 
             // Only the numbers get hidden. A chip on "1st 12" sits in a box far wider
             // than itself, and blanking that label would leave an unlabelled box.
