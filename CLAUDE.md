@@ -180,6 +180,21 @@ it covers, not how many.
 check misses errors that cancel, and a settlement written first gets tests shaped around
 what it already does rather than around what it owes.
 
+## Publishing
+
+**SPT Casino registers as `com.mybutthasarash.sptcasino`, and only the main file has
+to declare it.** That is `Casino.Client.dll`, and it does. The three server mods
+bundled alongside keep their own GUIDs and that is a valid upload.
+
+Written down because the opposite was believed here for months and is still the
+reason `docs/blackjack.md` and `docs/poker.md` needed correcting: the stricter reading
+was used, on 2026-09-05, to argue that the release could not go out without merging
+the three server mods first. It could. Do not block a release on this again.
+
+```
+scripts/casino/pack.ps1 -Zip     # releases/casino/SPT_CasinoV1.0.zip
+```
+
 ## Merging the servers
 
 Not done, and there is a landmine in it: **all three `EscrowStore`s write
