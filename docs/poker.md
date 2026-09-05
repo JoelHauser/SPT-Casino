@@ -142,7 +142,7 @@ Line counts are from the working tree, as a sense of what each piece costs.
 | `src/Blackjack.Client/BlackjackClientPlugin.cs` | 86 | BepInEx entry point, config binding. |
 | `src/Blackjack.Client/ProfileSync.cs` | 81 | Keeps the client's stash view in step after the table moves money. |
 | `src/Blackjack.Client/BlackjackApi.cs` | 77 | The client's side of the transport. |
-| `scripts/smoke.ps1` | 259 | Drives a real server with no game attached. The HTTPS, compression and cookie handling in it is the expensive part. |
+| `scripts/poker/smoke.ps1` | 259 | Drives a real server with no game attached. The HTTPS, compression and cookie handling in it is the expensive part. |
 | `tools/Blackjack.Console/Program.cs` | 100 | Terminal table. Worth more here than there: it can watch the bots play thousands of hands with no Unity. |
 
 ### Ports as a shape, with different contents
@@ -629,8 +629,8 @@ The invariant checking is the point, not a decoration:
 ### Taking it to another machine
 
 ```
-./scripts/pack-console.ps1          # dist/console-win-x64/Poker.Console.exe
-./scripts/pack-console.ps1 -Zip     # and a zip beside it in releases/
+./scripts/poker/pack-console.ps1          # dist/console-win-x64/Poker.Console.exe
+./scripts/poker/pack-console.ps1 -Zip     # and a zip beside it in releases/
 ```
 
 **Self-contained by default**, which is 70MB of exe and worth it: the box with the
@@ -659,9 +659,9 @@ early -- which is most of them.
 ## Shipping it to an install
 
 ```
-./scripts/pack-mod.ps1                          # server only, anywhere
-./scripts/pack-mod.ps1 -InstallPath 'H:\SPT4.1.X'   # both halves, on the game box
-./scripts/smoke.ps1 -SessionId <id> -PingOnly
+./scripts/poker/pack-mod.ps1                          # server only, anywhere
+./scripts/poker/pack-mod.ps1 -InstallPath 'H:\SPT4.1.X'   # both halves, on the game box
+./scripts/poker/smoke.ps1 -SessionId <id> -PingOnly
 ```
 
 **`-InstallPath` is what makes it a whole mod.** With it the script also builds the
@@ -1298,7 +1298,7 @@ all of them still apply to this mod.
   unrelated mod, IncreaseClimbHeight, had been sitting unloaded in that dead folder
   since August for the same reason.
 - **Stake defaults live in five places and must agree**: `HoldemRules`,
-  `SitRequest`, the console's `Args`, `PokerPanel.Sit`, and `scripts/smoke.ps1`.
+  `SitRequest`, the console's `Args`, `PokerPanel.Sit`, and `scripts/poker/smoke.ps1`.
   The harness carrying its own copy made a retune look as though it had not taken
   effect -- the change was fine, the harness was overriding it.
 - **Zip entries must be written by hand with forward slashes.** `Compress-Archive`
@@ -1308,12 +1308,12 @@ all of them still apply to this mod.
   `ZipFile::CreateFromDirectory` does exactly the same on Windows, which was found by
   opening the first zip this repo produced and reading the entry names. Open the
   archive and add each entry with `CreateEntryFromFile`, replacing the separators
-  yourself; `scripts/pack-mod.ps1` does. Check the entry names of anything you ship.
+  yourself; `scripts/poker/pack-mod.ps1` does. Check the entry names of anything you ship.
 
 ## Talking to the server without a game client
 
 All read out of 4.1.3 and confirmed against a running server, over in Blackjack.
-`scripts/smoke.ps1` there is a working reference to port.
+`scripts/poker/smoke.ps1` there is a working reference to port.
 
 - **It serves HTTPS, not HTTP**, on the same port, with a self-signed certificate it
   generates into `user\certs\`. .NET rejects that by default and reports "the
@@ -1490,7 +1490,7 @@ enumerate by hand.
 it -- see the note under "Parked" for why. Measure decision frequencies instead;
 they are proportions and converge in thousands rather than millions.
 
-On a machine with SPT, `scripts\smoke.ps1 -SessionId <id> -PingOnly` first. It
+On a machine with SPT, `scripts\poker\smoke.ps1 -SessionId <id> -PingOnly` first. It
 touches no money and proves the mod loaded, the route is reachable, the session
 resolved and the profile can be read.
 

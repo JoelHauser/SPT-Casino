@@ -31,7 +31,7 @@ are .NET 10 class libraries referencing `SPTarkov.Server.Core`, with an
 | `tests/Blackjack.Game.Tests` | 52 tests over the engine. |
 | `tests/Blackjack.Server.Tests` | 51 tests over the money flow, on fakes. |
 | `tools/Blackjack.Console` | Terminal table. Plays the engine with no SPT install. |
-| `scripts/smoke.ps1` | Drives a real server over HTTP. Verified; `-Play` picks the action to exercise. |
+| `scripts/blackjack/smoke.ps1` | Drives a real server over HTTP. Verified; `-Play` picks the action to exercise. |
 
 The engine knows nothing about currency -- it takes an `int` and returns an `int`.
 Everything that maps a `Wallet` to an item template lives in `Wallets.cs` and
@@ -446,7 +446,7 @@ against a running server.
   cannot be passed through `-Headers`: `Cookie` is a restricted header and it is
   dropped **silently**, so the request arrives with no session and the server says
   "session id provided was empty, did you restart the server while the game was
-  running?". Use a `WebRequestSession`. `scripts\smoke.ps1` does.
+  running?". Use a `WebRequestSession`. `scripts\blackjack\smoke.ps1` does.
 
 ## Architecture
 
@@ -543,7 +543,7 @@ each fail 7 tests. Do that again after changing anything that moves currency.
 moved equals the profit the engine reported. An end-of-session balance check would
 miss errors that cancel.
 
-On a machine with SPT, `scripts\smoke.ps1 -SessionId <id> -PingOnly` first. It
+On a machine with SPT, `scripts\blackjack\smoke.ps1 -SessionId <id> -PingOnly` first. It
 touches no money and proves the mod loaded, the route is reachable, the session
 resolved and the profile can be read.
 
@@ -576,7 +576,7 @@ The version lives in **four** places and they must agree: `Blackjack.Server.cspr
 disagree about the GUID; a version they disagree about is the same kind of trap.
 
 Pack with `System.IO.Compression` -- `Compress-Archive` writes backslash entries,
-which extract on Linux as one file with slashes in its name. `scripts/pack.ps1` does
+which extract on Linux as one file with slashes in its name. `scripts/blackjack/pack.ps1` does
 it correctly and rebuilds Release first.
 
 SPT's own assemblies are not bundled -- the server provides them. Symbols ship for
