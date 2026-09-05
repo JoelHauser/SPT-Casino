@@ -1,0 +1,157 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      net472 because that is what the game's mono runtime loads.
+    -->
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace>Casino.Client</RootNamespace>
+    <AssemblyName>Casino.Client</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <Version>1.0.0</Version>
+
+    <!--
+      The three tables are compiled in from where they already live rather than
+      copied here. They are unchanged: the panels never referenced the task bar, the
+      escape patch or the menu icon, so lifting the entrance out from under them took
+      nothing with it. See Shims.cs for the one thing they did reach for.
+    -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+
+    <SPTPath Condition="'$(SPTPath)' == ''">H:\SPT4.1.X</SPTPath>
+    <SPTPath Condition="'$(SPTPath)' != ''">$(SPTPath.TrimEnd(''))</SPTPath>
+    <GameManaged>$(SPTPath)\EscapeFromTarkov_Data\Managed</GameManaged>
+    <SptPlugins>$(SPTPath)\BepInEx\plugins\spt</SptPlugins>
+    <BepInExCore>$(SPTPath)\BepInEx\core</BepInExCore>
+
+    <AssemblySearchPaths>$(GameManaged);$(AssemblySearchPaths)</AssemblySearchPaths>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <Target Name="ValidateSPTPath" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(GameManaged)\Assembly-CSharp.dll')"
+           Text="SPTPath ('$(SPTPath)') is not an SPT install root -- no EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll." />
+    <Error Condition="!Exists('$(SptPlugins)\spt-common.dll')"
+           Text="No spt-common.dll under '$(SptPlugins)'. The plugin must be built against the install it will run on." />
+  </Target>
+
+  <ItemGroup>
+    <!-- The casino itself: one entrance, one lobby, one escape key. -->
+    <Compile Include="*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The tables, as they are. Deliberately NOT included from each mod: its
+      ClientPlugin (there is one plugin now), its TaskBarTab and MenuIcon and
+      TabCrowding (there is one tab now), and its EscapePatch (three Harmony patches
+      on one method, replaced by CasinoEscape).
+    -->
+    <Compile Include="..\Roulette.Client\RoulettePanel.cs"  Link="Games\Roulette\RoulettePanel.cs" />
+    <Compile Include="..\Roulette.Client\WheelView.cs"      Link="Games\Roulette\WheelView.cs" />
+    <Compile Include="..\Roulette.Client\ClothView.cs"      Link="Games\Roulette\ClothView.cs" />
+    <Compile Include="..\Roulette.Client\ChipView.cs"       Link="Games\Roulette\ChipView.cs" />
+    <Compile Include="..\Roulette.Client\RouletteApi.cs"    Link="Games\Roulette\RouletteApi.cs" />
+    <Compile Include="..\Roulette.Client\ProfileSync.cs"    Link="Games\Roulette\ProfileSync.cs" />
+    <Compile Include="..\Roulette.Client\Textures.cs"       Link="Games\Roulette\Textures.cs" />
+
+    <Compile Include="..\Poker.Client\PokerPanel.cs"        Link="Games\Poker\PokerPanel.cs" />
+    <Compile Include="..\Poker.Client\CardView.cs"          Link="Games\Poker\CardView.cs" />
+    <Compile Include="..\Poker.Client\ChipView.cs"          Link="Games\Poker\ChipView.cs" />
+    <Compile Include="..\Poker.Client\PokerApi.cs"          Link="Games\Poker\PokerApi.cs" />
+    <Compile Include="..\Poker.Client\ProfileSync.cs"       Link="Games\Poker\ProfileSync.cs" />
+    <Compile Include="..\Poker.Client\Textures.cs"          Link="Games\Poker\Textures.cs" />
+
+    <Compile Include="..\Blackjack.Client\BlackjackPanel.cs" Link="Games\Blackjack\BlackjackPanel.cs" />
+    <Compile Include="..\Blackjack.Client\CardView.cs"       Link="Games\Blackjack\CardView.cs" />
+    <Compile Include="..\Blackjack.Client\BlackjackApi.cs"   Link="Games\Blackjack\BlackjackApi.cs" />
+    <Compile Include="..\Blackjack.Client\ProfileSync.cs"    Link="Games\Blackjack\ProfileSync.cs" />
+    <Compile Include="..\Blackjack.Client\Textures.cs"       Link="Games\Blackjack\Textures.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExCore)\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExCore)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameManaged)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Comfort">
+      <HintPath>$(GameManaged)\Comfort.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(GameManaged)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GameManaged)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GameManaged)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(GameManaged)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!--
+      For Animator alone: the task-bar tab freezes the one it clones, because an
+      Animator is a Behaviour rather than a MonoBehaviour and so slips past the sweep
+      that switches the rest of the borrowed tab off.
+    -->
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(GameManaged)\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(GameManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(GameManaged)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(GameManaged)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sirenix.Serialization">
+      <HintPath>$(GameManaged)\Sirenix.Serialization.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sirenix.OdinInspector.Attributes">
+      <HintPath>$(GameManaged)\Sirenix.OdinInspector.Attributes.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sirenix.Serialization.Config">
+      <HintPath>$(GameManaged)\Sirenix.Serialization.Config.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(GameManaged)\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GameManaged)\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="spt-common">
+      <HintPath>$(SptPlugins)\spt-common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="spt-reflection">
+      <HintPath>$(SptPlugins)\spt-reflection.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
