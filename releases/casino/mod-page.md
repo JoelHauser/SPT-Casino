@@ -6,6 +6,8 @@ The bar is on every screen outside a raid, so the tables open from the hideout, 
 
 **This is a place, not a feature.** The lobby is built to grow: each table is a tile, and new games get added as tiles rather than as new mods with new tabs. Three tables today. More to come, and they will arrive in this mod rather than beside it.
 
+![SPT Casino](https://i.imgur.com/HPJ7e19.png)
+
 ## The money is real
 
 A stake leaves your stash the moment you commit it. Winnings are paid straight back in. There is no chip balance, no separate wallet and nothing to cash out — what you see in your stash is what you have.
