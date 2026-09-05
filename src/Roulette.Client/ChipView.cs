@@ -282,6 +282,12 @@ namespace Roulette.Client
         /// clipped its own label. This is square, centred, and never wider than the
         /// chip itself.
         /// </summary>
+        /// <summary>
+        /// How many chips of a pile actually get drawn. Past three it is a smudge
+        /// rather than a stack, and stacking more only costs draw calls.
+        /// </summary>
+        private const int Deep = 3;
+
         internal static GameObject BuildOnCloth(
             Transform parent, int amount, TMP_FontAsset font, float size)
         {
@@ -293,15 +299,28 @@ namespace Roulette.Client
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.sizeDelta = new Vector2(size, size);
 
-            var stack = Breakdown(amount, out _);
+            // The real mix, largest first, rather than a count of the biggest one.
+            // With no number printed over the pile the chips themselves are the only
+            // thing saying what is on the spot, so a 250,000 bet has to draw a 100k, a
+            // 100k and a 50k -- three 100k chips would be a picture of 300,000.
+            var pile = new List<Chip>();
+            foreach (var entry in Breakdown(amount, out _))
+            {
+                for (var n = 0; n < entry.Value && pile.Count < Deep; n++)
+                {
+                    pile.Add(entry.Key);
+                }
 
-            // The pile is drawn from the largest denomination in it, and at most three
-            // deep -- past that it is a smudge rather than a stack, and the number on
-            // top is what a player actually reads.
-            var deep = Mathf.Min(3, stack.Sum(entry => entry.Value));
-            var face = stack.Count > 0 ? Sprite(stack[0].Key) : null;
+                if (pile.Count >= Deep)
+                {
+                    break;
+                }
+            }
 
-            for (var i = deep - 1; i >= 0; i--)
+            // Drawn back to front so the largest ends up on top, which is the one a
+            // player reads. Past three the pile is a smudge rather than a stack, and
+            // stacking more only costs draw calls.
+            for (var i = pile.Count - 1; i >= 0; i--)
             {
                 var chip = new GameObject("Chip", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
                 chip.transform.SetParent(rect, false);
@@ -315,6 +334,8 @@ namespace Roulette.Client
                 var image = chip.GetComponent<Image>();
                 image.raycastTarget = false;
 
+                var face = Sprite(pile[i]);
+
                 if (face != null)
                 {
                     image.sprite = face;
@@ -326,28 +347,10 @@ namespace Roulette.Client
                 }
             }
 
-            var label = new GameObject("Total", typeof(RectTransform));
-            label.transform.SetParent(rect, false);
-
-            var text = label.AddComponent<TextMeshProUGUI>();
-            text.text = Short(amount);
-            text.fontSize = size * 0.34f;
-            text.alignment = TextAlignmentOptions.Center;
-            text.color = new Color(0.10f, 0.10f, 0.10f, 1f);
-            text.raycastTarget = false;
-            text.enableWordWrapping = false;
-
-            if (font != null)
-            {
-                text.font = font;
-            }
-
-            var labelRect = (RectTransform)label.transform;
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = Vector2.zero;
-            labelRect.offsetMax = Vector2.zero;
-
+            // No total printed over the pile. The chip art already carries its value,
+            // and a second number in black on top of it read as a defect rather than as
+            // information -- which is what it was, since it duplicated what the face
+            // said and covered the artwork saying it.
             return go;
         }
 
