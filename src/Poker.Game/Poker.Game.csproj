@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Mutators stay internal: only a table may deal into a hand in a real game.
+         The tests need them to build fixed hands. -->
+    <InternalsVisibleTo Include="Poker.Game.Tests" />
+  </ItemGroup>
+
+</Project>
