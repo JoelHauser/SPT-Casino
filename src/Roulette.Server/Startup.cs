@@ -22,10 +22,11 @@ public class Startup(RouletteLog log) : IOnLoad
         log.Info("routes: POST /roulette/ping, /place, /remove, /clear, /spin, /state, /leave");
         log.Info("single-zero European wheel -- 37 pockets, 2.70% to the house on every bet");
 
-        // Said plainly and at boot, because a stash that never changes otherwise reads
-        // as the mod being broken rather than as the mod being unfinished.
-        log.Info("THE CHIPS ARE NOT CURRENCY IN THIS BUILD. Nothing is taken from your stash");
-        log.Info("and nothing is paid into it. The money path is not written yet.");
+        // Said plainly and at boot, because this is the line that stops being true
+        // quietly. It moves roubles now.
+        log.Info("THIS TABLE PLAYS FOR REAL ROUBLES. The stake leaves your stash when the");
+        log.Info("wheel turns and the return is paid back when it stops. Chips on the cloth");
+        log.Info("cost nothing until you spin.");
 
         // Stack limits are deliberately NOT reported here. PostLoad + 1 is not last:
         // BarterItemsStacks rewrites every one of them about half a second after this

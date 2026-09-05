@@ -262,12 +262,42 @@ namespace Roulette.Client
         private static void Clear() => Render(RouletteApi.Clear());
 
         /// <summary>
+        /// Shows anything the server needed to say regardless of what was asked, and
+        /// resyncs if it moved money.
+        ///
+        /// The only thing that arrives this way is a stake given back after a spin the
+        /// server never finished -- a crash between the debit and the credit. It is
+        /// rare and it is the player's money, so it is said plainly rather than
+        /// swallowed.
+        /// </summary>
+        private static void Note(JObject reply)
+        {
+            var note = (string)reply?["Note"];
+
+            if (string.IsNullOrEmpty(note))
+            {
+                return;
+            }
+
+            ProfileSync.Request();
+            SetStatus(note);
+
+            RouletteClientPlugin.Log.LogInfo("[Roulette] " + note);
+        }
+
+        /// <summary>
         /// Turns the wheel.
         ///
         /// The server settles before this returns, so the animation is played over a
-        /// result that already exists. The buttons go away while it runs -- not to
-        /// protect the money, which is already safe, but because a table that accepts
-        /// bets during a spin is lying about what it is doing.
+        /// result that already exists. **The money has already moved by the time the
+        /// ball starts rolling** -- the stake is out of the stash and the return is
+        /// back in it. The animation is theatre over a settled fact, which is the only
+        /// way to do it: a wheel that decided the result when it stopped would be a
+        /// wheel the client could be made to lie about.
+        ///
+        /// The buttons go away while it runs, not to protect the money, which is
+        /// already safe, but because a table that accepts bets during a spin is lying
+        /// about what it is doing.
         /// </summary>
         private static void Spin()
         {
@@ -286,6 +316,15 @@ namespace Roulette.Client
                 SetStatus(error);
                 return;
             }
+
+            // The stash changed behind the game's back. Without this the roubles have
+            // moved in the profile and are invisible until a reload, which is the
+            // failure that reads as the mod having eaten them -- and worse, the client
+            // goes on believing in stacks the server deleted, so the next thing the
+            // player drags in their stash is refused.
+            ProfileSync.Request();
+
+            Note(reply);
 
             var last = reply["Table"]?["Last"] as JObject;
 
