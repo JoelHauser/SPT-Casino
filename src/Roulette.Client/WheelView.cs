@@ -266,13 +266,20 @@ namespace Roulette.Client
             var root = NewImage("Wheel", parent, Clear);
             root.sizeDelta = new Vector2(diameter, diameter);
 
+            // Taken once. Warmed hands the arrays over and forgets them -- two megabytes
+            // that will never be read again once they are on the GPU -- so asking twice
+            // gets the warm pair and then a cold miss that repaints both from scratch.
+            // That is exactly what the first attempt at this did, and the wheel still
+            // cost its full 1302ms with the warm-up sitting there unused.
+            var painted = Warmed(pockets);
+
             // The head goes down first so the bowl's inner edge draws over it, which is
             // what makes the pockets look sunk into the bowl rather than pasted on.
             _head = NewImage("Head", root, Color.white);
             _head.anchorMin = _head.anchorMax = new Vector2(0.5f, 0.5f);
             _head.pivot = new Vector2(0.5f, 0.5f);
             _head.sizeDelta = new Vector2(diameter, diameter);
-            _head.GetComponent<Image>().sprite = Upload(Warmed(pockets).Head);
+            _head.GetComponent<Image>().sprite = Upload(painted.Head);
 
             BuildNumbers(pockets, diameter);
 
@@ -280,7 +287,7 @@ namespace Roulette.Client
             bowl.anchorMin = bowl.anchorMax = new Vector2(0.5f, 0.5f);
             bowl.pivot = new Vector2(0.5f, 0.5f);
             bowl.sizeDelta = new Vector2(diameter, diameter);
-            bowl.GetComponent<Image>().sprite = Upload(Warmed(pockets).Bowl);
+            bowl.GetComponent<Image>().sprite = Upload(painted.Bowl);
 
             BuildBall(root, diameter);
             BuildMarker(root, diameter);
@@ -643,6 +650,9 @@ namespace Roulette.Client
         // ------------------------------------------------------------- warming up
 
         private static Thread _warming;
+
+        /// <summary>Which pocket list the running warm-up is for. See Warmed.</summary>
+        private static string _warmingFor;
         private static Color32[] _warmBowl;
         private static Color32[] _warmHead;
         private static string _warmFor;
@@ -674,6 +684,7 @@ namespace Roulette.Client
             // Copied rather than captured. The list belongs to the caller and this is
             // about to be read from another thread for the best part of a second.
             var snapshot = pockets.ToArray();
+            _warmingFor = key;
 
             _warming = new Thread(() =>
             {
@@ -722,13 +733,19 @@ namespace Roulette.Client
             var key = Signature(pockets);
             var running = _warming;
 
-            if (running != null && key == Signature(pockets))
+            // Against the signature being warmed, not against itself. The first version
+            // compared `key` with `Signature(pockets)` -- the same value twice -- which
+            // is always true and so waited for a warm-up that might have been for a
+            // different wheel entirely.
+            if (running != null && key == _warmingFor)
             {
                 running.Join(TimeSpan.FromSeconds(10));
             }
 
             if (_warmFor == key && _warmBowl != null && _warmHead != null)
             {
+                RouletteClientPlugin.Log.LogInfo("[Roulette] wheel was painted ahead of time.");
+
                 var warm = (_warmBowl, _warmHead);
 
                 // Handed over rather than kept. Two megabytes of colour that will never
@@ -738,6 +755,10 @@ namespace Roulette.Client
 
                 return warm;
             }
+
+            RouletteClientPlugin.Log.LogInfo(
+                "[Roulette] wheel not warm (" + (_warmFor == null ? "never started" : "for " + _warmFor)
+                + ", wanted " + key + ") -- painting it now.");
 
             return (BowlPixels(), HeadPixels(pockets));
         }
