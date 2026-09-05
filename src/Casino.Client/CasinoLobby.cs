@@ -56,7 +56,7 @@ namespace Casino.Client
             // on to. A player who has read it never sees this branch again.
             if (CasinoIntro.ShouldShow())
             {
-                CasinoIntro.Open(Show);
+                CasinoIntro.Open(() => Show(instant: true));
                 return;
             }
 
@@ -67,7 +67,20 @@ namespace Casino.Client
         /// Shows the lobby. Also what a table falls back to when it closes, which is
         /// why it is separate from <see cref="Toggle"/>.
         /// </summary>
-        internal static void Show()
+        /// <param name="instant">
+        /// Skip the fade and come up solid.
+        ///
+        /// Used whenever something opaque is already covering the screen: the welcome
+        /// card and the tables both draw above the lobby, so bringing it up underneath
+        /// them costs nothing visually and there is nothing to fade in from.
+        ///
+        /// **Fading in from zero is what caused the flash.** Continue used to destroy
+        /// the welcome card and then start a fade, so for the length of that fade the
+        /// only thing on screen was the menu, and the casino appeared to blink out and
+        /// come back. Building the lobby first and then taking the cover away has no
+        /// frame in it where neither is drawn.
+        /// </param>
+        internal static void Show(bool instant = false)
         {
             try
             {
@@ -83,6 +96,19 @@ namespace Casino.Client
 
                 _closing = false;
                 _root.SetActive(true);
+
+                if (instant)
+                {
+                    if (_fade != null && CasinoPlugin.Instance != null)
+                    {
+                        CasinoPlugin.Instance.StopCoroutine(_fade);
+                        _fade = null;
+                    }
+
+                    _group.alpha = 1f;
+                    return;
+                }
+
                 FadeTo(1f, null);
             }
             catch (Exception ex)
@@ -118,14 +144,18 @@ namespace Casino.Client
         /// <summary>
         /// Leaves a table and comes back here.
         ///
-        /// The lobby is shown straight away rather than after the table has faded. The
-        /// two fades overlap, which is what makes it read as stepping back into the
-        /// room rather than as the screen going dark and something else arriving.
+        /// The lobby comes up solid underneath first and the table then fades off the
+        /// top of it, so the room is already there when the table goes. It reads as
+        /// stepping back rather than as the screen going dark and something arriving.
         /// </summary>
         internal static void Leave(ICasinoGame game)
         {
+            // The lobby first, solid, and then the table fades off the top of it. The
+            // other order dips through the menu in the middle of the two fades: both
+            // backdrops sit at 93%, so half way through neither is covering anything
+            // and the menu shows through the pair of them.
+            Show(instant: true);
             game?.Close();
-            Show();
         }
 
         // ------------------------------------------------------------------ drawing

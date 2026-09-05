@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -72,6 +73,7 @@ namespace Casino.Client
         };
 
         private static GameObject _root;
+        private static CanvasGroup _group;
 
         internal static bool IsOpen => _root != null && _root.activeSelf;
 
@@ -114,6 +116,7 @@ namespace Casino.Client
             {
                 UnityEngine.Object.Destroy(_root);
                 _root = null;
+                _group = null;
             }
         }
 
@@ -181,6 +184,62 @@ namespace Casino.Client
             }
         }
 
+        /// <summary>
+        /// Continue: remember it, put the lobby up underneath, then fade this away.
+        ///
+        /// **The order is the fix.** It used to destroy the card and then ask the lobby
+        /// to fade itself in from nothing, which left several frames where the only
+        /// thing drawn was the menu -- the casino appeared to blink out and come back.
+        /// The card sits above the lobby, so building the lobby first costs nothing
+        /// visually and there is never a frame with neither on screen.
+        /// </summary>
+        private static void Dismiss(Action onContinue)
+        {
+            Remember();
+
+            // Underneath, solid, before anything is taken away.
+            onContinue?.Invoke();
+
+            var host = CasinoPlugin.Instance;
+
+            if (host == null || _group == null)
+            {
+                Close();
+                return;
+            }
+
+            host.StartCoroutine(FadeOut());
+        }
+
+        private static IEnumerator FadeOut()
+        {
+            const float seconds = 0.18f;
+            var group = _group;
+            var root = _root;
+
+            for (var t = 0f; t < seconds; t += Time.unscaledDeltaTime)
+            {
+                if (group == null)
+                {
+                    yield break;
+                }
+
+                group.alpha = Mathf.Lerp(1f, 0f, t / seconds);
+                yield return null;
+            }
+
+            // Only tears down what this coroutine was fading. Reopening the card while
+            // it is on its way out would otherwise destroy the new one.
+            if (_root == root)
+            {
+                Close();
+            }
+            else if (root != null)
+            {
+                UnityEngine.Object.Destroy(root);
+            }
+        }
+
         // ------------------------------------------------------------------ drawing
 
         private static void Build(Action onContinue)
@@ -204,6 +263,11 @@ namespace Casino.Client
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 1f;
+
+            // Faded off rather than destroyed, so the lobby can be built underneath it
+            // first. See Dismiss.
+            _group = canvasObject.AddComponent<CanvasGroup>();
+            _group.alpha = 1f;
 
             var backdrop = CasinoLobby.NewBox("Backdrop", canvasObject.transform, new Color(0f, 0f, 0f, 0.94f));
             backdrop.anchorMin = Vector2.zero;
@@ -267,12 +331,7 @@ namespace Casino.Client
             text.rectTransform.offsetMax = Vector2.zero;
             text.color = Gold;
 
-            box.gameObject.AddComponent<Button>().onClick.AddListener(() =>
-            {
-                Remember();
-                Close();
-                onContinue?.Invoke();
-            });
+            box.gameObject.AddComponent<Button>().onClick.AddListener(() => Dismiss(onContinue));
         }
     }
 }
