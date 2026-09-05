@@ -353,10 +353,32 @@ built and deployed to `H:\SPT4.1.X` but has **not been looked at**. Deployed
   thirty-six maximum rouble stacks.
 - **Mutation-check the engine's payouts.** The settlement is checked; `Payouts` and
   `Bet.Covers` are not, and they are all money.
-- **Mutation-check `Payouts` and `Bet.Covers`.** The settlement has been checked this
-  way and the arithmetic under it has not, and it decides what every bet pays.
+- **Play a straight-up win big enough to split.** A 1,000,000 chip on a number pays
+  36,000,000, and on a stock server that is thirty-six maximum rouble stacks. This
+  server's limit is raised to 20,000,000 by an item mod, so the biggest win seen so
+  far arrived in one stack and the splitting loop has still never run for real.
 - **The console harness**, so a spin can be run thousands of times without Unity.
   `tools/Roulette.Console` does not exist; Poker's is the model.
+
+### The payouts are mutation-checked, and counting is not checking
+
+Twenty-one deliberate faults in `Payouts` and `Bet.Covers`: every price in the table
+moved one step, a winner paid without its stake back, a loser paid with it, and each
+branch of `Covers` given a plausible off-by-one. Nineteen were caught at once.
+
+**The two that survived were the same mistake, and it is worth naming.** A corner
+covering 1, 2, 3, 5 instead of 1, 2, 4, 5 -- a column of three and a stray -- passed
+everything, and so did swapping odd with even so the table paid odd bets on even
+results. Both survived because the tests counted the covered numbers instead of
+checking them: four distinct numbers in range is still four, eighteen is still
+eighteen, and `odds x coverage = 36` holds either way. The identity is a good test and
+it cannot see this class of fault at all.
+
+They are pinned now by properties derived from somewhere other than the code under
+test. A corner has to be two adjacent printed columns by two adjacent printed rows
+with all four cells filled, which comes from the grid. Odd numbers are `n % 2 == 1`.
+Red is whatever `Wheel.ColourOf` says. **When adding a bet, assert which numbers it
+covers, not how many.**
 
 ### The play stays on static routes, and that is a decision
 
