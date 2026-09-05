@@ -338,6 +338,17 @@ gain and the jaggedness took three rounds to remove.
 What is left is `panel 124ms`, of which the six chip PNGs are 61ms. Warmable the same
 way if it ever matters; at 197ms it does not.
 
+### There is no wheel image, and there is no wheel.png
+
+The bowl was a photograph once. It was measured and thrown out: its fret spacing came
+to 10.65 degrees, which is 33 or 34 pockets, not 37 -- the numbers could never have
+lined up with the pockets the server settles against. The wheel is generated from the
+server's own pocket list instead, which is why it is right by construction.
+
+`wheel.png` outlived that decision by weeks and was still being shipped: 3.0 MB of an
+image nothing loads, in every download, because deleting the code that used it did not
+delete the file. Removed 2026-09-05. `ball.png` is real and still used.
+
 ### Not yet seen on screen
 
 The most recent change -- right-click to lift a chip, the number hidden under the chip
