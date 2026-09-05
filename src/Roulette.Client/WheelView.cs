@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -270,7 +272,7 @@ namespace Roulette.Client
             _head.anchorMin = _head.anchorMax = new Vector2(0.5f, 0.5f);
             _head.pivot = new Vector2(0.5f, 0.5f);
             _head.sizeDelta = new Vector2(diameter, diameter);
-            _head.GetComponent<Image>().sprite = HeadSprite(pockets);
+            _head.GetComponent<Image>().sprite = Upload(Warmed(pockets).Head);
 
             BuildNumbers(pockets, diameter);
 
@@ -278,7 +280,7 @@ namespace Roulette.Client
             bowl.anchorMin = bowl.anchorMax = new Vector2(0.5f, 0.5f);
             bowl.pivot = new Vector2(0.5f, 0.5f);
             bowl.sizeDelta = new Vector2(diameter, diameter);
-            bowl.GetComponent<Image>().sprite = BowlSprite();
+            bowl.GetComponent<Image>().sprite = Upload(Warmed(pockets).Bowl);
 
             BuildBall(root, diameter);
             BuildMarker(root, diameter);
@@ -491,9 +493,9 @@ namespace Roulette.Client
         /// The bowl: the gold rim, the wooden apron with its deflectors, and the track
         /// the ball runs on. Transparent inside, where the head shows through.
         /// </summary>
-        private static Sprite BowlSprite()
+        private static Color32[] BowlPixels()
         {
-            return Paint((f, angle, light) =>
+            return Compute((f, angle, light) =>
             {
                 if (f > 1f)
                 {
@@ -541,12 +543,12 @@ namespace Roulette.Client
         /// Drawn from the pocket list the server sent, so the colours and their order
         /// cannot disagree with the wheel it is settling against.
         /// </summary>
-        private static Sprite HeadSprite(IReadOnlyList<PocketInfo> pockets)
+        private static Color32[] HeadPixels(IReadOnlyList<PocketInfo> pockets)
         {
             var step = 360f / pockets.Count;
             var half = Texture / 2f;
 
-            return Paint((f, angle, light) =>
+            return Compute((f, angle, light) =>
             {
                 if (f > OuterGoldInner)
                 {
@@ -638,6 +640,112 @@ namespace Roulette.Client
             });
         }
 
+        // ------------------------------------------------------------- warming up
+
+        private static Thread _warming;
+        private static Color32[] _warmBowl;
+        private static Color32[] _warmHead;
+        private static string _warmFor;
+
+        /// <summary>
+        /// Starts painting the wheel before anybody asks for it.
+        ///
+        /// Called when the task-bar tab appears, which is many seconds before the
+        /// earliest possible click, so by the time the table opens there is nothing
+        /// left to do but upload two colour arrays.
+        ///
+        /// Safe to call repeatedly and from anywhere: it does nothing if the wheel is
+        /// already warm for this pocket list, or if a warm-up is already running.
+        /// </summary>
+        internal static void Warm(IReadOnlyList<PocketInfo> pockets)
+        {
+            if (pockets == null || pockets.Count == 0)
+            {
+                return;
+            }
+
+            var key = Signature(pockets);
+
+            if (_warming != null || key == _warmFor)
+            {
+                return;
+            }
+
+            // Copied rather than captured. The list belongs to the caller and this is
+            // about to be read from another thread for the best part of a second.
+            var snapshot = pockets.ToArray();
+
+            _warming = new Thread(() =>
+            {
+                try
+                {
+                    var bowl = BowlPixels();
+                    var head = HeadPixels(snapshot);
+
+                    _warmBowl = bowl;
+                    _warmHead = head;
+                    _warmFor = key;
+                }
+                catch (Exception ex)
+                {
+                    // Never fatal. A failed warm-up just means the table paints the
+                    // wheel itself when it opens, exactly as it always did.
+                    RouletteClientPlugin.Log.LogWarning("[Roulette] could not warm the wheel: " + ex.Message);
+                }
+                finally
+                {
+                    _warming = null;
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "Roulette wheel",
+
+                // Below normal: this is work nobody is waiting for, and the menu it
+                // runs behind is being rendered on the thread that matters.
+                Priority = System.Threading.ThreadPriority.BelowNormal,
+            };
+
+            _warming.Start();
+        }
+
+        /// <summary>
+        /// The painted wheel, warm if the warm-up got there and painted now if not.
+        ///
+        /// A warm-up already running is waited for rather than raced: computing the
+        /// same pixels a second time on the main thread would be the slow path *and*
+        /// throw away the work in flight. Worst case this is exactly as slow as it was
+        /// before there was a warm-up.
+        /// </summary>
+        private static (Color32[] Bowl, Color32[] Head) Warmed(IReadOnlyList<PocketInfo> pockets)
+        {
+            var key = Signature(pockets);
+            var running = _warming;
+
+            if (running != null && key == Signature(pockets))
+            {
+                running.Join(TimeSpan.FromSeconds(10));
+            }
+
+            if (_warmFor == key && _warmBowl != null && _warmHead != null)
+            {
+                var warm = (_warmBowl, _warmHead);
+
+                // Handed over rather than kept. Two megabytes of colour that will never
+                // be read again once they are on the GPU.
+                _warmBowl = null;
+                _warmHead = null;
+
+                return warm;
+            }
+
+            return (BowlPixels(), HeadPixels(pockets));
+        }
+
+        /// <summary>What the painted wheel depends on: how many pockets, and their colours.</summary>
+        private static string Signature(IReadOnlyList<PocketInfo> pockets) =>
+            string.Join(",", pockets.Select(p => p.Colour));
+
         /// <summary>
         /// Runs a function over every pixel of a square texture, handing it the radius as
         /// a fraction, the angle clockwise from the top, and a lighting factor.
@@ -645,7 +753,15 @@ namespace Roulette.Client
         /// The fraction is of the **radius**, not the diameter. Getting that wrong is
         /// what drew a pocket ring at twice its size and burst it out of the bowl.
         /// </summary>
-        private static Sprite Paint(Func<float, float, float, Color32> shade)
+        private static Sprite Paint(Func<float, float, float, Color32> shade) =>
+            Upload(Compute(shade));
+
+        /// <summary>
+        /// Turns a colour array into a sprite. **Main thread only** -- this is the only
+        /// part of painting the wheel that touches a Unity object, and it is the cheap
+        /// part: an upload of a megapixel, not the four million samples that produced it.
+        /// </summary>
+        private static Sprite Upload(Color32[] pixels)
         {
             var texture = new Texture2D(Texture, Texture, TextureFormat.RGBA32, false)
             {
@@ -654,6 +770,28 @@ namespace Roulette.Client
                 hideFlags = HideFlags.HideAndDontSave,
             };
 
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            return Sprite.Create(
+                texture, new Rect(0f, 0f, Texture, Texture), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        /// <summary>
+        /// Every pixel of the wheel, as numbers.
+        ///
+        /// **Pure arithmetic, and deliberately so: this runs on a background thread.**
+        /// It measured at about 640ms a pass, twice, which was 1274 of the 1489ms the
+        /// table took to open the first time -- the whole of the stall. Nothing in here
+        /// may touch a Unity object. `Mathf` is safe because every function used from it
+        /// is a static wrapper over `System.Math`; `Texture2D`, `Sprite` and anything
+        /// with a `GameObject` behind it are not, and live in <see cref="Upload"/>.
+        ///
+        /// The output is identical to what it always was. The wheel is not cheaper to
+        /// draw, it is drawn somewhere the player is not waiting.
+        /// </summary>
+        private static Color32[] Compute(Func<float, float, float, Color32> shade)
+        {
             var pixels = new Color32[Texture * Texture];
             var half = Texture / 2f;
 
@@ -729,11 +867,7 @@ namespace Roulette.Client
                 }
             }
 
-            texture.SetPixels32(pixels);
-            texture.Apply();
-
-            return Sprite.Create(
-                texture, new Rect(0f, 0f, Texture, Texture), new Vector2(0.5f, 0.5f), 100f);
+            return pixels;
         }
 
         private static Color32 Lerp(Color32 a, Color32 b, float t)

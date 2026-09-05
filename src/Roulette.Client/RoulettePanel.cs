@@ -59,6 +59,9 @@ namespace Roulette.Client
 
         /// <summary>Money has moved and the running game has not been told. See ResyncStash.</summary>
         private static bool _syncOwed;
+
+        /// <summary>Whether the wheel has been sent off to be painted. See Prewarm.</summary>
+        private static bool _prewarmed;
         private static string _pocketSignature;
 
         /// <summary>What the next chip put down is worth. Chosen from the tray.</summary>
@@ -82,13 +85,71 @@ namespace Roulette.Client
             Open();
         }
 
+        /// <summary>
+        /// Paints the wheel before anyone asks for it.
+        ///
+        /// Called when the task-bar tab appears. The first open measured at 1489ms, of
+        /// which the wheel was 1274 -- two passes over a 1024-square texture at four
+        /// samples a pixel. None of that is Unity work, so it runs on a background
+        /// thread from the moment the menu is up, and by the time the tab is clicked
+        /// there is nothing left but an upload.
+        ///
+        /// The state call is what makes it possible: the wheel is drawn from the
+        /// server's pocket list, so the pockets have to be in hand first. It is the
+        /// same call Open makes, moved earlier, and it creates the same empty table.
+        /// </summary>
+        internal static void Prewarm()
+        {
+            if (_prewarmed)
+            {
+                return;
+            }
+
+            _prewarmed = true;
+
+            try
+            {
+                var pockets = RouletteApi.State()?["Table"]?["Pockets"] as JArray;
+
+                if (pockets == null)
+                {
+                    // The server may not be answering yet. Let the next tab install try.
+                    _prewarmed = false;
+                    return;
+                }
+
+                WheelView.Warm(Pockets(pockets));
+            }
+            catch (Exception ex)
+            {
+                _prewarmed = false;
+                RouletteClientPlugin.Log.LogWarning("[Roulette] could not pre-warm the wheel: " + ex.Message);
+            }
+        }
+
+        private static List<PocketInfo> Pockets(JArray pockets) =>
+            pockets
+                .Select(p => new PocketInfo(
+                    (int?)p["Number"] ?? 0,
+                    (string)p["Label"] ?? "?",
+                    (string)p["Colour"] ?? "Black"))
+                .ToList();
+
         internal static void Open()
         {
             try
             {
+                // Timed, because the first open visibly stalls and where the time goes
+                // is not obvious from reading it. Only the first open builds anything;
+                // every later one is a SetActive and a fade.
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                var built = _root == null;
+                long chrome = 0, state = 0;
+
                 if (_root == null)
                 {
                     Build();
+                    chrome = clock.ElapsedMilliseconds;
                 }
 
                 if (_root == null)
@@ -103,7 +164,20 @@ namespace Roulette.Client
                 Canvas.ForceUpdateCanvases();
                 LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)_root.transform);
 
+                var layout = clock.ElapsedMilliseconds;
+
+                // The wheel and the cloth are drawn from the server's reply, so they
+                // are built inside this call rather than in Build().
                 Render(RouletteApi.State());
+                state = clock.ElapsedMilliseconds;
+
+                if (built)
+                {
+                    RouletteClientPlugin.Log.LogInfo(
+                        $"[Roulette] first open took {state}ms -- panel {chrome}ms, "
+                        + $"layout {layout - chrome}ms, wheel+cloth+state {state - layout}ms "
+                        + $"(wheel {Timings.Wheel}ms, cloth {Timings.Cloth}ms, chips {Timings.Chips}ms)");
+                }
             }
             catch (Exception ex)
             {
@@ -533,14 +607,12 @@ namespace Roulette.Client
                 UnityEngine.Object.Destroy(_wheelHolder.GetChild(i).gameObject);
             }
 
-            var built = pockets
-                .Select(p => new PocketInfo(
-                    (int?)p["Number"] ?? 0,
-                    (string)p["Label"] ?? "?",
-                    (string)p["Colour"] ?? "Black"))
-                .ToList();
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
+            var built = Pockets(pockets);
 
             WheelView.Build(_wheelHolder, built, WheelSize, _font);
+            Timings.Wheel = clock.ElapsedMilliseconds;
             _pocketSignature = signature;
         }
 
@@ -581,7 +653,10 @@ namespace Roulette.Client
                 corners?.Select(x => (int)x).ToList() ?? new List<int>(),
                 sixLines?.Select(x => (int)x).ToList() ?? new List<int>());
 
+            var clock = System.Diagnostics.Stopwatch.StartNew();
             ClothView.Build(_clothHolder, _layout, _font, Place, Lift);
+            Timings.Cloth = clock.ElapsedMilliseconds;
+
             _layoutSignature = signature;
         }
 
@@ -626,6 +701,8 @@ namespace Roulette.Client
                 UnityEngine.Object.Destroy(_chipTray.GetChild(i).gameObject);
             }
 
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
             foreach (var chip in ChipView.Denominations)
             {
                 var value = chip.Value;
@@ -647,6 +724,11 @@ namespace Roulette.Client
                     BuildChipTray();
                     SetBalance(Staked());
                 });
+            }
+
+            if (Timings.Chips == 0)
+            {
+                Timings.Chips = clock.ElapsedMilliseconds;
             }
         }
 
@@ -930,5 +1012,22 @@ namespace Roulette.Client
                 return null;
             }
         }
+    }
+
+    /// <summary>
+    /// How long each generated piece took to build, in milliseconds.
+    ///
+    /// Kept because the first open stalls and the cost is all in code that draws its
+    /// own art -- a wheel painted at 1024 squared with four samples a pixel, a felt
+    /// texture, six chip faces decoded from PNG. Which of those dominates is not
+    /// obvious from reading them, and guessing wrong means optimising the wrong one.
+    /// </summary>
+    internal static class Timings
+    {
+        internal static long Wheel;
+
+        internal static long Cloth;
+
+        internal static long Chips;
     }
 }
