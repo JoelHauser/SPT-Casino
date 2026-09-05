@@ -1,0 +1,43 @@
+<!--
+  One solution over all three mods.
+
+  Grouped by mod rather than by layer, because that is how the work actually
+  happens: a change is nearly always to one game, top to bottom, and almost never
+  to every engine at once. The shared halves will get a folder of their own here
+  as they are pulled out.
+
+  The .Client projects are net472 and reference assemblies straight out of an SPT
+  install, so they are the one part of this that does not build on a machine
+  without the game. Everything else is .NET 10 and builds anywhere.
+-->
+<Solution>
+  <Folder Name="/Blackjack/">
+    <Project Path="src/Blackjack.Game/Blackjack.Game.csproj" />
+    <Project Path="src/Blackjack.Server/Blackjack.Server.csproj" />
+    <Project Path="src/Blackjack.Client/Blackjack.Client.csproj" />
+    <Project Path="tests/Blackjack.Game.Tests/Blackjack.Game.Tests.csproj" />
+    <Project Path="tests/Blackjack.Server.Tests/Blackjack.Server.Tests.csproj" />
+    <Project Path="tools/Blackjack.Console/Blackjack.Console.csproj" />
+    <!--
+      tools/Blackjack.Installer is deliberately not here, as it was not in
+      Blackjack's own solution. It embeds a payload.zip that
+      tools/build-installer.py generates, so from a clean checkout it fails with
+      CS1566 rather than building, which would make a green solution build
+      impossible for everyone who never runs the installer.
+    -->
+  </Folder>
+  <Folder Name="/Poker/">
+    <Project Path="src/Poker.Game/Poker.Game.csproj" />
+    <Project Path="src/Poker.Server/Poker.Server.csproj" />
+    <Project Path="src/Poker.Client/Poker.Client.csproj" />
+    <Project Path="tests/Poker.Game.Tests/Poker.Game.Tests.csproj" />
+    <Project Path="tests/Poker.Server.Tests/Poker.Server.Tests.csproj" />
+    <Project Path="tools/Poker.Console/Poker.Console.csproj" />
+  </Folder>
+  <Folder Name="/Roulette/">
+    <Project Path="src/Roulette.Game/Roulette.Game.csproj" />
+    <Project Path="src/Roulette.Server/Roulette.Server.csproj" />
+    <Project Path="src/Roulette.Client/Roulette.Client.csproj" />
+    <Project Path="tests/Roulette.Game.Tests/Roulette.Game.Tests.csproj" />
+  </Folder>
+</Solution>

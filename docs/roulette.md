@@ -4,8 +4,8 @@ A roulette table for the SPT hideout. Server mod in C# (.NET 10) against SPT 4.1
 with a BepInEx client plugin. **The wheel actually spins**, and that is a stated
 requirement rather than polish -- see "The wheel has to spin".
 
-Third in a family. **Blackjack** (`../Blackjack`, shipped at 1.0.2) and **Poker**
-(`../Poker-`, shipped at 1.0.0) between them already solved the money, the two
+Third in a family. **Blackjack** (`src/Blackjack.*`, shipped at 1.0.2) and **Poker**
+(`src/Poker.*`, shipped at 1.0.0) between them already solved the money, the two
 transports, the menu entrance, escape handling and the card and chip art. When
 something below says "port", there is working, shipped code in one of those repos to
 copy rather than rediscover.
@@ -138,7 +138,7 @@ result. Tying the credit to an animation completing is how money goes missing.
 
 ## The money, inherited whole from Poker
 
-Read `../Poker-/CLAUDE.md` under "The money" before writing any of it. The short
+Read `docs/poker.md` under "The money" before writing any of it. The short
 version of what applies here:
 
 - **One chip is one rouble.** Roubles are the only wallet that works at these stakes.
