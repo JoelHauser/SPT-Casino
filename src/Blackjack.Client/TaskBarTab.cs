@@ -99,7 +99,67 @@ namespace Blackjack.Client
         /// guesswork, both were read out of the installed assembly, and they still did
         /// not work.
         /// </summary>
-        internal static bool InRaid => Singleton<GameWorld>.Instantiated;
+        /// <summary>
+        /// Whether a raid is actually running.
+        ///
+        /// **Two traps here, and the tab was falling into at least one of them.** It
+        /// used to be a bare `Singleton&lt;GameWorld&gt;.Instantiated`.
+        ///
+        /// First, the hideout is a `GameWorld` too. `HideoutGameWorld` derives from
+        /// `ClientLocalGameWorld` from `ClientGameWorld` from `GameWorld`, so walking
+        /// into the hideout made this true and greyed the tab out. Standing in the
+        /// hideout is not being in a raid, and the table is meant to open from there.
+        ///
+        /// Second, `Instantiated` cannot see a destroyed world. Read out of Comfort.dll,
+        /// its whole body is:
+        ///
+        ///     ldsfld _instance ; box T ; ldnull ; cgt.un
+        ///
+        /// which is a **raw reference** comparison. Unity's own `==` reports a destroyed
+        /// object as null; this does not. So any world torn down without something
+        /// calling `Release` stays "instantiated" for the rest of the session, and the
+        /// tab never comes back. `HideoutController` does call `Release`, but relying on
+        /// every exit path reaching it is exactly the assumption that costs a dead menu.
+        ///
+        /// Comparing the instance against null with Unity's operator covers both.
+        /// </summary>
+        internal static bool InRaid
+        {
+            get
+            {
+                if (!Singleton<GameWorld>.Instantiated)
+                {
+                    return false;
+                }
+
+                var world = Singleton<GameWorld>.Instance;
+
+                // Unity's null, deliberately: a destroyed world is null here and is not
+                // null to the check above.
+                if (world == null)
+                {
+                    return false;
+                }
+
+                // The hideout and the narrated scenes are worlds without being raids.
+                return !(world is HideoutGameWorld) && !(world is NarrateGameWorld);
+            }
+        }
+
+        /// <summary>Why the tab is dim, for the log. See the diagnostic in Update.</summary>
+        internal static string DimReason()
+        {
+            if (!Singleton<GameWorld>.Instantiated)
+            {
+                return "no world";
+            }
+
+            var world = Singleton<GameWorld>.Instance;
+
+            return world == null
+                ? "world destroyed but still latched in the singleton"
+                : "world is " + world.GetType().Name;
+        }
 
         private static MenuTaskBar Bar =>
             PreloaderUI.Instantiated ? PreloaderUI.Instance?.MenuTaskBar : null;
@@ -976,6 +1036,9 @@ namespace Blackjack.Client
         private Transform _glow;
         private CanvasGroup _group;
 
+        /// <summary>Last reported liveness, so the diagnostic logs edges rather than frames.</summary>
+        private bool _wasLive = true;
+
         private void Awake()
         {
             _glow = transform.Find("Hover");
@@ -1009,6 +1072,24 @@ namespace Blackjack.Client
             }
 
             var live = Live;
+
+            // Says why, once each time the tab goes dim and once when it comes back.
+            // A tab that greys itself out and stays that way is indistinguishable from
+            // a broken mod, and every candidate cause looks the same from the outside:
+            // a raid running, a world left latched after the hideout, or the row itself
+            // locked. This names which.
+            if (live != _wasLive)
+            {
+                _wasLive = live;
+
+                BlackjackClientPlugin.Log.LogInfo(live
+                    ? "[Blackjack] tab live again."
+                    : "[Blackjack] tab dim -- InRaid=" + TaskBarTab.InRaid
+                        + " (" + TaskBarTab.DimReason() + "), mirrorGroup="
+                        + (MirrorGroup == null ? "gone" : MirrorGroup.interactable.ToString())
+                        + ", mirror="
+                        + (Mirror == null ? "gone" : Mirror.IsInteractable().ToString()));
+            }
 
             _group.alpha = live ? 1f : LockedAlpha;
             _group.interactable = live;
