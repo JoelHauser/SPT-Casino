@@ -241,22 +241,39 @@ namespace Casino.Client
                 face.sprite = Textures.RoundedBox(10, Tile, TileEdge, 2);
                 face.type = Image.Type.Sliced;
 
+                // The table's own artwork, or a drawn suit if it is not on disk.
+                //
+                // Untinted when it is artwork: these are black-and-white glyphs with
+                // their own shading, and tinting them gold would flatten that into one
+                // colour. The drawn fallback is a flat shape and does want the tint.
+                var art = Textures.FromFile(System.IO.Path.Combine(Casino.Shared.Host.AssetFolder, game.Icon));
+
                 var pip = NewBox("Pip", tile, Color.white);
-                pip.sizeDelta = new Vector2(84f, 84f);
-                pip.anchoredPosition = new Vector2(0f, 52f);
-                pip.GetComponent<Image>().sprite = Textures.Suit(game.Pip, Gold);
-                pip.GetComponent<Image>().raycastTarget = false;
+                pip.sizeDelta = new Vector2(104f, 104f);
+                pip.anchoredPosition = new Vector2(0f, 46f);
+
+                var pipImage = pip.GetComponent<Image>();
+                pipImage.sprite = art ?? Textures.Suit(game.Pip, Gold);
+                pipImage.color = Color.white;
+                pipImage.preserveAspect = true;
+                pipImage.raycastTarget = false;
+
+                if (art == null)
+                {
+                    CasinoPlugin.Log.LogInfo(
+                        $"[Casino] no {game.Icon} beside the plugin; {game.Name} falls back to a drawn suit.");
+                }
 
                 var name = NewText("Name", tile, game.Name, 26f);
                 name.rectTransform.anchorMin = name.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
                 name.rectTransform.sizeDelta = new Vector2(width - 24f, 34f);
-                name.rectTransform.anchoredPosition = new Vector2(0f, -28f);
+                name.rectTransform.anchoredPosition = new Vector2(0f, -34f);
                 name.color = Gold;
 
                 var blurb = NewText("Blurb", tile, game.Blurb, 17f);
                 blurb.rectTransform.anchorMin = blurb.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-                blurb.rectTransform.sizeDelta = new Vector2(width - 34f, 60f);
-                blurb.rectTransform.anchoredPosition = new Vector2(0f, -78f);
+                blurb.rectTransform.sizeDelta = new Vector2(width - 34f, 54f);
+                blurb.rectTransform.anchoredPosition = new Vector2(0f, -84f);
                 blurb.enableWordWrapping = true;
                 blurb.color = new Color(0.70f, 0.68f, 0.63f, 1f);
 

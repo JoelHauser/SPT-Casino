@@ -20,7 +20,15 @@ namespace Casino.Client
         /// <summary>As printed on the lobby tile.</summary>
         string Name { get; }
 
-        /// <summary>The card suit drawn on the tile. See Textures.Suit.</summary>
+        /// <summary>
+        /// The table's artwork on the lobby tile, as a filename beside the plugin.
+        /// </summary>
+        string Icon { get; }
+
+        /// <summary>
+        /// The card suit to draw if <see cref="Icon"/> is not on disk. A tile with
+        /// nothing on it is worse than a tile with the wrong shape on it.
+        /// </summary>
         char Pip { get; }
 
         /// <summary>One line under the name. What the game is, not how to play it.</summary>
@@ -45,6 +53,7 @@ namespace Casino.Client
         {
             new Table(
                 "BLACKJACK",
+                "tile-blackjack.png",
                 'D',
                 "Twenty-one against the dealer.",
                 () => Blackjack.Client.BlackjackPanel.IsOpen,
@@ -53,6 +62,7 @@ namespace Casino.Client
 
             new Table(
                 "POKER",
+                "tile-poker.png",
                 'S',
                 "No-limit hold'em against the house's regulars.",
                 () => Poker.Client.PokerPanel.IsOpen,
@@ -61,6 +71,7 @@ namespace Casino.Client
 
             new Table(
                 "ROULETTE",
+                "tile-roulette.png",
                 'H',
                 "A single-zero wheel. 2.70% to the house, every bet.",
                 () => Roulette.Client.RoulettePanel.IsOpen,
@@ -107,9 +118,17 @@ namespace Casino.Client
             private readonly Action _open;
             private readonly Action _close;
 
-            internal Table(string name, char pip, string blurb, Func<bool> isOpen, Action open, Action close)
+            internal Table(
+                string name,
+                string icon,
+                char pip,
+                string blurb,
+                Func<bool> isOpen,
+                Action open,
+                Action close)
             {
                 Name = name;
+                Icon = icon;
                 Pip = pip;
                 Blurb = blurb;
                 _isOpen = isOpen;
@@ -118,6 +137,8 @@ namespace Casino.Client
             }
 
             public string Name { get; }
+
+            public string Icon { get; }
 
             public char Pip { get; }
 
