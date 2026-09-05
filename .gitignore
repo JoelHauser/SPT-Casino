@@ -1,0 +1,19 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+TestResults/
+dist/
+
+# Staged by the installer build and embedded into it. Generated, and five
+# megabytes of it, so it is rebuilt rather than stored.
+tools/Blackjack.Installer/payload.zip
+dist-installer/
+
+# The console harnesses publish self-contained, so each zip is thirty megabytes
+# and rebuilds from source in seconds. The SPT mod zips are small and are tracked.
+releases/*/Blackjack.Console-*.zip
+releases/*/Poker.Console-*.zip
+releases/*/Roulette.Console-*.zip
