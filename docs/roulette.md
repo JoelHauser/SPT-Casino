@@ -267,47 +267,65 @@ two reds. The test was wrong, not the data, and it now pins that property instea
 
 **Update this section as work completes.**
 
-- Repo on `main`, pushed to `github.com/JoelHauser/Roulette`.
-- **`Roulette.Game` green at 70 tests** in about 50ms. Both wheels, the full cloth,
-  every bet, exact payouts, the caps and settlement.
+- **This mod lives in `SPT-Casino` now**, merged with Blackjack and Poker on
+  2026-09-04 and pushed to `github.com/JoelHauser/SPT-Casino`. The old
+  `github.com/JoelHauser/Roulette` repo and the `H:\SPTMods\Roulette` folder are the
+  pre-merge record and are not where work happens. See the root `CLAUDE.md`.
+- **`Roulette.Game` green at 79 tests** in about 50ms. Both wheels, the full cloth,
+  every bet, exact payouts, settlement, and lifting chips back off.
 - **The server is built, installed and verified on the real 4.1.3 install.** The gate
-  passes, the banner prints, six static routes register, the session resolves, the
+  passes, the banner prints, seven static routes register, the session resolves, the
   wallets read, and spins settle correctly against the published wheel positions.
 - **The client is built and deployed**, with the task-bar tab as its entrance. It
   references `spt-common 4.1.3.0`, so `PluginValidator` accepts it.
-- **The wheel spins and the ball lands.** Bowl from the photograph, pockets and
-  numbers drawn from the server's list, ball scaled from the real ratio.
+- **The wheel spins, the ball lands, and it has been watched.** Several rounds of
+  fixes came out of watching it -- see "The wheel has to spin" for the strobe, the
+  freeze at rest and the variance, each of which looked like something else first.
+- **The cloth is drawn and playable.** All 36 numbers and the zero, every split,
+  street, corner and six line as targets on the joins, the columns, the dozens and the
+  outside bets -- built from the server's own enumeration so it cannot offer a bet the
+  server would refuse. A chip tray picks the denomination; left click puts a chip on, a
+  right click takes one back off.
 - **No money moves.** `IBank` has no debit or credit on it, so this is a fact about
   what code exists rather than a promise.
 
 ### Not yet seen on screen
 
-The wheel has been built and deployed but **never watched**. The geometry is derived
-rather than eyeballed, so the constants in the table above, the 6.5s duration, the
-11 relative turns and the bounce envelope are all first guesses that want a look.
+The most recent change -- right-click to lift a chip, the number hidden under the chip
+covering it, and the balance line and chip tray moved clear of the wooden rail -- is
+built and deployed to `H:\SPT4.1.X` but has **not been looked at**. Deployed
+2026-09-04. What wants checking:
+
+- A right click on a stacked spot takes back one chip's worth rather than the pile.
+- A right click does not also place a chip, and does not open a game context menu.
+- The number under a chip is gone, and comes back when the chip does.
+- Nothing overlaps the wooden frame at the top or the bottom of the cloth.
 
 ### Open items
 
 **Next**
 
-- **Watch a spin.** Check the ball settles cleanly in a pocket, the numbers sit
-  right way up around the ring, and the marker points at the winning number.
-- **The betting cloth.** The panel has seven buttons where it should have a layout:
-  36 numbers, the splits, streets, corners, six lines, columns, dozens and the
-  outside bets. `Layout` already enumerates every spot, and splits are indices into
-  it.
-- **Chips.** Port `ChipView` and the six chip images from Poker. `MinBet` is 10,000
-  to match them, though roulette wants smaller chips than poker does -- a straight-up
-  bet at the minimum already returns 360,000.
-
-**Then**
-
-- **The money.** Port `Bank`, `Escrow`, `Abstractions` and `Fakes` from Poker, write
-  `MoneyInvariantTests` **before** the settlement it checks, and add the item-event
-  transport with `ProfileSync` beside it.
+- **The money**, which is all that is between this and a finished mod. Port `Bank`,
+  `Escrow`, `Abstractions` and `Fakes` from Poker, write `MoneyInvariantTests`
+  **before** the settlement it checks, and add the item-event transport with
+  `ProfileSync` beside it. Read `docs/poker.md` under "The money" first. The stake has
+  to leave the stash when the chip goes down and the return has to arrive when the
+  wheel stops, and neither may happen twice.
 - **Mutation-check the payouts.** Nothing in this engine has been mutation-checked
   yet, and it is all money.
 - **The console harness**, so a spin can be run thousands of times without Unity.
+  `tools/Roulette.Console` does not exist; Poker's is the model.
+
+**Held, deliberately**
+
+- **One casino tab instead of three.** Joel's plan is a single tab opening a picker for
+  all three games, **after this mod is finished** -- stated 2026-09-05. Not to be
+  started early. It also moots the fact that `MenuIcon.Pip` is `'S'` here and `'S'` in
+  Poker, which makes the two tabs identical once `TabCrowding` drops the labels.
+- **Shared client code.** `Textures.cs`, `EscapePatch.cs`, `ProfileSync.cs` and
+  `MenuIcon.cs` here are byte-identical to Poker's once the mod name is normalised, and
+  `TaskBarTab.cs` differs by a comment. Pulling them into one shared source project is
+  the precursor to the master tab. See the root `CLAUDE.md`.
 
 **Decisions left open**
 
