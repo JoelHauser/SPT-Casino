@@ -353,11 +353,32 @@ built and deployed to `H:\SPT4.1.X` but has **not been looked at**. Deployed
   thirty-six maximum rouble stacks.
 - **Mutation-check the engine's payouts.** The settlement is checked; `Payouts` and
   `Bet.Covers` are not, and they are all money.
-- **The item-event transport.** Only the static routes exist. Poker serves the same
-  actions on the endpoint EFT already uses for moving items, which is what lets the
-  stash update without `ProfileSync` having to ask.
+- **Mutation-check `Payouts` and `Bet.Covers`.** The settlement has been checked this
+  way and the arithmetic under it has not, and it decides what every bet pays.
 - **The console harness**, so a spin can be run thousands of times without Unity.
   `tools/Roulette.Console` does not exist; Poker's is the model.
+
+### The play stays on static routes, and that is a decision
+
+Poker and Blackjack put their whole game on EFT's item-event endpoint
+(`/client/game/profile/items/moving`), because the reply carries `ProfileChanges` the
+client applies to its own inventory -- one round trip moves the money and updates the
+stash. This mod's notes carried "add the item-event transport" as a to-do for months,
+inherited from Poker, where it is right.
+
+**It is wrong here, and the reason is the animation.** The wheel runs for six to nine
+seconds over a result the server settled before it replied. Send the spin as an item
+event and the game applies the profile change the instant the reply lands, so the
+rouble counter on the screen behind the table moves while the ball is still rolling
+and the player knows the answer nine seconds early. That is not hypothetical -- it
+happened, through `ProfileSync` firing too early, and `RoulettePanel.ResyncStash`
+exists to fix it.
+
+Static routes are what let the client decide *when* to ask, and it asks when the ball
+lands. The one item event this mod registers is `RouletteSync`, which does nothing to
+the game and exists only to be that ask. See `RouletteItemEventRouter`.
+
+Do not "finish the port" by moving `place` and `spin` onto it.
 
 **Held, deliberately**
 
