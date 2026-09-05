@@ -18,6 +18,14 @@ and believes it.
 
 ---
 
+> **This table is part of SPT Casino.** Since 2026-09-05 it has no plugin, no
+> task-bar tab and no escape handler of its own: one plugin, `src/Casino.Client`,
+> owns all three and compiles this table's panel in from `src/Roulette.Client`. That
+> project still builds a standalone plugin and it is **not shipped** -- it is where
+> the panel is edited. The entrance, the lobby and the escape key are in the root
+> `CLAUDE.md`. The server half is unchanged and still its own mod with its own GUID.
+
+
 ## The single most important fact
 
 **SPT 4.x server mods are C#, not TypeScript.** The `mod.ts` / `package.json` /
@@ -402,16 +410,17 @@ the game and exists only to be that ask. See `RouletteItemEventRouter`.
 
 Do not "finish the port" by moving `place` and `spin` onto it.
 
-**Held, deliberately**
+**Done, and this is where they went**
 
-- **One casino tab instead of three.** Joel's plan is a single tab opening a picker for
-  all three games, **after this mod is finished** -- stated 2026-09-05. Not to be
-  started early. It also moots the fact that `MenuIcon.Pip` is `'S'` here and `'S'` in
-  Poker, which makes the two tabs identical once `TabCrowding` drops the labels.
-- **Shared client code.** `Textures.cs`, `EscapePatch.cs`, `ProfileSync.cs` and
-  `MenuIcon.cs` here are byte-identical to Poker's once the mod name is normalised, and
-  `TaskBarTab.cs` differs by a comment. Pulling them into one shared source project is
-  the precursor to the master tab. See the root `CLAUDE.md`.
+- **One casino tab instead of three**, built on 2026-09-05 once this table played for
+  money. `src/Casino.Client` owns the tab, the lobby and the escape key; this project
+  no longer has any of them. The duplicate spade that would have made this tab
+  indistinguishable from Poker's went with them -- the three suits are on the lobby
+  tiles now, where they identify a table rather than a mod.
+- **Shared client code** is still not shared, and is now worse: `Textures.cs` and
+  `ProfileSync.cs` are compiled into `Casino.Client.dll` three times over, once per
+  table. `MenuIcon`, `TabCrowding`, `TaskBarTab` and `EscapePatch` are no longer
+  duplicated at all. See the root `CLAUDE.md`.
 
 **Decisions left open**
 

@@ -1,8 +1,8 @@
 # Blackjack -- working notes for Claude
 
 A card table for the SPT hideout. Server mod in C# (.NET 10) against SPT 4.1.3,
-with a BepInEx client plugin still to be written. Players stake roubles, dollars,
-euros, GP coins, bitcoin or Lega medals.
+with a client panel that has been built, shipped and played. Players stake roubles,
+dollars, euros, GP coins, bitcoin or Lega medals.
 
 This file is loaded automatically at the start of every session. Keep it to things
 a fresh session would otherwise rediscover the hard way -- not a chronological
@@ -10,6 +10,14 @@ diary, which would grow without bound. **Update "Current state" when you finish 
 piece of work.**
 
 ---
+
+> **This table is part of SPT Casino.** Since 2026-09-05 it has no plugin, no
+> task-bar tab and no escape handler of its own: one plugin, `src/Casino.Client`,
+> owns all three and compiles this table's panel in from `src/Blackjack.Client`. That
+> project still builds a standalone plugin and it is **not shipped** -- it is where
+> the panel is edited. The entrance, the lobby and the escape key are in the root
+> `CLAUDE.md`. The server half is unchanged and still its own mod with its own GUID.
+
 
 ## The single most important fact
 
