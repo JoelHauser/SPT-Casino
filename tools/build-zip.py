@@ -6,7 +6,10 @@ Run tools/build-installer.py first to stage the payload.
 """
 import os, shutil, zipfile
 
-REPO = r'H:\SPTMods\Blackjack'
+# Derived from where this file sits rather than written out, so moving the repo --
+# as merging the three casinos into one did -- cannot leave it pointing at a folder
+# that is no longer the checkout.
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAYLOAD = os.path.join(REPO, r'tools\Blackjack.Installer\payload.zip')
 VERSION = '1.0.2'
 OUT = os.path.join(REPO, 'releases', 'Blackjack_V%s.zip' % VERSION)

@@ -5,7 +5,10 @@ straight over the target and both halves land where they belong.
 """
 import os, shutil, subprocess, zipfile
 
-REPO = r'H:\SPTMods\Blackjack'
+# Derived from where this file sits rather than written out, so moving the repo --
+# as merging the three casinos into one did -- cannot leave it pointing at a folder
+# that is no longer the checkout.
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOTNET = r'C:\Users\Hoel\.dotnet\dotnet.exe'
 SPT = r'H:\SPT4.1.X'
 

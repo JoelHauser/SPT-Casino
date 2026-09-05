@@ -4,7 +4,7 @@ A poker table for the SPT hideout. Server mod in C# (.NET 10) against SPT 4.1.3,
 with a BepInEx client plugin. Players buy in with **roubles, dollars or euros** --
 spendable currency only. See "Currency only, and why the valuables went".
 
-Sibling project to **Blackjack** (`../Blackjack`), which is shipped and working at
+Sibling project to **Blackjack** (`src/Blackjack.*`, notes in `docs/blackjack.md`), which is shipped and working at
 1.0.2. **The core of this mod comes from there.** Most of what is written here was
 learned there, the expensive way. When something below says "port", it means there
 is working, shipped code in that repo to copy rather than rediscover -- see "What
