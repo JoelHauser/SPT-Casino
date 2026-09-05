@@ -11,7 +11,9 @@ public record ModMetadata : IModMetadata
     /// <summary>
     /// Declared identically by both halves of the mod -- here and by
     /// <c>[BepInPlugin]</c> on the client plugin, with no ".client" suffix on either.
-    /// The Forge rejects an upload where the two disagree.
+    /// Kept as it is under SPT Casino, which registers as
+    /// com.mybutthasarash.sptcasino: only the main file needs to declare the
+    /// GUID the mod is registered under, so a bundled server mod may keep its own.
     /// </summary>
     public string ModGuid { get; init; } = "com.mybutthasarash.roulette";
 

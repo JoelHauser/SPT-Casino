@@ -19,8 +19,8 @@ namespace Roulette.Client
     public class RouletteClientPlugin : BaseUnityPlugin
     {
         // Deliberately identical to the server mod's ModGuid, and with no ".client"
-        // on the end. The Forge checks that both halves declare the GUID the mod is
-        // registered under, and rejects an upload where they differ.
+        // on the end. Not shipped on its own any more; SPT Casino's plugin carries the
+        // registered GUID. Only that main file has to match it.
         public const string PluginGuid = "com.mybutthasarash.roulette";
         public const string PluginName = "Roulette";
         public const string PluginVersion = "0.1.0";

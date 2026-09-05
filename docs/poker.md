@@ -1519,9 +1519,12 @@ bundled -- the server provides them.
 
 **The mod GUID is `com.mybutthasarash.poker`**, and **both halves declare it
 unchanged** -- `ModMetadata.ModGuid` on the server and `[BepInPlugin]` on the client
-plugin, with no `.client` suffix on either. The Forge checks that the two halves
-agree with the GUID the mod is registered under and rejects an upload where they
-differ. There is nothing to collide with: BepInEx keeps its own plugin registry and
+plugin, with no `.client` suffix on either.
+
+**Only the main file has to match the GUID the mod is registered under** -- corrected
+2026-09-05, after the stricter reading was used to argue that SPT Casino could not be
+uploaded without merging its three server mods first. It can. There is nothing to
+collide with: BepInEx keeps its own plugin registry and
 SPT's mod GUID lives in the server metadata, so the two identifiers never meet.
 Blackjack ships as `com.mybutthasarash.blackjack` on the same rule.
 

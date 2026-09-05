@@ -580,8 +580,13 @@ right and installs nothing.
 
 The version lives in **four** places and they must agree: `Blackjack.Server.csproj`
 `<Version>`, `ModMetadata.Version`, `Blackjack.Client.csproj` `<Version>` and
-`BlackjackClientPlugin.PluginVersion`. The Forge rejects an upload whose two halves
-disagree about the GUID; a version they disagree about is the same kind of trap.
+`BlackjackClientPlugin.PluginVersion`.
+
+**Only the main file has to declare the GUID the mod is registered under.** This
+section used to say the Forge rejects an upload whose two halves disagree, and that is
+wrong -- corrected 2026-09-05. SPT Casino ships one plugin declaring
+`com.mybutthasarash.sptcasino` next to three server mods that each keep their own, and
+that is a valid upload. Do not let the stricter reading block a release again.
 
 Pack with `System.IO.Compression` -- `Compress-Archive` writes backslash entries,
 which extract on Linux as one file with slashes in its name. `scripts/blackjack/pack.ps1` does

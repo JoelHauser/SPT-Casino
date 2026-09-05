@@ -19,8 +19,8 @@ namespace Poker.Client
     public class PokerClientPlugin : BaseUnityPlugin
     {
         // Deliberately identical to the server mod's ModGuid, and with no ".client"
-        // on the end. The Forge checks that both halves declare the GUID the mod is
-        // registered under, and rejects an upload where they differ. BepInEx keeps
+        // on the end. Not shipped on its own any more; SPT Casino's plugin carries the
+        // registered GUID. Only that main file has to match it. BepInEx keeps
         // its own plugin registry and SPT's mod GUID lives in the server metadata,
         // so the two identifiers never meet and there is nothing to collide with.
         public const string PluginGuid = "com.mybutthasarash.poker";
