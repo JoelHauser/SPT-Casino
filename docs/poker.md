@@ -16,6 +16,14 @@ diary. **Update "Current state" when you finish a piece of work.**
 
 ---
 
+> **This table is part of SPT Casino.** Since 2026-09-05 it has no plugin, no
+> task-bar tab and no escape handler of its own: one plugin, `src/Casino.Client`,
+> owns all three and compiles this table's panel in from `src/Poker.Client`. That
+> project still builds a standalone plugin and it is **not shipped** -- it is where
+> the panel is edited. The entrance, the lobby and the escape key are in the root
+> `CLAUDE.md`. The server half is unchanged and still its own mod with its own GUID.
+
+
 ## The variant: no-limit Texas Hold'em against bots
 
 **Decided, after two reversals.** Read the history before reopening it, because the

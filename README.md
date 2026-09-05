@@ -1,56 +1,70 @@
-# SPT-Casino
+# SPT Casino
 
-Three gambling mods for [SPT](https://sp-tarkov.com) 4.1.x, developed together.
+A casino for [SPT](https://sp-tarkov.com) 4.1.x. One tab on the menu bar opens a
+lobby; the lobby has three tables.
 
-| | | |
-| --- | --- | --- |
-| **Blackjack** | A blackjack table in the hideout menu. Stake roubles, dollars, euros, GP coins, bitcoin or Lega medals. | Shipped |
-| **Poker** | No-limit Texas Hold'em against bots, seated under names drawn from the game's own PMC nickname list. | Shipped |
-| **Roulette** | A European wheel that actually spins, and a betting cloth to play it from. | In progress |
+| | |
+| --- | --- |
+| **Blackjack** | Twenty-one against the dealer. |
+| **Poker** | No-limit hold'em against bots, seated under names drawn from the game's own PMC nickname list. |
+| **Roulette** | A single-zero European wheel that actually spins, and a full betting cloth to play it from. |
 
-Each is a separate mod with its own GUID, plugin and server folder, and each installs
-on its own. They live in one repository because they are the same mod three times
-underneath: the menu tab, the escape handling, the profile sync, the chip and card art
-and the money path were written once and copied twice.
+**It plays for real roubles.** A stake leaves your stash the moment you commit it and
+winnings are paid straight back into it. There is no chip balance and nothing to cash
+out. If your stash is too full to take a payout, it arrives in the post instead.
+
+The house edge is real too. Roulette keeps 2.70% of everything staked on it, and the
+other two are not charity either.
+
+## Installing
+
+Extract over your SPT folder -- the one holding `SPT_Runtime` -- and start the server.
+
+**If you have Blackjack, Poker or Roulette installed separately, remove them first.**
+They are all part of this now. Leaving them gives you four tabs on the bar and four
+copies of the same key handler fighting over the escape key.
+
+You should see a `[Casino] client loaded` line in `BepInEx/LogOutput.log`, and a block
+for each table in the server console. Silence from a table means the version gate: the
+server mods declare `~4.1.3` and load nothing outside it.
+
+## Playing
+
+**CASINO** on the bar along the bottom of the menu. It is on every out-of-raid screen,
+so the tables open from the hideout or the flea market without backing out first.
+
+Escape leaves a table and brings you back to the lobby. Escape again closes the casino,
+and only the casino -- the screen behind it stays where it was.
+
+The first time an account walks in, a card explains what the money does. Read it once.
 
 ## Building
 
-Requires the .NET 10 SDK, and an SPT 4.1.x install for the client plugins.
+Requires the .NET 10 SDK, and an SPT 4.1.x install for the plugin.
 
 ```
 dotnet build SPT-Casino.slnx
 dotnet test  SPT-Casino.slnx
+scripts/casino/pack.ps1 -InstallPath 'C:\path\to\SPT'
 ```
 
-The `.Client` projects are BepInEx plugins targeting net472 and are compiled against
-the assemblies of a real install, found through `$(SPTPath)` or passed with
-`-p:SPTPath=<install root>`. The rest is .NET 10 and builds anywhere.
+`Casino.Client` is net472 and is compiled against the assemblies of a real install,
+found through `$(SPTPath)` or passed with `-p:SPTPath=<install root>`. Everything else
+is .NET 10 and builds anywhere.
 
-## Packing a mod
-
-```
-scripts/blackjack/pack.ps1
-scripts/poker/pack-mod.ps1
-scripts/roulette/pack-mod.ps1
-```
-
-Each produces a zip under `releases/<mod>/`, laid out relative to the SPT folder so it
-extracts straight over an install. `-InstallPath` also deploys it. **`SPT_Runtime/` is
-part of the path inside the zip**, not the folder you extract into.
-
-## Layout
+## How it is laid out
 
 ```
-src/<Mod>.Game       the rules, with no SPT types in them, unit tested
-src/<Mod>.Server     the SPT server mod
-src/<Mod>.Client     the BepInEx plugin that draws the table
-tools/<Mod>.Console  a harness that plays the game in a terminal
-docs/<mod>.md        that mod's working notes
+src/Casino.Client     the plugin: tab, lobby, welcome card, escape key
+src/<Table>.Client    each table's panel and views, compiled into the plugin
+src/<Table>.Server    each table's server mod, separate, on its own routes
+src/<Table>.Game      the rules, with no SPT types in them, unit tested
+tools/<Table>.Console a harness that plays the game in a terminal
+docs/<table>.md       that table's working notes
 ```
 
-## Releases
-
-Under `releases/<mod>/`, with a changelog beside each zip.
+One plugin, three server mods. The tables were three separate mods until September
+2026 and their server halves still are, each keeping its own money in its own place.
 
 ## Licence
 
