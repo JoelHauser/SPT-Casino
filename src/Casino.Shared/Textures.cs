@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
-namespace Roulette.Client
+namespace Casino.Shared
 {
     /// <summary>
     /// Sprites drawn in code at load, because the mod ships no art.

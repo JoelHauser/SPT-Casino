@@ -74,6 +74,10 @@ namespace Blackjack.Client
             Instance = this;
             Log = Logger;
 
+            // The shared drawing code needs the same two things. See Casino.Shared.Host.
+            Casino.Shared.Host.Plugin = this;
+            Casino.Shared.Host.Log = Logger;
+
             EnforceTableMaximum = Config.Bind(
                 "Table",
                 "Enforce maximum bet",

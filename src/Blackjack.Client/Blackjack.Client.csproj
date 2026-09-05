@@ -36,6 +36,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      The drawing code every table shares: one copy, in src/Casino.Shared, compiled
+      into whoever is building. See the root CLAUDE.md.
+    -->
+    <Compile Include="..\Casino.Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="BepInEx">
       <HintPath>$(BepInExCore)\BepInEx.dll</HintPath>
       <Private>false</Private>

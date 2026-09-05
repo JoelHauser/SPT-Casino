@@ -39,6 +39,13 @@
   <ItemGroup>
     <!-- The casino itself: one entrance, one lobby, one escape key. -->
     <Compile Include="*.cs" />
+
+    <!--
+      One copy of what every table draws with. These were a file per table, identical
+      but for the name stamped through them, and compiling all three into one assembly
+      made that duplication ship rather than merely exist.
+    -->
+    <Compile Include="..\Casino.Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -51,23 +58,13 @@
     <Compile Include="..\Roulette.Client\RoulettePanel.cs"  Link="Games\Roulette\RoulettePanel.cs" />
     <Compile Include="..\Roulette.Client\WheelView.cs"      Link="Games\Roulette\WheelView.cs" />
     <Compile Include="..\Roulette.Client\ClothView.cs"      Link="Games\Roulette\ClothView.cs" />
-    <Compile Include="..\Roulette.Client\ChipView.cs"       Link="Games\Roulette\ChipView.cs" />
     <Compile Include="..\Roulette.Client\RouletteApi.cs"    Link="Games\Roulette\RouletteApi.cs" />
-    <Compile Include="..\Roulette.Client\ProfileSync.cs"    Link="Games\Roulette\ProfileSync.cs" />
-    <Compile Include="..\Roulette.Client\Textures.cs"       Link="Games\Roulette\Textures.cs" />
 
     <Compile Include="..\Poker.Client\PokerPanel.cs"        Link="Games\Poker\PokerPanel.cs" />
-    <Compile Include="..\Poker.Client\CardView.cs"          Link="Games\Poker\CardView.cs" />
-    <Compile Include="..\Poker.Client\ChipView.cs"          Link="Games\Poker\ChipView.cs" />
     <Compile Include="..\Poker.Client\PokerApi.cs"          Link="Games\Poker\PokerApi.cs" />
-    <Compile Include="..\Poker.Client\ProfileSync.cs"       Link="Games\Poker\ProfileSync.cs" />
-    <Compile Include="..\Poker.Client\Textures.cs"          Link="Games\Poker\Textures.cs" />
 
     <Compile Include="..\Blackjack.Client\BlackjackPanel.cs" Link="Games\Blackjack\BlackjackPanel.cs" />
-    <Compile Include="..\Blackjack.Client\CardView.cs"       Link="Games\Blackjack\CardView.cs" />
     <Compile Include="..\Blackjack.Client\BlackjackApi.cs"   Link="Games\Blackjack\BlackjackApi.cs" />
-    <Compile Include="..\Blackjack.Client\ProfileSync.cs"    Link="Games\Blackjack\ProfileSync.cs" />
-    <Compile Include="..\Blackjack.Client\Textures.cs"       Link="Games\Blackjack\Textures.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -7,7 +7,7 @@ using SPT.Common.Http;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using Textures = Roulette.Client.Textures;
+using Textures = Casino.Shared.Textures;
 
 namespace Casino.Client
 {

@@ -1,3 +1,4 @@
+using Casino.Shared;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -388,7 +389,7 @@ namespace Roulette.Client
             }
 
             _syncOwed = false;
-            ProfileSync.Request();
+            ProfileSync.Request("RouletteSync");
         }
 
         /// <summary>
@@ -434,7 +435,7 @@ namespace Roulette.Client
                 return;
             }
 
-            ProfileSync.Request();
+            ProfileSync.Request("RouletteSync");
             SetStatus(note);
 
             RouletteClientPlugin.Log.LogInfo("[Roulette] " + note);

@@ -1,4 +1,4 @@
-using Textures = Roulette.Client.Textures;
+using Textures = Casino.Shared.Textures;
 using System;
 using System.Collections;
 using System.Collections.Generic;

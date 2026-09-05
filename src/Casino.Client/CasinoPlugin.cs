@@ -58,6 +58,10 @@ namespace Casino.Client
             Instance = this;
             Log = Logger;
 
+            // Where the art is and where to log, for the shared drawing code.
+            Casino.Shared.Host.Plugin = this;
+            Casino.Shared.Host.Log = Logger;
+
             // The tables were written against their own plugins. One plugin now, so it
             // answers to all three names. See Shims.cs.
             Roulette.Client.RouletteClientPlugin.Instance = this;

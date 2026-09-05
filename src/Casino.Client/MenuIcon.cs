@@ -1,5 +1,5 @@
 ﻿using System;
-using Textures = Roulette.Client.Textures;
+using Textures = Casino.Shared.Textures;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
