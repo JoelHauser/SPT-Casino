@@ -23,6 +23,17 @@ public record ClearRequest : IRequestData;
 
 public record SpinRequest : IRequestData;
 
+/// <summary>Takes chips back off one spot. The same shape as placing them.</summary>
+public record RemoveRequest : IRequestData
+{
+    public string Kind { get; set; } = string.Empty;
+
+    public int Selection { get; set; }
+
+    /// <summary>How much to lift. Zero or less takes the whole pile.</summary>
+    public int Amount { get; set; }
+}
+
 /// <summary>Puts one chip -- or several -- on one spot.</summary>
 public record PlaceRequest : IRequestData
 {

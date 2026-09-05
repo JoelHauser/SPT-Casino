@@ -32,11 +32,18 @@ namespace Roulette.Client
         internal static JObject Leave() => Post("/roulette/leave", "{}");
 
         /// <summary>
-        /// PascalCase property names, deliberately. SPT matches request bodies
-        /// case-sensitively, so lowercase keys bind nothing and every field silently
-        /// takes its default -- which is how a 100,000 stake arrives as 0 while
-        /// looking like it bound correctly.
+        /// Lifts chips back off a spot. Zero takes the whole pile.
+        ///
+        /// PascalCase property names, deliberately, like every other body here. SPT
+        /// matches request bodies case-sensitively, so lowercase keys bind nothing and
+        /// every field silently takes its default -- which is how a 100,000 stake
+        /// arrives as 0 while looking like it bound correctly.
         /// </summary>
+        internal static JObject Remove(string kind, int selection, int amount) =>
+            Post(
+                "/roulette/remove",
+                "{\"Kind\":\"" + kind + "\",\"Selection\":" + Num(selection) + ",\"Amount\":" + Num(amount) + "}");
+
         internal static JObject Place(string kind, int selection, int amount) =>
             Post(
                 "/roulette/place",

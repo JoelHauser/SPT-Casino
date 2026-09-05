@@ -31,6 +31,11 @@ public class RouletteRouter(JsonUtil jsonUtil, RouletteCallbacks callbacks)
                 async (url, info, sessionId, output, cancellationToken) =>
                     await callbacks.Place(info, sessionId)),
 
+            new RouteAction<RemoveRequest>(
+                "/roulette/remove",
+                async (url, info, sessionId, output, cancellationToken) =>
+                    await callbacks.Remove(info, sessionId)),
+
             new RouteAction<ClearRequest>(
                 "/roulette/clear",
                 async (url, info, sessionId, output, cancellationToken) =>

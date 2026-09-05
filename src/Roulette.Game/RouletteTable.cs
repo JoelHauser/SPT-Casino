@@ -138,6 +138,49 @@ public sealed class RouletteTable
         }
     }
 
+    /// <summary>
+    /// Takes chips back off one spot.
+    ///
+    /// Reduces rather than removes, because a spot can be built up a chip at a time and
+    /// taking the lot off would be a surprising answer to picking one back up. Asking
+    /// for more than is there takes what is there rather than refusing -- a player
+    /// lifting a chip bigger than the pile means "take it off", not "do nothing".
+    /// </summary>
+    /// <returns>What came back off the cloth.</returns>
+    public int Remove(BetKind kind, int selection, int amount)
+    {
+        if (Phase != SpinPhase.Betting)
+        {
+            throw new InvalidOperationException("The wheel has turned.");
+        }
+
+        var index = _bets.FindIndex(b => b.Kind == kind && b.Selection == selection);
+
+        if (index < 0)
+        {
+            return 0;
+        }
+
+        var taken = Math.Min(amount <= 0 ? _bets[index].Amount : amount, _bets[index].Amount);
+        var left = _bets[index].Amount - taken;
+
+        if (left <= 0)
+        {
+            _bets.RemoveAt(index);
+        }
+        else
+        {
+            _bets[index] = _bets[index] with { Amount = left };
+        }
+
+        if (_log.Enabled)
+        {
+            _log.Write($"took {taken:N0} off {Describe(new Bet(kind, selection, taken))}, {Staked:N0} left");
+        }
+
+        return taken;
+    }
+
     /// <summary>Takes everything back off the cloth. Only while bets are open.</summary>
     public int ClearBets()
     {

@@ -48,6 +48,12 @@ public class RouletteCallbacks(
         return new ValueTask<string>(Respond(service.Place(info, sessionId)));
     }
 
+    public ValueTask<string> Remove(RemoveRequest info, MongoId sessionId)
+    {
+        Received("remove", sessionId, $"{info.Amount:N0} off {info.Kind} {info.Selection}");
+        return new ValueTask<string>(Respond(service.Remove(info, sessionId)));
+    }
+
     public ValueTask<string> Clear(ClearRequest info, MongoId sessionId)
     {
         Received("clear", sessionId, null);

@@ -227,6 +227,38 @@ namespace Roulette.Client
             }
         }
 
+        /// <summary>
+        /// Takes a chip back off a spot -- the right-click half of placing one.
+        ///
+        /// The chip currently held is what comes off, so a spot built up with three
+        /// 100k chips gives back one at a time. Asking for more than is there takes what
+        /// is there, so a big chip in hand still clears a small pile rather than doing
+        /// nothing.
+        /// </summary>
+        private static void Lift(string kind, int selection)
+        {
+            if (WheelView.IsSpinning)
+            {
+                return;
+            }
+
+            var reply = RouletteApi.Remove(kind, selection, _chip);
+
+            if (reply == null)
+            {
+                SetStatus("No answer from the server.");
+                return;
+            }
+
+            Render(reply);
+
+            var error = (string)reply["Error"];
+            if (!string.IsNullOrEmpty(error))
+            {
+                SetStatus(error);
+            }
+        }
+
         private static void Clear() => Render(RouletteApi.Clear());
 
         /// <summary>
@@ -314,9 +346,12 @@ namespace Roulette.Client
 
             if (!keepStatus)
             {
+                // The right-click is said where it will be read: on the line the player
+                // is already looking at while there are chips down. An undiscoverable
+                // control is the same as one that is not there.
                 SetStatus(staked > 0
-                    ? $"{staked:N0} on the cloth across {bets?.Count ?? 0} bet(s)."
-                    : "Put something on the cloth.");
+                    ? $"{staked:N0} on the cloth across {bets?.Count ?? 0} bet(s).  Right-click a spot to take a chip back."
+                    : "Left-click to put a chip down, right-click to take one back.");
             }
 
             if (!keepResult)
@@ -411,7 +446,7 @@ namespace Roulette.Client
                 corners?.Select(x => (int)x).ToList() ?? new List<int>(),
                 sixLines?.Select(x => (int)x).ToList() ?? new List<int>());
 
-            ClothView.Build(_clothHolder, _layout, _font, Place);
+            ClothView.Build(_clothHolder, _layout, _font, Place, Lift);
             _layoutSignature = signature;
         }
 
@@ -556,8 +591,15 @@ namespace Roulette.Client
             // Wheel left, cloth right. Both are looked at while betting, and stacking
             // them ran the cloth off the bottom of a 16:9 screen. The pair is centred as
             // a whole, so an ultrawide simply gets more dark either side.
-            var wheelX = -((ClothView.Width + WheelSize) * 0.25f) - 30f;
-            var clothX = wheelX + (WheelSize * 0.5f) + (ClothView.Width * 0.5f) + 60f;
+            // Solved rather than eyeballed. Putting the wheel at -(table + gap)/2 makes
+            // the pair centre on the screen for any wheel size: the left edge is
+            // wheelX - WheelSize/2 and the right edge wheelX + WheelSize/2 + table + gap,
+            // and those two sum to zero exactly when wheelX takes that value. The old
+            // figure only balanced when the wheel happened to be as wide as the cloth.
+            const float gap = 70f;
+
+            var wheelX = -(ClothView.Framed + gap) * 0.5f;
+            var clothX = wheelX + (WheelSize * 0.5f) + (ClothView.Framed * 0.5f) + gap;
 
             _wheelHolder = NewBox("Wheel", canvasObject.transform, Color.clear);
             _wheelHolder.anchorMin = _wheelHolder.anchorMax = new Vector2(0.5f, 0.5f);
@@ -568,7 +610,7 @@ namespace Roulette.Client
             _clothHolder = NewBox("ClothHolder", canvasObject.transform, Color.clear);
             _clothHolder.anchorMin = _clothHolder.anchorMax = new Vector2(0.5f, 0.5f);
             _clothHolder.pivot = new Vector2(0.5f, 0.5f);
-            _clothHolder.sizeDelta = new Vector2(ClothView.Width, ClothView.Height);
+            _clothHolder.sizeDelta = new Vector2(ClothView.Framed, ClothView.FramedHeight);
             _clothHolder.anchoredPosition = new Vector2(clothX, 70f);
 
             // The result goes under the wheel, where the eye already is when the ball
@@ -585,7 +627,7 @@ namespace Roulette.Client
             _balance.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             _balance.rectTransform.sizeDelta = new Vector2(ClothView.Width, 28f);
             _balance.rectTransform.anchoredPosition =
-                new Vector2(clothX, 70f + (ClothView.Height * 0.5f) + 26f);
+                new Vector2(clothX, 70f + ClothView.Reach + 30f);
             _balance.color = Gold;
 
             // The tray under the cloth: a chip is picked, then put down, the way a real
@@ -594,7 +636,7 @@ namespace Roulette.Client
             _chipTray.anchorMin = _chipTray.anchorMax = new Vector2(0.5f, 0.5f);
             _chipTray.pivot = new Vector2(0.5f, 0.5f);
             _chipTray.sizeDelta = new Vector2(ClothView.Width, 62f);
-            _chipTray.anchoredPosition = new Vector2(clothX, 70f - (ClothView.Height * 0.5f) - 48f);
+            _chipTray.anchoredPosition = new Vector2(clothX, 70f - ClothView.Reach - 52f);
 
             var tray = _chipTray.gameObject.AddComponent<HorizontalLayoutGroup>();
             tray.spacing = 12f;

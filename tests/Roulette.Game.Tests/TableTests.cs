@@ -256,6 +256,86 @@ public class TableTests
     }
 
     [Fact]
+    public void LiftingAChipReducesThePileRatherThanClearingIt()
+    {
+        var table = Table();
+        table.Place(new Bet(BetKind.Straight, 7, 30_000));
+
+        Assert.Equal(10_000, table.Remove(BetKind.Straight, 7, 10_000));
+        Assert.Equal(20_000, table.Staked);
+        Assert.Single(table.Bets);
+    }
+
+    [Fact]
+    public void LiftingMoreThanIsThereTakesWhatIsThere()
+    {
+        // A player holding a 100k chip who right-clicks a 10k pile means "take it
+        // off", not "do nothing" -- and must not be handed 90k that was never staked.
+        var table = Table();
+        table.Place(new Bet(BetKind.Straight, 7, 10_000));
+
+        Assert.Equal(10_000, table.Remove(BetKind.Straight, 7, 100_000));
+        Assert.Empty(table.Bets);
+    }
+
+    [Fact]
+    public void LiftingEverythingOffASpotRemovesTheBet()
+    {
+        var table = Table();
+        table.Place(new Bet(BetKind.Straight, 7, 10_000));
+
+        table.Remove(BetKind.Straight, 7, 10_000);
+
+        Assert.Empty(table.Bets);
+        Assert.Equal(0, table.Staked);
+    }
+
+    [Fact]
+    public void LiftingZeroTakesTheWholePile()
+    {
+        var table = Table();
+        table.Place(new Bet(BetKind.Straight, 7, 40_000));
+
+        Assert.Equal(40_000, table.Remove(BetKind.Straight, 7, 0));
+        Assert.Empty(table.Bets);
+    }
+
+    [Fact]
+    public void LiftingFromAnEmptySpotDoesNothing()
+    {
+        var table = Table();
+        table.Place(new Bet(BetKind.Straight, 7, 10_000));
+
+        Assert.Equal(0, table.Remove(BetKind.Straight, 8, 10_000));
+        Assert.Equal(10_000, table.Staked);
+    }
+
+    [Fact]
+    public void LiftingTouchesOnlyTheSpotAskedFor()
+    {
+        // Split selections are indices, and straight-up bets are numbers. The two
+        // share a value space, so a bet must be matched on its kind as well.
+        var table = Table();
+        table.Place(new Bet(BetKind.Straight, 3, 10_000));
+        table.Place(new Bet(BetKind.Split, 3, 10_000));
+
+        table.Remove(BetKind.Straight, 3, 10_000);
+
+        var left = Assert.Single(table.Bets);
+        Assert.Equal(BetKind.Split, left.Kind);
+    }
+
+    [Fact]
+    public void NothingComesOffOnceTheWheelHasTurned()
+    {
+        var table = Table();
+        table.Place(new Bet(BetKind.Straight, 7, 10_000));
+        table.Spin();
+
+        Assert.Throws<InvalidOperationException>(() => table.Remove(BetKind.Straight, 7, 10_000));
+    }
+
+    [Fact]
     public void ClearingTheClothGivesBackExactlyWhatWasOnIt()
     {
         var table = Table();

@@ -19,7 +19,7 @@ public class Startup(RouletteLog log) : IOnLoad
 
         log.Success($"v{metadata.Version} loaded -- built for SPT {metadata.SptVersion}");
         log.Info($"mod folder: {log.ModFolder}");
-        log.Info("routes: POST /roulette/ping, /place, /clear, /spin, /state, /leave");
+        log.Info("routes: POST /roulette/ping, /place, /remove, /clear, /spin, /state, /leave");
         log.Info("single-zero European wheel -- 37 pockets, 2.70% to the house on every bet");
 
         // Said plainly and at boot, because a stash that never changes otherwise reads

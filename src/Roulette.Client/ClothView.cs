@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Roulette.Client
@@ -64,25 +65,60 @@ namespace Roulette.Client
         private static Sprite _felt;
 
         private static TMP_FontAsset _font;
+
+        /// <summary>The label of the cell being built, so Wire can register it.</summary>
+        private static TextMeshProUGUI _pendingLabel;
         private static Action<string, int> _onBet;
+        private static Action<string, int> _onLift;
 
         /// <summary>Every bet that has a place on the cloth, and where its chips go.</summary>
         private static readonly Dictionary<string, RectTransform> Stacks = new Dictionary<string, RectTransform>();
+
+        /// <summary>
+        /// The printed number on each square, so it can be hidden under a chip.
+        ///
+        /// A real chip sits on top of the number and covers it. Leaving it showing round
+        /// the edge of the chip is the sort of thing that reads as wrong without anyone
+        /// being able to say why.
+        /// </summary>
+        private static readonly Dictionary<string, TextMeshProUGUI> Labels =
+            new Dictionary<string, TextMeshProUGUI>();
 
         internal static float Width => (Columns + 2f) * Cell;
 
         internal static float Height => (Rows * Cell) + (2f * OutsideRow);
 
         /// <summary>
+        /// The table as it is actually drawn, wooden rail included.
+        ///
+        /// Anything placed near the cloth has to clear this rather than the felt, which
+        /// is the mistake the first pass made: the balance line and the chip tray were
+        /// both measured off the felt and so ended up sitting on the wood.
+        /// </summary>
+        internal static float Framed => Width + (2f * Surround);
+
+        /// <summary>Framed height. Its half is <see cref="Reach"/>.</summary>
+        internal static float FramedHeight => Height + (2f * Surround);
+
+        /// <summary>How far the table reaches above and below its centre.</summary>
+        internal static float Reach => FramedHeight * 0.5f;
+
+        /// <summary>
         /// Builds the cloth. <paramref name="onBet"/> is handed the bet kind and its
         /// selection, exactly as the server names them.
         /// </summary>
         internal static GameObject Build(
-            Transform parent, ClothLayout layout, TMP_FontAsset font, Action<string, int> onBet)
+            Transform parent,
+            ClothLayout layout,
+            TMP_FontAsset font,
+            Action<string, int> onBet,
+            Action<string, int> onLift)
         {
             _font = font;
             _onBet = onBet;
+            _onLift = onLift;
             Stacks.Clear();
+            Labels.Clear();
 
             // A wooden surround with the felt inset into it, rather than a green
             // rectangle with a line round it. The frame is what makes it read as a
@@ -128,6 +164,11 @@ namespace Roulette.Client
                 }
             }
 
+            foreach (var label in Labels.Values)
+            {
+                label.enabled = true;
+            }
+
             if (bets == null)
             {
                 return;
@@ -135,9 +176,17 @@ namespace Roulette.Client
 
             foreach (var bet in bets)
             {
-                if (Stacks.TryGetValue(Key(bet.Kind, bet.Selection), out var stack))
+                var key = Key(bet.Kind, bet.Selection);
+
+                if (Stacks.TryGetValue(key, out var stack))
                 {
-                    ChipView.BuildOnCloth(stack, bet.Amount, _font, size: 34f);
+                    ChipView.BuildOnCloth(stack, bet.Amount, _font, size: 42f);
+                }
+
+                // The chip covers the number, as it would on a cloth.
+                if (Labels.TryGetValue(key, out var covered))
+                {
+                    covered.enabled = false;
                 }
             }
         }
@@ -197,6 +246,12 @@ namespace Roulette.Client
 
             return _felt = Sprite.Create(texture, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), 100f);
         }
+
+        /// <summary>A spot was clicked. Routed through here so the spots stay dumb.</summary>
+        internal static void Bet(string kind, int selection) => _onBet?.Invoke(kind, selection);
+
+        /// <summary>A spot was right-clicked -- take a chip back off it.</summary>
+        internal static void Lift(string kind, int selection) => _onLift?.Invoke(kind, selection);
 
         private static string Key(string kind, int selection) =>
             kind.ToLowerInvariant() + ":" + selection;
@@ -376,6 +431,7 @@ namespace Roulette.Client
 
             var text = NewText(cell, label, height > Cell ? 22f : (width > Cell * 1.5f ? 18f : 21f));
             Stretch(text.rectTransform);
+            _pendingLabel = text;
 
             return cell;
         }
@@ -388,20 +444,31 @@ namespace Roulette.Client
         /// </summary>
         private static void Wire(RectTransform cell, string kind, int selection)
         {
-            var button = cell.gameObject.AddComponent<Button>();
-            var captured = kind;
-            var chosen = selection;
-            button.onClick.AddListener(() => _onBet?.Invoke(captured, chosen));
+            // Not a Button: a Button only knows about the left mouse button, and the
+            // right one is how a chip comes back off.
+            var spot = cell.gameObject.AddComponent<ClothSpot>();
+            spot.Kind = kind;
+            spot.Selection = selection;
 
             // A plain centred square, deliberately with no layout group on it. The
             // first version used a horizontal group the width of the whole cell, which
             // is what pushed every pile off its spot and let the figure overflow into
             // the neighbouring square.
             var stack = NewBox("Chips", cell, new Color(0f, 0f, 0f, 0f));
-            stack.sizeDelta = new Vector2(38f, 38f);
+            stack.sizeDelta = new Vector2(42f, 42f);
             stack.GetComponent<Image>().raycastTarget = false;
 
-            Stacks[Key(kind, selection)] = stack;
+            var key = Key(kind, selection);
+            Stacks[key] = stack;
+
+            // Only the numbers get hidden. A chip on "1st 12" sits in a box far wider
+            // than itself, and blanking that label would leave an unlabelled box.
+            if (_pendingLabel != null && string.Equals(kind, "Straight", StringComparison.OrdinalIgnoreCase))
+            {
+                Labels[key] = _pendingLabel;
+            }
+
+            _pendingLabel = null;
         }
 
         private static bool IsRed(int n) =>
@@ -481,5 +548,37 @@ namespace Roulette.Client
         internal IReadOnlyList<int> Corners { get; }
 
         internal IReadOnlyList<int> SixLines { get; }
+    }
+
+    /// <summary>
+    /// A betting spot. Left click puts a chip on, right click takes one off.
+    ///
+    /// A plain <c>Button</c> cannot do this -- it raises <c>onClick</c> for the left
+    /// button only and never sees the right one at all.
+    /// </summary>
+    internal sealed class ClothSpot : MonoBehaviour, IPointerClickHandler
+    {
+        internal string Kind { get; set; }
+
+        internal int Selection { get; set; }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (eventData == null)
+            {
+                return;
+            }
+
+            if (eventData.button == PointerEventData.InputButton.Right)
+            {
+                ClothView.Lift(Kind, Selection);
+                return;
+            }
+
+            if (eventData.button == PointerEventData.InputButton.Left)
+            {
+                ClothView.Bet(Kind, Selection);
+            }
+        }
     }
 }

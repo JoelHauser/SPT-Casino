@@ -88,6 +88,32 @@ public class RouletteService(IBank bank, IProfileGateway profiles, TableStore ta
         return Success(sessionId);
     }
 
+    /// <summary>
+    /// Lifts chips off a spot. Right-clicking a square is the other half of clicking
+    /// it, and a player who has stacked four chips on a number should be able to take
+    /// one back rather than clearing the whole cloth.
+    /// </summary>
+    public RouletteResponse Remove(RemoveRequest request, MongoId sessionId)
+    {
+        if (!Enum.TryParse<BetKind>(request.Kind, ignoreCase: true, out var kind))
+        {
+            return RouletteResponse.Failed($"There is no bet called '{request.Kind}'.");
+        }
+
+        var table = Table(sessionId);
+
+        try
+        {
+            table.Remove(kind, request.Selection, request.Amount);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Success(sessionId) with { Ok = false, Error = ex.Message };
+        }
+
+        return Success(sessionId);
+    }
+
     public RouletteResponse Clear(MongoId sessionId)
     {
         var table = Table(sessionId);
