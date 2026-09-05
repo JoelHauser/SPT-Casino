@@ -11,6 +11,14 @@
   without the game. Everything else is .NET 10 and builds anywhere.
 -->
 <Solution>
+  <Folder Name="/Casino/">
+    <!--
+      One plugin, three tables. It compiles the three .Client panels in from where
+      they already live rather than owning copies, so those projects stay in the
+      solution as the place the code is edited. They are no longer shipped.
+    -->
+    <Project Path="src/Casino.Client/Casino.Client.csproj" />
+  </Folder>
   <Folder Name="/Blackjack/">
     <Project Path="src/Blackjack.Game/Blackjack.Game.csproj" />
     <Project Path="src/Blackjack.Server/Blackjack.Server.csproj" />
