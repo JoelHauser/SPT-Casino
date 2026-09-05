@@ -66,8 +66,9 @@ New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
 
 Copy-Item $built.FullName -Destination $pluginDir -Force
 
-# The union of the three asset trees. Verified identical wherever they overlap.
-foreach ($game in @('Roulette', 'Poker', 'Blackjack')) {
+# The casino's own art -- the tab icon -- then the union of the three asset trees,
+# which was verified identical wherever they overlap.
+foreach ($game in @('Casino', 'Roulette', 'Poker', 'Blackjack')) {
     $assets = Join-Path $root "src\$game.Client\assets"
     if (Test-Path $assets) {
         Copy-Item (Join-Path $assets '*') -Destination $pluginDir -Recurse -Force
