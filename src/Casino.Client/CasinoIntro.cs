@@ -38,24 +38,37 @@ namespace Casino.Client
         private static readonly Color Panel = new Color(0.09f, 0.10f, 0.11f, 0.98f);
         private static readonly Color Edge = new Color(0.45f, 0.38f, 0.22f, 1f);
 
+        /// <summary>
+        /// What a new player is told, and the whole of it.
+        ///
+        /// **Short on purpose.** This is the only screen in the mod that explains what
+        /// the money does, and a wall of text is a wall of text the player clicks past.
+        /// Four beats: where they are, what is here, that the stake is real, and that
+        /// the edge does not care. Everything else is discoverable at a table, where it
+        /// is useful, rather than here, where it is a manual.
+        ///
+        /// No double hyphens. TMP renders them literally, so an em dash written the way
+        /// it is written everywhere else in this repo comes out as two hyphens sitting
+        /// in the middle of a sentence, looking like something failed to convert.
+        /// Sentences are broken instead, which reads better in a narrow column anyway.
+        ///
+        /// It is measured against the box it goes in. The first version of this ran to
+        /// sixteen rendered lines in a box that fits eleven, so the last third of it --
+        /// including the line telling the player what escape does -- was simply cut off.
+        /// See the sizing note on the card in Build.
+        /// </summary>
         private static readonly string[] Lines =
         {
             "You have found the back room.",
             string.Empty,
-            "Three tables run here, and they take the same roubles you would spend on "
-            + "ammunition. Blackjack against the dealer, no-limit hold'em against the "
-            + "regulars, and a single-zero roulette wheel.",
+            "Blackjack, hold'em and a single-zero wheel. They take the same roubles "
+            + "you would spend on ammunition, and they take them for good.",
             string.Empty,
-            "The money is real. A stake leaves your stash when you commit it and the "
-            + "winnings are paid straight back into it -- there is no separate balance "
-            + "and nothing to cash out. If your stash is too full to take a payout, it "
-            + "arrives in the post instead.",
+            "A stake leaves your stash the moment you commit it. Winnings are paid "
+            + "straight back in. There is no chip balance and nothing to cash out.",
             string.Empty,
-            "The house edge is real too, and it does not get tired. Roulette keeps 2.70% "
-            + "of everything staked on it, forever, and the other two are not charity "
-            + "either. Play with what you can afford to lose in a raid.",
-            string.Empty,
-            "Escape leaves a table and brings you back here. Good luck.",
+            "The house keeps its edge whatever you do. Play with what you could lose "
+            + "in a raid.",
         };
 
         private static GameObject _root;
@@ -198,8 +211,12 @@ namespace Casino.Client
             backdrop.offsetMin = Vector2.zero;
             backdrop.offsetMax = Vector2.zero;
 
+            // 620 tall for eleven lines of body at 20pt plus the pip, the title and
+            // the button. The first version was 560 with a 300-tall body holding
+            // sixteen lines of copy, so a third of the text was cut off the bottom --
+            // and neither the copy nor the box was measured against the other.
             var card = CasinoLobby.NewBox("Card", canvasObject.transform, Color.white);
-            card.sizeDelta = new Vector2(920f, 560f);
+            card.sizeDelta = new Vector2(880f, 620f);
 
             var face = card.GetComponent<Image>();
             face.sprite = Textures.RoundedBox(12, Panel, Edge, 2);
@@ -207,21 +224,28 @@ namespace Casino.Client
 
             var pip = CasinoLobby.NewBox("Pip", card, Color.white);
             pip.sizeDelta = new Vector2(64f, 64f);
-            pip.anchoredPosition = new Vector2(0f, 208f);
+            pip.anchoredPosition = new Vector2(0f, 232f);
             pip.GetComponent<Image>().sprite = Textures.Suit('S', Gold);
             pip.GetComponent<Image>().raycastTarget = false;
 
             var title = CasinoLobby.NewText("Title", card, "THE CASINO", 34f);
-            title.rectTransform.sizeDelta = new Vector2(820f, 44f);
-            title.rectTransform.anchoredPosition = new Vector2(0f, 148f);
+            title.rectTransform.sizeDelta = new Vector2(780f, 44f);
+            title.rectTransform.anchoredPosition = new Vector2(0f, 168f);
             title.color = Gold;
 
             var body = CasinoLobby.NewText("Body", card, string.Join("\n", Lines), 20f);
-            body.rectTransform.sizeDelta = new Vector2(800f, 300f);
-            body.rectTransform.anchoredPosition = new Vector2(0f, -20f);
+            body.rectTransform.sizeDelta = new Vector2(740f, 330f);
+            body.rectTransform.anchoredPosition = new Vector2(0f, -34f);
             body.alignment = TextAlignmentOptions.TopLeft;
             body.enableWordWrapping = true;
-            body.lineSpacing = 6f;
+            body.lineSpacing = 8f;
+
+            // Shrinks rather than clips if a future edit runs long, or a player's font
+            // is wider than the one this was measured against. A card that quietly
+            // loses its last paragraph is the failure this had already made once.
+            body.enableAutoSizing = true;
+            body.fontSizeMax = 20f;
+            body.fontSizeMin = 15f;
 
             BuildContinue(card, onContinue);
         }
@@ -230,7 +254,7 @@ namespace Casino.Client
         {
             var box = CasinoLobby.NewBox("Continue", parent, Color.white);
             box.sizeDelta = new Vector2(220f, 50f);
-            box.anchoredPosition = new Vector2(0f, -228f);
+            box.anchoredPosition = new Vector2(0f, -252f);
 
             var image = box.GetComponent<Image>();
             image.sprite = Textures.RoundedBox(6, new Color(0.18f, 0.16f, 0.10f, 1f), Gold, 2);
