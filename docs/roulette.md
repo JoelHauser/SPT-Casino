@@ -286,8 +286,12 @@ two reds. The test was wrong, not the data, and it now pins that property instea
   outside bets -- built from the server's own enumeration so it cannot offer a bet the
   server would refuse. A chip tray picks the denomination; left click puts a chip on, a
   right click takes one back off.
-- **No money moves.** `IBank` has no debit or credit on it, so this is a fact about
-  what code exists rather than a promise.
+- **The table plays for real roubles.** The stake leaves the stash when the wheel
+  turns and the return is paid back when it stops; chips on the cloth cost nothing
+  until you spin. Escrow records what was taken before it is taken, so a server killed
+  mid-spin gives it back on next contact. 13 money tests, written before the
+  settlement, and mutation-checked against eight deliberate faults -- all eight
+  caught. **Not yet played against a real profile.**
 
 ### Not yet seen on screen
 
@@ -305,14 +309,16 @@ built and deployed to `H:\SPT4.1.X` but has **not been looked at**. Deployed
 
 **Next**
 
-- **The money**, which is all that is between this and a finished mod. Port `Bank`,
-  `Escrow`, `Abstractions` and `Fakes` from Poker, write `MoneyInvariantTests`
-  **before** the settlement it checks, and add the item-event transport with
-  `ProfileSync` beside it. Read `docs/poker.md` under "The money" first. The stake has
-  to leave the stash when the chip goes down and the return has to arrive when the
-  wheel stops, and neither may happen twice.
-- **Mutation-check the payouts.** Nothing in this engine has been mutation-checked
-  yet, and it is all money.
+- **Play it against a real profile.** The money path is written and tested but has
+  never moved a rouble on a running server. Watch: the stake leaves on spin, the
+  return arrives, the stash on screen updates without a reload, and a straight-up win
+  splits across stacks correctly -- 1,000,000 on a number pays 36,000,000, which is
+  thirty-six maximum rouble stacks.
+- **Mutation-check the engine's payouts.** The settlement is checked; `Payouts` and
+  `Bet.Covers` are not, and they are all money.
+- **The item-event transport.** Only the static routes exist. Poker serves the same
+  actions on the endpoint EFT already uses for moving items, which is what lets the
+  stash update without `ProfileSync` having to ask.
 - **The console harness**, so a spin can be run thousands of times without Unity.
   `tools/Roulette.Console` does not exist; Poker's is the model.
 
