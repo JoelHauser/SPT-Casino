@@ -51,11 +51,11 @@ point needs about nine million hands. `PayoutTests` computes the exact edge over
 | Project | Owns |
 | --- | --- |
 | `src/Roulette.Game` | Wheel, cloth, bets, payouts. No SPT reference, no I/O, no clock. |
-| `tests/Roulette.Game.Tests` | 70 tests. |
+| `tests/Roulette.Game.Tests` | 79 tests. |
 | `src/Roulette.Server` | The mod: routes, DI, logging, the money. |
 | `src/Roulette.Client` | The BepInEx half: entrance, table panel, the spinning wheel. `net472`. |
 | `tools/Roulette.Console` | Terminal table. No SPT needed. |
-| `scripts/` | `pack-mod.ps1`, `smoke.ps1`, mirroring Poker's. |
+| `scripts/roulette/` | `pack-mod.ps1`, `smoke.ps1`, mirroring Poker's. |
 
 The engine knows nothing about currency -- it takes an `int` and returns an `int`.
 Everything that maps a wallet to an item template belongs in `Wallets.cs` and

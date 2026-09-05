@@ -270,7 +270,7 @@ and paying out on losing hands, each fail 7 tests.
 
 Both of the things this could not reach have since been checked against a real
 4.1.3 server: `Bank`'s own `InventoryHelper` calls move money correctly, and
-`scripts/smoke.ps1` resolves the session and plays a hand over HTTP.
+`scripts/blackjack/smoke.ps1` resolves the session and plays a hand over HTTP.
 
 Neither was clean first time, and the bugs are worth knowing because none were
 reachable from the tests:
@@ -372,7 +372,7 @@ scanned, which looks exactly like the mod failing to load.
 Then, with the server running:
 
 ```
-scripts\smoke.ps1 -SessionId <your-profile-id>
+scriptslackjack\smoke.ps1 -SessionId <your-profile-id>
 ```
 
 That plays a hand over HTTP with no game client attached.
@@ -386,7 +386,7 @@ things work; leave it on for a first run.
 **Start with the ping.**
 
 ```
-scripts\smoke.ps1 -SessionId <your-profile-id> -PingOnly
+scriptslackjack\smoke.ps1 -SessionId <your-profile-id> -PingOnly
 ```
 
 It touches no money and starts no round, and answers the four things that must be

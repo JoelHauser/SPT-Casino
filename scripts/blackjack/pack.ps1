@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Builds both halves in Release and packs releases\Blackjack_V<ver>.zip.
+    Builds both halves in Release and packs releases\blackjack\Blackjack_V<ver>.zip.
 
 .DESCRIPTION
     The zip is laid out to extract straight into an SPT folder:
@@ -11,7 +11,7 @@
     Nothing else. There is deliberately no README.txt in the zip: a loose file at
     the top of an archive meant to be extracted over an SPT folder lands in the
     install root, where it is litter rather than documentation, and it is a worse
-    copy of what the mod page already says. releases\package-readme.txt is kept as
+    copy of what the mod page already says. releases\blackjack\package-readme.txt is kept as
     the source for that page; it is no longer packed.
 
     Two things this does rather than trusts:
@@ -31,8 +31,8 @@
     load on. Defaults to whatever Blackjack.Client.csproj finds.
 
 .EXAMPLE
-    scripts\pack.ps1
-    scripts\pack.ps1 -SPTPath H:\SPT4.1.X
+    scriptslackjack\pack.ps1
+    scriptslackjack\pack.ps1 -SPTPath H:\SPT4.1.X
 #>
 [CmdletBinding()]
 param(
@@ -41,7 +41,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $PSScriptRoot
+# Two levels up, not one: these scripts sit in scripts/<mod>/ since the three
+# casinos were merged into one repository, so the repo root is the grandparent.
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 function Get-Match {
     param([string]$Path, [string]$Pattern)
@@ -117,7 +119,7 @@ Copy-Item (Join-Path $root 'src\Blackjack.Client\assets\cards\*.png') $cardDir
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-$zipPath = Join-Path $root ("releases\Blackjack_V{0}.zip" -f $version)
+$zipPath = Join-Path $root ("releases\blackjack\Blackjack_V{0}.zip" -f $version)
 if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
 
 $zip = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')

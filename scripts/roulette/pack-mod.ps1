@@ -15,11 +15,11 @@
 
 .EXAMPLE
     # Anywhere. Server only.
-    ./scripts/pack-mod.ps1
+    ./scripts/roulette/pack-mod.ps1
 
 .EXAMPLE
     # On the box with the game: builds both halves, installs them, writes a full zip.
-    ./scripts/pack-mod.ps1 -InstallPath 'H:\SPT4.1.X'
+    ./scripts/roulette/pack-mod.ps1 -InstallPath 'H:\SPT4.1.X'
 #>
 [CmdletBinding()]
 param(
@@ -32,7 +32,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$root = Split-Path -Parent $PSScriptRoot
+# Two levels up, not one: these scripts sit in scripts/<mod>/ since the three
+# casinos were merged into one repository, so the repo root is the grandparent.
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $project = Join-Path $root 'src/Roulette.Server/Roulette.Server.csproj'
 $build = Join-Path $root 'dist/mod-build'
 $stage = Join-Path $root 'dist/mod'
@@ -109,7 +111,7 @@ $version = if ($metadata -match 'new\("(?<v>\d+\.\d+\.\d+)"\)') { $Matches['v'] 
 Write-Host "Staged v${version}:" -ForegroundColor Green
 Get-ChildItem $modFolder | ForEach-Object { Write-Host ("  {0,9:N0}  {1}" -f $_.Length, $_.Name) }
 
-$releases = Join-Path $root 'releases'
+$releases = Join-Path $root 'releases/roulette'
 New-Item -ItemType Directory -Force -Path $releases | Out-Null
 $suffix = if ($clientIncluded) { '' } else { '-server-only' }
 $archive = Join-Path $releases "Roulette-$version-SPT4.1$suffix.zip"
@@ -178,7 +180,7 @@ if (-not $clientIncluded) {
     Write-Host 'It cannot be built on a machine without the game -- 4.1.3 checks the plugin''s' -ForegroundColor Yellow
     Write-Host 'spt-* references against the running server. On the box with SPT on it, run:' -ForegroundColor Yellow
     Write-Host ''
-    Write-Host "    ./scripts/pack-mod.ps1 -InstallPath 'H:\SPT4.1.X'" -ForegroundColor Cyan
+    Write-Host "    ./scripts/roulette/pack-mod.ps1 -InstallPath 'H:\SPT4.1.X'" -ForegroundColor Cyan
     Write-Host ''
     Write-Host 'which builds both halves, installs them, and writes a complete zip.' -ForegroundColor Yellow
     Write-Host ''

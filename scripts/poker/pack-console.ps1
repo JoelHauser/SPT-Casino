@@ -12,9 +12,9 @@
     there is nothing to drop into user/mods. This is the engine harness only.
 
 .EXAMPLE
-    ./scripts/pack-console.ps1
-    ./scripts/pack-console.ps1 -Zip
-    ./scripts/pack-console.ps1 -FrameworkDependent -Zip
+    ./scripts/poker/pack-console.ps1
+    ./scripts/poker/pack-console.ps1 -Zip
+    ./scripts/poker/pack-console.ps1 -FrameworkDependent -Zip
 #>
 [CmdletBinding()]
 param(
@@ -26,7 +26,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$root = Split-Path -Parent $PSScriptRoot
+# Two levels up, not one: these scripts sit in scripts/<mod>/ since the three
+# casinos were merged into one repository, so the repo root is the grandparent.
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $project = Join-Path $root 'tools/Poker.Console/Poker.Console.csproj'
 $output = Join-Path $root "dist/console-$Runtime"
 
@@ -68,7 +70,7 @@ $size = [math]::Round($exe.Length / 1MB, 1)
 Write-Host "Built $($exe.Name) ($size MB)" -ForegroundColor Green
 
 if ($Zip) {
-    $releases = Join-Path $root 'releases'
+    $releases = Join-Path $root 'releases/poker'
     New-Item -ItemType Directory -Force -Path $releases | Out-Null
 
     $stamp = Get-Date -Format 'yyyyMMdd'
