@@ -293,6 +293,43 @@ two reds. The test was wrong, not the data, and it now pins that property instea
   settlement, and mutation-checked against eight deliberate faults -- all eight
   caught. **Not yet played against a real profile.**
 
+### Opening the table costs 197ms, and used to cost 1489
+
+Measured, not estimated -- `RoulettePanel.Open` times itself on the first open and
+logs the breakdown, which is worth keeping because every candidate cause here looks
+the same from the outside.
+
+The first measurement was `1489ms -- panel 156ms, layout 2ms, wheel 1274ms, cloth
+26ms, chips 62ms`. The wheel was 86% of it: two passes over a 1024-square texture at
+four samples a pixel, about 640ms each.
+
+**None of that is Unity work.** `WheelView.Paint` is split into `Compute`, which is
+pure arithmetic filling a `Color32[]` and runs on a background thread, and `Upload`,
+which makes the `Texture2D` and is the cheap end. `WheelView.Warm` is started from
+`TaskBarTab` the moment the tab appears, which is many seconds before the earliest
+possible click. It is now `197ms -- panel 124ms, wheel 41ms`, and the 41 is the two
+uploads.
+
+Three things here that were each wrong once:
+
+- **`Warmed` is destructive.** It hands the arrays over and forgets them -- two
+  megabytes that are dead once they are on the GPU. `Build` called it twice, once for
+  the head and once for the bowl, so the first call took the warm pair and the second
+  repainted both from scratch. The cost was paid in full *and* the background work was
+  thrown away. **Call it once, into a local.**
+- Nothing inside `Compute` may touch a Unity object. `Mathf` is fine, since every
+  function used from it is a static wrapper over `System.Math`. `Texture2D`, `Sprite`
+  and anything with a `GameObject` behind it are not.
+- A warm-up in flight is joined, never raced. Repainting on the main thread while a
+  thread is already doing it is the slow path twice over.
+
+**The quality is untouched.** The wheel is not cheaper to draw; it is drawn somewhere
+the player is not waiting. Do not trade samples for speed here -- there is nothing to
+gain and the jaggedness took three rounds to remove.
+
+What is left is `panel 124ms`, of which the six chip PNGs are 61ms. Warmable the same
+way if it ever matters; at 197ms it does not.
+
 ### Not yet seen on screen
 
 The most recent change -- right-click to lift a chip, the number hidden under the chip
