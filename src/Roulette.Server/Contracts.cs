@@ -15,6 +15,13 @@ namespace Roulette.Server;
 /// go over as integers unless every property carrying one is attributed. Both sibling
 /// mods were caught by that; sending strings sidesteps it.
 /// </summary>
+/// <summary>
+/// Carries nothing, because it asks for nothing. Sent on EFT's item-event endpoint
+/// when the client needs the profile changes the server has been holding for it.
+/// See <see cref="RouletteItemEventRouter"/>.
+/// </summary>
+public record RouletteSyncAction : BaseInteractionRequestData;
+
 public record PingRequest : IRequestData;
 
 public record StateRequest : IRequestData;
