@@ -39,5 +39,6 @@
     <Project Path="src/Roulette.Server/Roulette.Server.csproj" />
     <Project Path="src/Roulette.Client/Roulette.Client.csproj" />
     <Project Path="tests/Roulette.Game.Tests/Roulette.Game.Tests.csproj" />
+    <Project Path="tests/Roulette.Server.Tests/Roulette.Server.Tests.csproj" />
   </Folder>
 </Solution>

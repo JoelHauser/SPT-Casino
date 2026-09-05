@@ -1,5 +1,7 @@
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.Models.Common;
+using SPTarkov.Server.Core.Models.Eft.ItemEvent;
+using SPTarkov.Server.Core.Routers;
 using SPTarkov.Server.Core.Utils;
 
 namespace Roulette.Server;
@@ -15,6 +17,7 @@ namespace Roulette.Server;
 public class RouletteCallbacks(
     HttpResponseUtil httpResponseUtil,
     RouletteService service,
+    EventOutputHolder eventOutputHolder,
     IBank bank,
     RouletteLog log)
 {
@@ -60,23 +63,34 @@ public class RouletteCallbacks(
         return new ValueTask<string>(Respond(service.Clear(sessionId)));
     }
 
-    public ValueTask<string> Spin(SpinRequest info, MongoId sessionId)
+    public async ValueTask<string> Spin(SpinRequest info, MongoId sessionId)
     {
         Received("spin", sessionId, null);
-        return new ValueTask<string>(Respond(service.Spin(sessionId)));
+        return Respond(await service.SpinAsync(sessionId, Output(sessionId)));
     }
 
-    public ValueTask<string> State(StateRequest info, MongoId sessionId)
+    public async ValueTask<string> State(StateRequest info, MongoId sessionId)
     {
         Received("state", sessionId, null);
-        return new ValueTask<string>(Respond(service.State(sessionId)));
+        return Respond(await service.StateAsync(sessionId, Output(sessionId)));
     }
 
-    public ValueTask<string> Leave(ClearRequest info, MongoId sessionId)
+    public async ValueTask<string> Leave(ClearRequest info, MongoId sessionId)
     {
         Received("leave", sessionId, null);
-        return new ValueTask<string>(Respond(service.Leave(sessionId)));
+        return Respond(await service.LeaveAsync(sessionId, Output(sessionId)));
     }
+
+    /// <summary>
+    /// The response the bank writes its change records into.
+    ///
+    /// **From `EventOutputHolder`, never from `new`.** A hand-built one initialises
+    /// nothing and `RemoveItemByCount` reaches straight into
+    /// `output.ProfileChanges[sessionId]`, so it throws after the items are already
+    /// gone. On Blackjack that surfaced as "not enough roubles" while the stake had
+    /// left the stash.
+    /// </summary>
+    private ItemEventRouterResponse Output(MongoId sessionId) => eventOutputHolder.GetOutput(sessionId);
 
     private string Respond(RouletteResponse response)
     {

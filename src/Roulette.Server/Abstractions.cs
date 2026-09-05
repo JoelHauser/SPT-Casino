@@ -1,4 +1,5 @@
 using SPTarkov.Server.Core.Models.Common;
+using SPTarkov.Server.Core.Models.Eft.ItemEvent;
 
 namespace Roulette.Server;
 
@@ -10,21 +11,28 @@ namespace Roulette.Server;
 /// running server. SPT's DI registers a class against every interface it implements,
 /// so <see cref="Bank"/> resolves for this with no extra wiring.
 ///
-/// **There is deliberately no way to move money on this interface yet.** This build
-/// reads balances and nothing else, so "the mod cannot take your roubles" is a fact
-/// about what code exists rather than a promise about what it does. Debit, credit and
-/// the shortfall-to-mail path arrive together with the settlement that needs them,
-/// and Poker's `Bank` is the thing to port when they do.
-///
-/// When they are added, every one takes an `ItemEventRouterResponse` to write the
-/// change record into, and it must come from `EventOutputHolder.GetOutput` and never
-/// from `new` -- a hand-built one initialises nothing and `RemoveItemByCount` reaches
-/// straight into `output.ProfileChanges[sessionId]`, so it throws **after** the items
-/// are already gone.
+/// Every method that moves money takes an <see cref="ItemEventRouterResponse"/> to
+/// write the change record into. It must come from `EventOutputHolder.GetOutput`,
+/// never from `new` -- a hand-built one initialises nothing and `RemoveItemByCount`
+/// reaches straight into `output.ProfileChanges[sessionId]`, so it throws **after**
+/// the items are already gone. On Blackjack that surfaced as "not enough roubles"
+/// while the stake had left the stash.
 /// </summary>
 public interface IBank
 {
     int GetBalance(MongoId sessionId, Wallet wallet);
+
+    /// <summary>
+    /// Takes money. False means nothing was touched, so the caller must not turn a
+    /// wheel it cannot pay out on.
+    /// </summary>
+    bool TryDebit(MongoId sessionId, Wallet wallet, int amount, ItemEventRouterResponse output);
+
+    /// <summary>
+    /// Pays money back, splitting it across stacks and posting anything the stash
+    /// refuses as mail rather than losing it.
+    /// </summary>
+    void Credit(MongoId sessionId, Wallet wallet, int amount, ItemEventRouterResponse output);
 
     /// <summary>
     /// The running server's stack limit for a wallet, which item mods change.
@@ -62,4 +70,51 @@ public interface IRouletteLog
 
     /// <summary>The sink the engine writes its own reasoning to.</summary>
     Roulette.Game.IGameLog ForEngine();
+}
+
+
+/// <summary>What the table is holding of the player's money, and in what.</summary>
+public class OutstandingStake
+{
+    public string Wallet { get; set; } = nameof(Server.Wallet.Roubles);
+
+    /// <summary>What was taken for a spin and has not been returned.</summary>
+    public int Amount { get; set; }
+
+    public long TakenAtUtc { get; set; }
+}
+
+/// <summary>
+/// Records what the table owes the player while a spin is in flight.
+///
+/// **Roulette's escrow is Blackjack's, not Poker's.** Poker takes one buy-in and
+/// hands back a live stack that moves every hand, so what it holds has to be
+/// re-recorded constantly. Here the money is out of the wallet only between the
+/// debit and the credit of a single spin, and what is owed in that window is
+/// exactly what was taken -- it cannot drift, because nothing happens in between.
+///
+/// The window is short but it is not zero, and it is the only window in this mod
+/// where the player's money exists nowhere. A server killed inside it has taken
+/// the stake and paid nothing, and without a record on disk there is no way to
+/// know it ever happened.
+/// </summary>
+public interface IEscrowStore
+{
+    OutstandingStake? Get(MongoId sessionId);
+
+    void Record(MongoId sessionId, Wallet wallet, int amount);
+
+    void Release(MongoId sessionId);
+}
+
+/// <summary>
+/// Where the wheel gets its randomness.
+///
+/// An interface so a test can seed it. The alternative -- letting the service call
+/// `new Random()` -- makes every money test depend on which pocket the ball happened
+/// to find, which is the one thing a money test must not care about.
+/// </summary>
+public interface IRandomSource
+{
+    Random Create();
 }

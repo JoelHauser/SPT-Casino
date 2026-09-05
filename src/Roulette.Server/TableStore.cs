@@ -12,11 +12,12 @@ namespace Roulette.Server;
 /// server restart, and keeping it out of the profile means this mod never changes the
 /// profile schema -- so uninstalling it cannot corrupt a save.
 ///
-/// That is safe **only while no money moves**. Once a stake is taken from the stash,
-/// what is owed back has to be recorded somewhere that survives a crash. Roulette has
-/// an easier time of it than Poker did: the stake is taken when the wheel turns and
-/// paid back when it stops, so escrow holds one number for the length of one spin
-/// rather than a stack that moves every hand.
+/// That would not be safe on its own now that money moves, which is what
+/// <see cref="EscrowStore"/> is for. Roulette has an easier time of it than Poker did:
+/// the stake is taken when the wheel turns and paid back when it stops, so escrow
+/// holds one number for the length of one spin rather than a stack that moves every
+/// hand. Chips sitting on a cloth that dies with the server were never taken from the
+/// stash, so losing them costs nobody anything.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
 public class TableStore
