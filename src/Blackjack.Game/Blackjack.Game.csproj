@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Hand.Add and friends stay internal: only BlackjackTable may mutate a
+         hand in a real game. The tests need them to build fixed hands. -->
+    <InternalsVisibleTo Include="Blackjack.Game.Tests" />
+  </ItemGroup>
+
+</Project>
