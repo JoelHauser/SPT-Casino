@@ -78,6 +78,7 @@ public sealed record TableView(
     IReadOnlyList<BetView> Bets,
     int Staked,
     int MinBet,
+    int Step,
     int MaxTotalStake,
     SpinView? Last)
 {
@@ -89,6 +90,7 @@ public sealed record TableView(
         [.. table.Bets.Select(Describe)],
         table.Staked,
         table.Rules.MinBet,
+        table.Rules.Step,
         table.Rules.MaxTotalStake,
         table.Last is null ? null : Describe(table.Last));
 

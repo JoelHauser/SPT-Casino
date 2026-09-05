@@ -272,10 +272,16 @@ public sealed class RouletteTable
             throw new ArgumentException("A bet needs chips on it.", nameof(bet));
         }
 
-        if (bet.Amount % Rules.MinBet != 0)
+        if (bet.Amount < Rules.MinBet)
         {
             throw new ArgumentException(
-                $"Bets go up in {Rules.MinBet:N0}; {bet.Amount:N0} does not.", nameof(bet));
+                $"The smallest bet is {Rules.MinBet:N0}; {bet.Amount:N0} is less.", nameof(bet));
+        }
+
+        if (bet.Amount % Rules.Step != 0)
+        {
+            throw new ArgumentException(
+                $"Bets go up in {Rules.Step:N0}; {bet.Amount:N0} does not.", nameof(bet));
         }
 
         var ok = bet.Kind switch

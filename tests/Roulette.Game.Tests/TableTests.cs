@@ -99,13 +99,29 @@ public class TableTests
         Assert.Equal(1_000_000, table.Staked);
     }
 
+    /// <summary>
+    /// Bets move in whole steps of 5,000, and nothing is free.
+    ///
+    /// 15,000 used to be refused here, on the rule that a bet had to be a whole number
+    /// of the smallest chip. That rule also refused the 25,000 chip, which is a real
+    /// chip in the tray, so it went -- see EveryChipInTheTrayCanBePlaced.
+    ///
+    /// 15,000 is legal now and the tray cannot build it: 10k and 25k are the smallest
+    /// two, and no combination makes three steps. That is a gap rather than a fault.
+    /// Every amount the client can produce is a sum of denominations and so is
+    /// reachable by construction; 15,000 can only arrive from a hand-written request,
+    /// where the worst it does is draw a pile with a remainder on the player's own
+    /// money. The alternative -- teaching the engine which chip images exist -- would
+    /// put the art in the rules.
+    /// </summary>
     [Fact]
-    public void BetsGoUpInWholeChips()
+    public void BetsGoUpInWholeSteps()
     {
         var table = Table();
 
-        Assert.Throws<ArgumentException>(() => table.Place(new Bet(BetKind.Red, 0, 15_000)));
+        Assert.Throws<ArgumentException>(() => table.Place(new Bet(BetKind.Red, 0, 12_345)));
         Assert.Throws<ArgumentException>(() => table.Place(new Bet(BetKind.Red, 0, 0)));
+        Assert.Throws<ArgumentException>(() => table.Place(new Bet(BetKind.Red, 0, -10_000)));
     }
 
     [Fact]
@@ -253,6 +269,67 @@ public class TableTests
 
         Assert.Equal(360_000, spin.Returned);
         Assert.Single(spin.Outcomes, o => o.Won);
+    }
+
+    /// <summary>
+    /// Every chip in the tray is a legal bet, on its own and stacked with any other.
+    ///
+    /// This is the test that would have caught the 25,000 chip being unplaceable. The
+    /// step used to be the smallest chip, 10,000, and 25,000 is not a multiple of it,
+    /// so that chip was refused every time it was put down -- on a live table, by a
+    /// player, before anything here noticed.
+    /// </summary>
+    [Theory]
+    [InlineData(10_000)]
+    [InlineData(25_000)]
+    [InlineData(50_000)]
+    [InlineData(100_000)]
+    [InlineData(500_000)]
+    [InlineData(1_000_000)]
+    public void EveryChipInTheTrayCanBePlaced(int chip)
+    {
+        var table = Table();
+        table.Place(new Bet(BetKind.Straight, 7, chip));
+
+        Assert.Equal(chip, table.Staked);
+    }
+
+    [Fact]
+    public void ChipsStackInAnyCombination()
+    {
+        int[] tray = [10_000, 25_000, 50_000, 100_000, 500_000, 1_000_000];
+        var table = Table();
+        var total = 0;
+
+        // Every pair, on the same spot, so the running total is what gets validated
+        // rather than each chip on its own.
+        foreach (var first in tray)
+        {
+            foreach (var second in tray)
+            {
+                table.Place(new Bet(BetKind.Straight, 7, first));
+                table.Place(new Bet(BetKind.Straight, 7, second));
+                total += first + second;
+            }
+        }
+
+        Assert.Equal(total, table.Staked);
+    }
+
+    [Fact]
+    public void ABetUnderTheMinimumIsRefused()
+    {
+        var table = Table();
+
+        Assert.Throws<ArgumentException>(() => table.Place(new Bet(BetKind.Straight, 7, 5_000)));
+    }
+
+    [Fact]
+    public void ABetOffTheStepIsRefused()
+    {
+        var table = Table();
+
+        Assert.Throws<ArgumentException>(() => table.Place(new Bet(BetKind.Straight, 7, 12_345)));
     }
 
     [Fact]

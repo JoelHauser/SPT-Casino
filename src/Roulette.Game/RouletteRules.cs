@@ -18,12 +18,29 @@ public sealed record RouletteRules
     public WheelKind Wheel { get; init; } = WheelKind.European;
 
     /// <summary>
-    /// The smallest chip, and therefore the smallest bet and the step every bet
-    /// moves in. A stake that cannot be built out of chips is one the table can
-    /// never show honestly -- the lesson Poker learned by drawing a 30,000 pot as a
-    /// 25k chip with 5,000 stranded.
+    /// The smallest bet the table takes, which is the smallest chip.
     /// </summary>
     public int MinBet { get; init; } = 10_000;
+
+    /// <summary>
+    /// The step every bet moves in.
+    ///
+    /// **Not the same number as <see cref="MinBet"/>, and conflating them cost the
+    /// 25,000 chip.** The tray holds 10k, 25k, 50k, 100k, 500k and 1M. Requiring
+    /// every stake to be a whole number of the smallest chip sounds right and is not:
+    /// 25,000 is not a multiple of 10,000, so the 25k chip was refused by the table
+    /// every time it was put down, and no combination of chips could be corrected
+    /// into a legal bet either.
+    ///
+    /// The step is the greatest common divisor of the denominations -- 5,000 -- which
+    /// is the largest number every reachable stake is a multiple of. Below the
+    /// minimum it is unreachable anyway, since there is no 5,000 chip to place.
+    ///
+    /// A stake that cannot be built out of chips is one the table can never show
+    /// honestly, which is the lesson Poker learned by drawing a 30,000 pot as a 25k
+    /// chip with 5,000 stranded. This is the same lesson from the other end.
+    /// </summary>
+    public int Step { get; init; } = 5_000;
 
     /// <summary>
     /// The most that may ride on one bet.
