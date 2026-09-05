@@ -46,8 +46,25 @@ This repo is worked on from more than one machine. Check before assuming:
 | The one this file was written on | `C:\HUH` -- SPT 4.1.3, **EFT 0.16.9.5-40743** |
 | Joel's Windows box | `H:\SPT4.1.X` (4.1.3) and `H:\SPT2026` (4.0.13) |
 
+**On Joel's box `dotnet` is not the dotnet you want.** The one first on PATH is
+`C:\Program Files\dotnet\dotnet.exe` and it carries **only the 8.0.423 SDK**, so every
+.NET 10 project -- engine, server, both test suites -- dies on NETSDK1045 before it
+compiles a line, which reads exactly like the repo targeting something impossible. The
+.NET 10 SDK is installed, just user-local:
+
+```
+C:\Users\Hoel\.dotnet\dotnet.exe --list-sdks   # 9.0.317, 10.0.400
+```
+
+Use that path for `dotnet test`, `dotnet build` of the server half, `dotnet run` of the
+console tool, and `dotnet run probe.cs` file-based apps. `pack.ps1` shells out to plain
+`dotnet`, so it needs that directory ahead of `C:\Program Files\dotnet` on PATH for the
+call. The client plugin is net472 and builds under either.
+
 `Blackjack.Client.csproj` picks whichever of those exists; `-p:SPTPath=...` for
-anything else. **The two installs are not the same game build**, and the client
+anything else. Pass that through PowerShell, not Bash -- a backslash path gets mangled
+on the way and every reference silently fails to resolve, giving a couple of hundred
+"type or namespace not found" errors that look like a broken project file. **The two installs are not the same game build**, and the client
 plugin is compiled against the game, not just against SPT -- see the MenuScreen note
 under "Things that will bite you".
 
@@ -188,8 +205,26 @@ on the right -- and every one of these was a guess before it was checked.
   laid out as one more item in the row and shoves the button sideways. `LayoutElement.ignoreLayout`
   is what keeps an overlay an overlay.
 - **The bar greys itself out through its own dictionary** (`SetTaskBarInteractable`,
-  `SetButtonsInteractable`), which a grafted-on tab is not in. Mirroring a neighbour's
-  `interactable` is how ours dims and stops answering at the same moments as the rest.
+  `SetButtonsInteractable`), which a grafted-on tab is not in. Mirroring a neighbour is
+  how ours dims and stops answering at the same moments as the rest -- but **mirror the
+  wrapper's `CanvasGroup`, not the toggle's `interactable`.** Following the IL: locking
+  the row is `SetButtonsInteractable(false, NOT_AVAILABLE_IN_RAID)` ->
+  `HoverTooltipArea.SetUnlockStatus(bool)` -> `MyExtensions.SetUnlockStatus(CanvasGroup,
+  bool, bool)`, whose whole body is **alpha 0.3 and `interactable` false on the tab
+  wrapper's CanvasGroup**. `Toggle.interactable` is a serialized field the game never
+  touches, so reading it reports "live" through a whole loading screen -- which is exactly
+  what left BLACKJACK lit beside a row of grey tabs while a raid loaded. `IsInteractable()`
+  would have been right, since it folds in the canvas group; the plain property is not.
+  0.3 is also the number to dim to: it is that method's literal, so ours matches the row
+  rather than nearly matching it. Note the third argument is false there, so
+  `blocksRaycasts` stays on -- a locked tab still eats the click. That is fine for a
+  `Selectable`, which the CanvasGroup stops anyway, but our tab answers through
+  `IPointerClickHandler`, which a CanvasGroup does not gate. The click has to be refused
+  in code.
+- **A raid dims the tab on its own account, not only through the mirror.** `InRaid` is
+  checked first in `BlackjackTabClick.Live`, because the one thing this must never get
+  wrong is a tab that still looks clickable while the player is loading in. It does not
+  depend on the bar having remembered to grey itself.
 
 ### The pip is 160 units wide, and that one number broke both entrances
 
@@ -520,8 +555,16 @@ into an SPT folder:
 ```
 SPT_Runtime/user/mods/Blackjack/    Blackjack.Server.dll + .pdb, Blackjack.Game.dll + .pdb, config.json
 BepInEx/plugins/Blackjack/          Blackjack.Client.dll, table.png, cards/*.png
-README.txt
 ```
+
+**Two directories and nothing else -- no README at the top of the zip.** Decided for
+1.1.2 and back out of `pack.ps1`: the zip is extracted *over* an SPT folder, so a loose
+file at its root lands in the install root beside the game's own, where it is litter
+rather than documentation, and it is a worse copy of what the mod page already says.
+`releases/package-readme.txt` is kept as the source for that page and is no longer
+packed -- which also retires the trap that it had gone two releases describing a button
+that no longer existed, because nothing about a version bump made anyone reread it.
+1.0.2 through 1.1.1 all carry the README; from 1.1.2 none do.
 
 **`SPT_Runtime/` is part of the path**, not the folder you extract into -- the server
 mod lives under it in a 4.x install. Dropping that prefix produces a zip that looks
@@ -546,11 +589,23 @@ the server half, deliberately, because so much of it has still only run once.
 **Update this section as work completes.**
 
 - Working branch **`test`**, pushed. `main` has not been moved onto it.
-- **1.1.1 is the current build**: `releases/Blackjack_V1.1.1.zip`, both halves in one
-  zip, with `releases/CHANGELOG-1.1.1.md` and `releases/mod-page.md` beside it. 1.1.0 is
-  the last one anybody else has.
+- **1.1.2 is the current build**: `releases/Blackjack_V1.1.2.zip`, both halves in one
+  zip, with `releases/CHANGELOG-1.1.2.md` beside it and `releases/mod-page.md`, which is
+  version-free and did not need touching. 1.1.0 is still the last one anybody else has --
+  neither 1.1.1 nor 1.1.2 has been released.
+- **The zip no longer carries a README**, from 1.1.2 on. See "Releasing". The file it used
+  to carry had gone stale in 1.1.1 -- still describing the main-menu button as a second way
+  in, months after that button was deleted -- which is what prompted taking it out rather
+  than merely fixing it. `releases/package-readme.txt` survives as the mod-page source and
+  is now correct.
 - **The tab has been seen and is right**: correct width, a clean diamond that no longer
   distorts on hover, sitting beside Poker's spade. See "The pip is 160 units wide".
+- **The tab now greys out with the rest of the row while a raid loads.** It used to stay
+  lit on the DEPLOYING TO LOCATION screen with every game tab beside it dimmed, because
+  the mirror read `Toggle.interactable` -- a field the game never sets. It reads the tab
+  wrapper's `CanvasGroup` now, and dims on `InRaid` regardless. Built and packed as 1.1.2,
+  **not yet seen on a screen**. See the greying-out note under "The task bar, as it
+  actually is".
 - **The main-menu button is gone**, along with the F12 setting that briefly hid it. The
   plugin no longer patches `MenuScreen` at all. See the entry-point note above.
 - **Escape closes the table and nothing else**, and the table has been played from the
@@ -583,9 +638,11 @@ exercised by betting until some are added.
 - ~~**The task-bar tab compiles but has never run.**~~ It runs, and BLACKJACK is on
   the bar beside MAIN MENU and HIDEOUT with Poker's tab next to it. What that first
   sighting found was the icon sizing itself from its own sprite -- see "The pip is 160
-  units wide". **Fixed, packed as 1.1.1 and not yet looked at.** 1.1.0 is what anybody
-  else has, and it still has the oversized tab; whether 1.1.1 goes out is a separate
-  decision from having built it.
+  units wide". **Fixed, packed, and still not looked at** -- now as part of 1.1.2, which
+  also greys the tab out while a raid loads. 1.1.0 is what anybody else has, and it still
+  has the oversized tab; whether 1.1.2 goes out is a separate decision from having built
+  it. Two builds have now been packed without being seen, which is two more than is
+  comfortable.
 - **The tab closes the table when a raid starts.** The panel's canvas is
   `DontDestroyOnLoad`, so nothing else would. It matters most in co-op, where the raid
   is started by the host and a player can be pulled out of the lobby with the table

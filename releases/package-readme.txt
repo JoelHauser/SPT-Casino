@@ -14,15 +14,12 @@ INSTALL
   and moves the money. The plugin draws the table and sends what you asked for.
 
 PLAYING
-  Two ways in, and both do the same thing:
+  BLACKJACK on the bar along the bottom of the menu, beside HIDEOUT. It is
+  there on every screen out of raid, so the table opens from the hideout or
+  the flea market without backing out first. It greys out with the rest of the
+  bar once you are loading into a raid.
 
-    BLACKJACK on the bar along the bottom of the menu, beside HIDEOUT. It is
-    there on every screen out of raid, so the table opens from the hideout or
-    the flea market without backing out first.
-
-    BLACKJACK on the main menu, with PLAY and the rest.
-
-  Escape closes the table.
+  Escape closes the table, and only the table -- the screen behind it stays put.
 
   Stake roubles, dollars, euros, GP coins, bitcoin or Lega medals. The table
   takes up to 500,000 roubles a hand, 5,000 dollars or euros, 50 GP, 10 bitcoin
@@ -47,14 +44,14 @@ FIRST RUN
   In game, BepInEx/LogOutput.log carries every client line, each prefixed
   [Blackjack].
 
-WHAT IS NEW IN 1.1.0
-  The task-bar tab, so the table is reachable from anywhere in the menu rather
-  than only from the main menu.
+WHAT IS NEW IN 1.1.2
+  The tab greys out while a raid loads, in step with every other tab on the bar,
+  instead of staying lit on the deployment screen as though the table were still
+  open for business. It was never actually playable there -- the table closes at
+  the first sign of a raid -- so this is about the tab telling the truth.
 
-  It has been built against a real install and every part of the game it touches
-  was checked there, but it had not been seen running when this was packed. If
-  the tab is missing, misplaced or dead, BepInEx/LogOutput.log says which tabs it
-  found and what it did with them -- that is the thing worth reporting.
+  If the tab is ever missing, misplaced or dead, BepInEx/LogOutput.log says which
+  tabs it found and what it did with them -- that is the thing worth reporting.
 
 LOGGING
   config.json turns the server's verbose logging off once things work. Leave it

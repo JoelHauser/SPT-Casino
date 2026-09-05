@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Builds both halves in Release and packs releases\Blackjack_V<ver>.zip.
 
@@ -7,7 +7,12 @@
 
         SPT_Runtime\user\mods\Blackjack\    the server mod
         BepInEx\plugins\Blackjack\          the client plugin, the table, the cards
-        README.txt
+
+    Nothing else. There is deliberately no README.txt in the zip: a loose file at
+    the top of an archive meant to be extracted over an SPT folder lands in the
+    install root, where it is litter rather than documentation, and it is a worse
+    copy of what the mod page already says. releases\package-readme.txt is kept as
+    the source for that page; it is no longer packed.
 
     Two things this does rather than trusts:
 
@@ -106,10 +111,6 @@ if (-not $clientBuilt) { throw "no Blackjack.Client.dll under src\Blackjack.Clie
 Copy-Item $clientBuilt.FullName $pluginDir
 Copy-Item (Join-Path $root 'src\Blackjack.Client\assets\table.png') $pluginDir
 Copy-Item (Join-Path $root 'src\Blackjack.Client\assets\cards\*.png') $cardDir
-
-$readme = Get-Content -Raw (Join-Path $root 'releases\package-readme.txt')
-$readme = $readme.Replace('{VERSION}', $version)
-Set-Content -Path (Join-Path $stage 'README.txt') -Value $readme -Encoding UTF8
 
 # -------------------------------------------------------------------- the zip
 
