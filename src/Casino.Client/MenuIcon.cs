@@ -25,13 +25,26 @@ namespace Casino.Client
     internal static class MenuIcon
     {
         /// <summary>
-        /// The mod's suit.
+        /// The fallback suit, drawn rather than loaded.
         ///
         /// A club, because there is one tab now and it is not any one game's table. The
         /// three suits that were competing for space on the bar are on the lobby tiles
         /// instead, where they identify a game rather than a mod.
+        ///
+        /// Only used when <see cref="IconFile"/> is missing. A tab with no pip at all
+        /// would be a blank square on the bar, which is worse than the wrong shape.
         /// </summary>
         private const char Pip = 'C';
+
+        /// <summary>
+        /// The tab's own artwork: a chip with a card leaning on it, cut out of the
+        /// casino sign and kept as a white silhouette with the background alpha'd away.
+        ///
+        /// White on purpose. The bar tints its icons, and a coloured source would fight
+        /// that; a white one takes whatever tint the row is using, the way the drawn
+        /// pip did.
+        /// </summary>
+        private const string IconFile = "casino-tab.png";
 
         /// <summary>
         /// Swaps the borrowed icon for the mod's suit.
@@ -74,7 +87,7 @@ namespace Casino.Client
                 return;
             }
 
-            var pip = Textures.Suit(Pip, Color.white);
+            var pip = Artwork() ?? Textures.Suit(Pip, Color.white);
 
             // **A DefaultUIButton carries two icons, not one** -- `_iconImage` and
             // `_iconIdleImage`, swapped by its own PointerEnter and PointerExit handlers.
@@ -189,6 +202,41 @@ namespace Casino.Client
         /// Both tests matter. Area alone catches a thin divider; aspect alone catches a
         /// square button. Requiring both leaves the pip.
         /// </summary>
+        /// <summary>
+        /// The tab artwork from disk, or null if it is not there.
+        ///
+        /// Cached on first use rather than loaded per tab: the bar is rebuilt after
+        /// every raid and after any mod that touches the row, so this is asked for
+        /// far more often than it looks.
+        ///
+        /// A missing file is not an error worth shouting about -- the drawn club takes
+        /// over and the tab still reads as the casino. It is worth one line in the log,
+        /// because a silently different icon is the sort of thing that gets noticed
+        /// months later and blamed on something else.
+        /// </summary>
+        private static Sprite Artwork()
+        {
+            if (_artwork != null || _artworkTried)
+            {
+                return _artwork;
+            }
+
+            _artworkTried = true;
+            _artwork = Textures.FromFile(System.IO.Path.Combine(Casino.Shared.Host.AssetFolder, IconFile));
+
+            if (_artwork == null)
+            {
+                CasinoPlugin.Log.LogInfo(
+                    $"[Casino] no {IconFile} beside the plugin; the tab falls back to a drawn club.");
+            }
+
+            return _artwork;
+        }
+
+        private static Sprite _artwork;
+
+        private static bool _artworkTried;
+
         private static bool LooksLikeAPip(Image image, Component owner)
         {
             var rect = image.rectTransform;
