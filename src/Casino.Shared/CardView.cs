@@ -3,7 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Blackjack.Client
+namespace Casino.Shared
 {
     /// <summary>
     /// Draws one playing card.
@@ -78,7 +78,7 @@ namespace Blackjack.Client
         {
             if (_cardDirectory == null)
             {
-                var beside = Path.GetDirectoryName(BlackjackClientPlugin.Instance?.Info?.Location ?? ".") ?? ".";
+                var beside = Host.AssetFolder;
                 _cardDirectory = Path.Combine(beside, "cards");
             }
 

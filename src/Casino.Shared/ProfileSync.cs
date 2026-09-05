@@ -2,7 +2,7 @@ using System;
 using Comfort.Common;
 using EFT.UI;
 
-namespace Poker.Client
+namespace Casino.Shared
 {
     /// <summary>
     /// Tells the game to pick up the money the server has just moved.
@@ -37,11 +37,15 @@ namespace Poker.Client
         /// matches item-event actions case-sensitively, and this is the shape EFT's own
         /// operations take, so the game's serialiser writes it unchanged.
         ///
-        /// Must stay in step with `PokerActions.Sync` on the server.
+        /// The action name is the one thing that genuinely differed between the three
+        /// copies of this file, so it is the one thing passed in. Each must stay in
+        /// step with its own server's `...Actions.Sync`.
         /// </summary>
         private sealed class SyncOperation
         {
-            public string Action = "PokerSync";
+            public SyncOperation(string action) => Action = action;
+
+            public string Action;
 
             public override string ToString() => Action;
         }
@@ -52,7 +56,7 @@ namespace Poker.Client
         /// Safe to call when nothing has changed -- an empty set of changes applies as
         /// nothing -- so callers do not have to work out whether money moved.
         /// </summary>
-        internal static void Request()
+        internal static void Request(string action)
         {
             try
             {
@@ -64,14 +68,14 @@ namespace Poker.Client
                     return;
                 }
 
-                session.SendOperationRightNow(new SyncOperation(), new Callback(OnSynced));
+                session.SendOperationRightNow(new SyncOperation(action), new Callback(OnSynced));
             }
             catch (Exception error)
             {
                 // Never let this take the table down with it. The money has already
                 // moved; the worst case without it is a stash that reads stale until
                 // the game reloads, which is exactly where this started.
-                PokerClientPlugin.Log.LogError($"[Poker] could not ask the game to resync: {error}");
+                Host.Error($"[Casino] could not ask the game to resync: {error}");
             }
         }
 
@@ -79,8 +83,8 @@ namespace Poker.Client
         {
             if (result != null && result.Failed)
             {
-                PokerClientPlugin.Log.LogWarning(
-                    $"[Poker] the game refused the resync: {result.Error}. "
+                Host.Warn(
+                    $"[Casino] the game refused the resync: {result.Error}. "
                     + "The stash may read stale until it reloads.");
             }
         }

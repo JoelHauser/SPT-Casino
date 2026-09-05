@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Casino.Shared;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -270,7 +271,7 @@ namespace Blackjack.Client
 
             // An abandoned stake is refunded server-side, so closing the table can
             // itself have moved money.
-            ProfileSync.Request();
+            ProfileSync.Request("BlackjackSync");
         }
 
         // ------------------------------------------------------------------- actions
@@ -307,7 +308,7 @@ namespace Blackjack.Client
 
             // The stake is taken before the first card, so the game is already out of
             // date by the time the hand is on screen.
-            ProfileSync.Request();
+            ProfileSync.Request("BlackjackSync");
         }
 
         private static void Act(string action)
@@ -317,7 +318,7 @@ namespace Blackjack.Client
             // Double and Split take more money mid-hand, and standing or busting
             // settles the round. All of them move items, so all of them need the game
             // told; sending it on every action is cheaper than working out which.
-            ProfileSync.Request();
+            ProfileSync.Request("BlackjackSync");
         }
 
         private static void ChooseWallet(string wallet)

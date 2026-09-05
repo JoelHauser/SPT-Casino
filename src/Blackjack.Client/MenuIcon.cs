@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Casino.Shared;
+using System;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;

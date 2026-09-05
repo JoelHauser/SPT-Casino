@@ -5,7 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Roulette.Client
+namespace Casino.Shared
 {
     /// <summary>
     /// Draws an amount as a stack of chips.
@@ -379,7 +379,7 @@ namespace Roulette.Client
         {
             if (_directory == null)
             {
-                var beside = Path.GetDirectoryName(RouletteClientPlugin.Instance?.Info?.Location ?? ".") ?? ".";
+                var beside = Host.AssetFolder;
                 _directory = Path.Combine(beside, "chips");
             }
 

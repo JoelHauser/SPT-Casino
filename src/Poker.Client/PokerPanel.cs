@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Casino.Shared;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -178,7 +179,7 @@ namespace Poker.Client
                     // not know its stash changed. Without this the roubles are in the
                     // profile and invisible until a reload, which is the failure that
                     // reads as the mod having eaten them.
-                    ProfileSync.Request();
+                    ProfileSync.Request("PokerSync");
 
                     SetStatus(note);
                 }
@@ -339,7 +340,7 @@ namespace Poker.Client
             // The buy-in has just left the stash. Without this the game keeps showing
             // roubles the server has already deleted, and the next stack the player
             // drags fails to merge against an item that is no longer there.
-            ProfileSync.Request();
+            ProfileSync.Request("PokerSync");
 
             Render(reply);
         }
@@ -350,7 +351,7 @@ namespace Poker.Client
 
             // The chips have just come back as currency, so the same applies in the
             // other direction.
-            ProfileSync.Request();
+            ProfileSync.Request("PokerSync");
 
             ShowLobby();
         }

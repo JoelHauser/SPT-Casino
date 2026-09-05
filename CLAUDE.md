@@ -27,6 +27,7 @@ repo's front page before the merge.
 
 ```
 src/Casino.Client/        the only plugin. Tab, lobby, welcome card, escape key
+src/Casino.Shared/        one copy of what every table draws with. No project of its own
 src/<Table>.Client/       each table's panel and views. NOT shipped as plugins
 src/<Table>.Server/       each table's server mod, still separate, still its own GUID
 src/<Table>.Game/         the rules, no SPT types, unit tested
@@ -70,35 +71,41 @@ up **solid underneath** whatever is on screen, then fade that away. Fading the l
 drawn, which is exactly the flash that had to be fixed once already. `CasinoLobby.Show`
 takes an `instant` flag for this.
 
-## Why the tables are still three copies of the same code
+## What the tables share, and where it lives
 
-They were built one after another, each borrowing the last one's answers. Normalise
-the mod name away and much of the client half is the *same file*:
+`src/Casino.Shared` holds one copy of everything every table draws with:
 
-| File | Poker vs Roulette | Blackjack vs Poker |
-| --- | --- | --- |
-| `Textures.cs` (461 lines) | identical | identical |
-| `ProfileSync.cs` (88) | identical | 49 differ |
-| `CardView.cs` (207) | n/a | identical |
-| `ChipView.cs` | near-identical | n/a |
+| File | Was |
+| --- | --- |
+| `Textures.cs` | identical in all three |
+| `CardView.cs` | identical in Blackjack and Poker |
+| `ChipView.cs` | Roulette's was a strict superset of Poker's, zero lines lost |
+| `ProfileSync.cs` | identical but for the sync action, which is now a parameter |
+| `Host.cs` | new: the two things the shared code needs from its host |
 
-The server half repeats too: `Bank.cs`, `Escrow.cs`, `Abstractions.cs`,
-`ProfileGateway.cs`, `TableStore.cs` and `Wallets.cs` exist three times.
+**`Host` is the whole seam.** These files used to reach for their own table's plugin
+by name, which is most of why they could not simply be shared, and there were only
+ever two such reaches: where the art is, and where to log. Both are set once at
+startup, and both tolerate never being set -- a shared file that throws because a host
+forgot to introduce itself would be worse than the duplication it replaced.
 
-**This is now worse than it was, not better.** Before the merge those were three
-copies in three assemblies. They are three copies compiled into *one* assembly, so
-`Casino.Client.dll` ships `Textures` three times over. `MenuIcon`, `TabCrowding`,
-`TaskBarTab` and `EscapePatch` are no longer triplicated -- the casino owns one of
-each -- but the rest is still waiting.
+The three `.Client` projects compile the shared files too, so each still builds on its
+own. `Casino.Client` compiles them once alongside the three panels.
+
+Verified against the built assembly rather than assumed: `Casino.Client.dll` now
+carries exactly one `Textures`, one `ProfileSync`, one `CardView` and one `ChipView`.
+Before the extraction it shipped three, three, two and two.
+
+**Still duplicated, on the server side**: `Bank.cs`, `Escrow.cs`, `Abstractions.cs`,
+`ProfileGateway.cs`, `TableStore.cs` and `Wallets.cs` exist three times. Those are
+three separate mods loaded into one server process, so the duplication is real but
+harmless in a way the client's was not. See "Merging the servers".
 
 **Blackjack is the one that drifts**: it is the oldest and improvements made while
 writing the other two were never carried back. On 2026-09-05 that cost a real bug --
 `InRaid` was wrong in all three copies at once, and every casino tab greyed out for
-the rest of the session after a visit to the hideout.
-
-Pulling `Textures`, `ProfileSync`, `CardView` and `ChipView` into one shared source
-file is the next obvious job. Until then, **a fix to any of them has to be made three
-times**, and this table is the list of where.
+the rest of the session after a visit to the hideout. That class of fault is what the
+extraction was for.
 
 ## `dotnet` on this box is not the `dotnet` you want
 

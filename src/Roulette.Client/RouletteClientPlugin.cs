@@ -55,6 +55,10 @@ namespace Roulette.Client
             Instance = this;
             Log = Logger;
 
+            // The shared drawing code needs the same two things. See Casino.Shared.Host.
+            Casino.Shared.Host.Plugin = this;
+            Casino.Shared.Host.Log = Logger;
+
             ShowTaskBarTab = Config.Bind(
                 "Menu",
                 "Show the task-bar tab",
