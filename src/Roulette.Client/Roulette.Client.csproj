@@ -1,0 +1,154 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      net472 because that is what the game's mono runtime loads. This is the one
+      project here that is not .NET 10, because it runs inside EFT rather than
+      inside the server.
+    -->
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace>Roulette.Client</RootNamespace>
+    <AssemblyName>Roulette.Client</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <Version>0.1.0</Version>
+
+    <!-- Everything below is referenced straight out of an install. -->
+    <SPTPath Condition="'$(SPTPath)' == ''">H:\SPT4.1.X</SPTPath>
+    <SPTPath Condition="'$(SPTPath)' != ''">$(SPTPath.TrimEnd('\'))</SPTPath>
+    <GameManaged>$(SPTPath)\EscapeFromTarkov_Data\Managed</GameManaged>
+    <SptPlugins>$(SPTPath)\BepInEx\plugins\spt</SptPlugins>
+    <BepInExCore>$(SPTPath)\BepInEx\core</BepInExCore>
+
+    <!--
+      4.1.3's PluginValidator reads a plugin's references to spt-* and requires the
+      major.minor to match the running server. A plugin built against a 4.0 or 3.11
+      install is rejected outright, so this must be built against the install it will
+      run on.
+    -->
+    <AssemblySearchPaths>$(GameManaged);$(AssemblySearchPaths)</AssemblySearchPaths>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <EnableDefaultItems>true</EnableDefaultItems>
+  </PropertyGroup>
+
+  <!--
+    Fails the build rather than letting the compiler report thirty missing types.
+    A wrong SPTPath is the likeliest way this project breaks on a new machine.
+  -->
+  <Target Name="ValidateSPTPath" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(GameManaged)\Assembly-CSharp.dll')"
+           Text="SPTPath ('$(SPTPath)') is not an SPT install root -- no EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll." />
+    <Error Condition="!Exists('$(SptPlugins)\spt-common.dll')"
+           Text="No spt-common.dll under '$(SptPlugins)'. The plugin must be built against the install it will run on." />
+  </Target>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExCore)\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExCore)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameManaged)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Comfort">
+      <HintPath>$(GameManaged)\Comfort.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(GameManaged)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GameManaged)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GameManaged)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(GameManaged)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!--
+      For Animator alone: the task-bar tab freezes the one it clones, because an
+      Animator is a Behaviour rather than a MonoBehaviour and so slips past the sweep
+      that switches the rest of the borrowed tab off.
+    -->
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(GameManaged)\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(GameManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(GameManaged)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(GameManaged)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sirenix.Serialization">
+      <HintPath>$(GameManaged)\Sirenix.Serialization.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sirenix.OdinInspector.Attributes">
+      <HintPath>$(GameManaged)\Sirenix.OdinInspector.Attributes.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sirenix.Serialization.Config">
+      <HintPath>$(GameManaged)\Sirenix.Serialization.Config.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(GameManaged)\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GameManaged)\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="spt-common">
+      <HintPath>$(SptPlugins)\spt-common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="spt-reflection">
+      <HintPath>$(SptPlugins)\spt-reflection.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!--
+    Copies the built plugin into the install. Off by default so an ordinary build
+    cannot touch a running game.
+  -->
+  <!--
+    The art sits beside the DLL rather than being embedded: the ball and the chip faces
+    load from disk next to Instance.Info.Location, and a missing file falls back to
+    something drawn rather than failing.
+
+    There is no wheel image. It was a photograph once, with the wrong number of
+    pockets; the wheel is drawn from the server's own pocket list now.
+  -->
+  <ItemGroup>
+    <BallArt Include="assets\ball.png" />
+    <ChipArt Include="assets\chips\*.png" />
+  </ItemGroup>
+
+  <Target Name="DeployToSPT" AfterTargets="Build" Condition="'$(DeployToSPT)' == 'true'">
+    <MakeDir Directories="$(SPTPath)\BepInEx\plugins\Roulette\chips" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SPTPath)\BepInEx\plugins\Roulette" />
+    <Copy SourceFiles="@(BallArt)" DestinationFolder="$(SPTPath)\BepInEx\plugins\Roulette" />
+    <Copy SourceFiles="@(ChipArt)" DestinationFolder="$(SPTPath)\BepInEx\plugins\Roulette\chips" />
+    <Message Importance="high" Text="Deployed $(TargetFileName) + art to $(SPTPath)\BepInEx\plugins\Roulette" />
+  </Target>
+
+</Project>
