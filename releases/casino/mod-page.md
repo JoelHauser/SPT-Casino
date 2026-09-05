@@ -1,10 +1,16 @@
-A casino in your menu. One tab, a lobby, and three tables that play for the roubles in your stash.
+> ### This replaces my Blackjack and Poker mods
+>
+> Both are tables inside this one now. **Uninstall them before installing this** — see [Installing](#installing). Leaving them in place gives you three tabs on the bar instead of one, and three copies of the same key handler arguing over the escape key.
+>
+> They will not be updated separately from here on. Everything that was in them is here, unchanged, along with the rest of the room.
+
+A casino in your menu. One tab, a lobby, and tables that play for the roubles in your stash.
 
 There is no unlock, no hideout requirement and no quest. Install it, and a **CASINO** tab appears on the bar along the bottom of the menu — on a profile five minutes old or one with a thousand raids behind it.
 
 The bar is on every screen outside a raid, so the tables open from the hideout, the flea market or a trader screen without backing out of them first.
 
-**This is a place, not a feature.** The lobby is built to grow: each table is a tile, and new games get added as tiles rather than as new mods with new tabs. Three tables today. More to come, and they will arrive in this mod rather than beside it.
+**This is a place, not a feature.** The lobby is built to grow: each table is a tile, and new games get added as tiles rather than as new mods with new tabs. Blackjack, hold'em and a single-zero wheel are open so far, and more will arrive in this mod rather than beside it.
 
 ![SPT Casino](https://i.imgur.com/HPJ7e19.png)
 
@@ -77,7 +83,7 @@ Pick a chip from the tray and click a spot. **Right-click takes one back off.** 
 
 Extract into your SPT folder — the one that holds `SPT_Runtime` — and start the server.
 
-**If you have my Blackjack, Poker or Roulette mods installed separately, delete them first.** They are all part of this now. Specifically, remove these folders:
+**Delete my old Blackjack and Poker mods first.** They are tables inside this one now. Remove whichever of these folders you have:
 
 ```
 BepInEx/plugins/Blackjack
@@ -85,7 +91,9 @@ BepInEx/plugins/Poker
 BepInEx/plugins/Roulette
 ```
 
-Leaving them gives you four tabs on the bar and four copies of the same key handler arguing over the escape key.
+The server-side folders under `SPT_Runtime/user/mods/` can stay — this overwrites them.
+
+Leaving the old plugins in place gives you three tabs on the bar instead of one, and three copies of the same key handler arguing over the escape key.
 
 The first time an account walks in, a card explains what the money does. Read it once and it never comes back.
 
