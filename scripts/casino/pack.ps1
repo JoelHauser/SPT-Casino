@@ -3,9 +3,13 @@
     Builds SPT Casino and, with -InstallPath, installs it over a real SPT folder.
 
 .DESCRIPTION
-    One plugin, three server mods. The client half is a single DLL carrying all three
-    tables; the server halves stay exactly as they were, each on its own routes, because
-    that is where the money lives and the merge deliberately did not go near it.
+    Builds and installs the whole of SPT Casino: one plugin carrying all three tables,
+    and the three server mods they talk to.
+
+    The server halves stay separate, each on its own routes with its own GUID, because
+    that is where the money lives and the merge deliberately did not go near it. They
+    are still part of the same install: a casino with no server mods loads, draws a
+    lobby, and every table fails on its first request.
 
     The art is one folder. The three mods' asset trees were byte-identical everywhere
     they overlapped -- 59 of 61 files appear in more than one and not one of them
@@ -28,6 +32,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 $version = '1.0.0'
+$tables = @('Blackjack', 'Poker', 'Roulette')
 $plugin = Join-Path $root 'src\Casino.Client\Casino.Client.csproj'
 $stage = Join-Path $root 'dist\casino'
 
@@ -38,6 +43,12 @@ if ($LASTEXITCODE -ne 0) { throw "the plugin did not build ($LASTEXITCODE)" }
 $built = Get-ChildItem -Recurse -Path (Join-Path $root 'src\Casino.Client\bin\Release') -Filter 'Casino.Client.dll' |
     Sort-Object LastWriteTime | Select-Object -Last 1
 if (-not $built) { throw 'no Casino.Client.dll under src\Casino.Client\bin\Release' }
+
+Write-Host 'Building the three server mods...' -ForegroundColor Cyan
+foreach ($table in $tables) {
+    dotnet build (Join-Path $root "src\$table.Server\$table.Server.csproj") -c Release --nologo -v q
+    if ($LASTEXITCODE -ne 0) { throw "$table.Server did not build ($LASTEXITCODE)" }
+}
 
 # --- stage -----------------------------------------------------------------------
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
@@ -56,6 +67,28 @@ foreach ($game in @('Roulette', 'Poker', 'Blackjack')) {
 
 $art = (Get-ChildItem $pluginDir -Recurse -File | Measure-Object).Count - 1
 Write-Host "Staged the plugin and $art art file(s)." -ForegroundColor Green
+
+# The server mods, one folder each under SPT_Runtime. That prefix is part of the path
+# inside the zip, not the folder you extract into: dropping it produces something that
+# looks right and installs nothing.
+foreach ($table in $tables) {
+    $modDir = Join-Path $stage "SPT_Runtime\user\mods\$table"
+    New-Item -ItemType Directory -Force -Path $modDir | Out-Null
+
+    $serverBin = Join-Path $root "src\$table.Server\bin\Release"
+
+    foreach ($name in @("$table.Server.dll", "$table.Server.pdb", "$table.Game.dll", "$table.Game.pdb")) {
+        $file = Get-ChildItem -Recurse -Path $serverBin -Filter $name -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime | Select-Object -Last 1
+        if ($file) { Copy-Item $file.FullName -Destination $modDir -Force }
+        elseif ($name -notlike '*.pdb') { throw "no $name under $serverBin" }
+    }
+
+    $config = Join-Path $root "src\$table.Server\config.json"
+    if (Test-Path $config) { Copy-Item $config -Destination $modDir -Force }
+
+    Write-Host "  staged the $table server mod" -ForegroundColor DarkGray
+}
 
 # --- install ---------------------------------------------------------------------
 if (-not $InstallPath) {
@@ -86,8 +119,15 @@ foreach ($old in @('Blackjack', 'Poker', 'Roulette')) {
 }
 
 Copy-Item (Join-Path $stage 'BepInEx') -Destination $target -Recurse -Force
-Write-Host "Installed SPT Casino $version to $target\BepInEx\plugins\Casino" -ForegroundColor Green
+Write-Host "Installed the plugin to $target\BepInEx\plugins\Casino" -ForegroundColor Green
+
+Copy-Item (Join-Path $stage 'SPT_Runtime') -Destination $target -Recurse -Force
+foreach ($table in $tables) {
+    Write-Host "Installed the $table server mod to $target\SPT_Runtime\user\mods\$table" -ForegroundColor Green
+}
 
 Write-Host ''
-Write-Host 'The three server mods are unchanged and stay where they are.' -ForegroundColor Cyan
-Write-Host 'Look for a [Casino] client loaded line in BepInEx/LogOutput.log.' -ForegroundColor Cyan
+Write-Host "SPT Casino $version is installed. Restart the server." -ForegroundColor Cyan
+Write-Host 'Look for a [Casino] client loaded line in BepInEx/LogOutput.log, and a' -ForegroundColor Cyan
+Write-Host 'block from each table in the server console. Silence from a table means' -ForegroundColor Cyan
+Write-Host 'the version gate rather than a bug in it.' -ForegroundColor Cyan
