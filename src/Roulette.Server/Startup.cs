@@ -20,6 +20,7 @@ public class Startup(RouletteLog log) : IOnLoad
         log.Success($"v{metadata.Version} loaded -- built for SPT {metadata.SptVersion}");
         log.Info($"mod folder: {log.ModFolder}");
         log.Info("routes: POST /roulette/ping, /place, /remove, /clear, /spin, /state, /leave");
+        log.Info($"item event: {RouletteActions.Sync}, so the stash keeps up without a reload");
         log.Info("single-zero European wheel -- 37 pockets, 2.70% to the house on every bet");
 
         // Said plainly and at boot, because this is the line that stops being true
