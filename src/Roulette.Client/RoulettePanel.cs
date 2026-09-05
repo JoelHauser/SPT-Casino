@@ -53,6 +53,12 @@ namespace Roulette.Client
         private static bool _closing;
 
         private static JObject _lastReply;
+
+        /// <summary>Whether the table is showing a finished spin. See Reopen.</summary>
+        private static bool _settled;
+
+        /// <summary>Money has moved and the running game has not been told. See ResyncStash.</summary>
+        private static bool _syncOwed;
         private static string _pocketSignature;
 
         /// <summary>What the next chip put down is worth. Chosen from the tray.</summary>
@@ -111,6 +117,11 @@ namespace Roulette.Client
             {
                 return;
             }
+
+            // Walking out mid-spin, or closing on the result. The animation's callback
+            // may never run, and the money has moved regardless, so the debt is settled
+            // on the way out rather than left for a reload to discover.
+            ResyncStash();
 
             _closing = true;
 
@@ -210,6 +221,16 @@ namespace Roulette.Client
                 return;
             }
 
+            // Putting a chip down after a result plainly means "next spin, this bet".
+            // The table is still settled and would refuse it -- which it did, ten times
+            // in five seconds, in the first session that played for money. The player
+            // was clicking the cloth and being told "The wheel has turned" with no way
+            // to tell that a button somewhere else was what they needed.
+            if (!Reopen())
+            {
+                return;
+            }
+
             var reply = RouletteApi.Place(kind, selection, _chip);
 
             if (reply == null)
@@ -242,6 +263,14 @@ namespace Roulette.Client
                 return;
             }
 
+            // Right-clicking a settled cloth clears it and stops there. The chips shown
+            // belong to a spin that is over, so there is nothing to lift off -- and
+            // reopening then removing would take a chip the player never placed.
+            if (!Reopen())
+            {
+                return;
+            }
+
             var reply = RouletteApi.Remove(kind, selection, _chip);
 
             if (reply == null)
@@ -257,6 +286,58 @@ namespace Roulette.Client
             {
                 SetStatus(error);
             }
+        }
+
+        /// <summary>
+        /// Tells the running game its stash changed, once the result is out.
+        ///
+        /// The money moves on the server before the reply is even sent, so the client
+        /// has to be told or the roubles are invisible until a reload -- the failure
+        /// that reads as the mod having eaten them. Worse than invisible, actually: the
+        /// client goes on believing in stacks the server deleted, so the next thing the
+        /// player drags in their stash is refused.
+        ///
+        /// **The timing is the whole point.** Asking for it the moment the spin replies
+        /// updates the rouble counter on the screen behind the table, and the player
+        /// watches their money go up or down while the ball is still rolling. The wheel
+        /// then spends nine seconds animating a result they already know. So it waits
+        /// for the ball, and the two land together.
+        ///
+        /// Deferring the telling is not deferring the money. The stake is gone and the
+        /// return is paid either way; this only decides when the game is let in on it.
+        /// </summary>
+        private static void ResyncStash()
+        {
+            if (!_syncOwed)
+            {
+                return;
+            }
+
+            _syncOwed = false;
+            ProfileSync.Request();
+        }
+
+        /// <summary>
+        /// Clears a finished spin so the cloth takes bets again.
+        ///
+        /// Returns false when it did the clearing, because that was a whole action on
+        /// its own: the old chips have just come off and putting the new one down in
+        /// the same click would be putting it on a cloth the player has not looked at
+        /// yet.
+        /// </summary>
+        private static bool Reopen()
+        {
+            if (!_settled)
+            {
+                return true;
+            }
+
+            // The same call the NEXT SPIN button makes. On a settled table it clears
+            // and reopens without turning the wheel or moving any money.
+            Render(RouletteApi.Spin());
+            SetStatus("Cloth cleared. Place your bets.");
+
+            return false;
         }
 
         private static void Clear() => Render(RouletteApi.Clear());
@@ -317,20 +398,30 @@ namespace Roulette.Client
                 return;
             }
 
-            // The stash changed behind the game's back. Without this the roubles have
-            // moved in the profile and are invisible until a reload, which is the
-            // failure that reads as the mod having eaten them -- and worse, the client
-            // goes on believing in stacks the server deleted, so the next thing the
-            // player drags in their stash is refused.
-            ProfileSync.Request();
+            // Deliberately NOT synced here. See ResyncStash: the money has already
+            // moved server-side, and asking the game to notice it now would print the
+            // answer in the rouble counter behind the table before the ball has
+            // stopped rolling.
+            _syncOwed = true;
 
             Note(reply);
 
             var last = reply["Table"]?["Last"] as JObject;
 
             // Pressing spin on a settled table opens the next one, and that reply
-            // carries the previous result rather than a new one. Nothing to animate.
-            if (last == null || (int?)reply["Table"]?["Staked"] > 0)
+            // carries the *previous* result rather than a new one. Nothing to animate.
+            //
+            // Told apart by the phase, which is the only thing that actually says it.
+            // This used to test `Staked > 0`, on the reasoning that a fresh spin still
+            // has chips on the cloth -- and it does, because settling deliberately
+            // leaves the bets in place so the player can see what each one did. So the
+            // test was true exactly when there *was* something new to animate: the
+            // result was printed under the wheel the instant SPIN was pressed, and the
+            // animation then played on the next press, over the old number.
+            var settled = string.Equals(
+                (string)reply["Table"]?["Phase"], "Settled", StringComparison.OrdinalIgnoreCase);
+
+            if (last == null || !settled)
             {
                 Render(reply);
                 return;
@@ -349,6 +440,9 @@ namespace Roulette.Client
                 var label = (string)last["Label"] ?? "?";
                 var colour = (string)last["Colour"];
                 var profit = (int?)last["Profit"] ?? 0;
+
+                // Now, with the ball. Any earlier and the stash gives the result away.
+                ResyncStash();
 
                 SetResult(label, colour);
 
@@ -381,6 +475,8 @@ namespace Roulette.Client
 
             var staked = (int?)table["Staked"] ?? 0;
             var phase = (string)table["Phase"] ?? "Betting";
+
+            _settled = string.Equals(phase, "Settled", StringComparison.OrdinalIgnoreCase);
             var bets = table["Bets"] as JArray;
 
             if (!keepStatus)
