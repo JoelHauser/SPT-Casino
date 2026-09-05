@@ -164,6 +164,12 @@ namespace Blackjack.Client
             {
                 if (_builtOnRight == OnRight)
                 {
+                    // The row is shared with the game's own tabs and with whatever
+                    // other mods have added, and it is over-subscribed easily. Checked
+                    // every tick rather than once at build, because tabs come and go as
+                    // other mods install them and the resolution can change under us.
+                    // See TabCrowding.
+                    TabCrowding.Apply(_tab);
                     return;
                 }
 
@@ -187,6 +193,7 @@ namespace Blackjack.Client
             }
 
             _tab = null;
+            TabCrowding.Forget();
         }
 
         // ------------------------------------------------------------------ finding it
@@ -281,6 +288,10 @@ namespace Blackjack.Client
 
             var click = clone.AddComponent<BlackjackTabClick>();
             click.Mirror = template;
+
+            // The wrapper, not the toggle: the CanvasGroup on `from` is the one the bar
+            // dims when it locks the row for a raid. See the note on BlackjackTabClick.Mirror.
+            click.MirrorGroup = from.GetComponent<CanvasGroup>();
 
             Place(clone, group, container, wantRight);
 
@@ -942,8 +953,25 @@ namespace Blackjack.Client
         /// dictionary of tabs, which ours is not in. Copying a neighbour's state means
         /// the tab dims and stops answering exactly when the rest of the row does,
         /// without having to know why.
+        ///
+        /// **The toggle is the wrong thing to copy, and that is why the tab stayed lit
+        /// through a loading screen.** Read out of 4.1.3: MenuTaskBar dims a tab through
+        /// `SetButtonsInteractable(false, NOT_AVAILABLE_IN_RAID)`, which calls
+        /// `HoverTooltipArea.SetUnlockStatus` on each tab, which ends up in
+        /// `MyExtensions.SetUnlockStatus(CanvasGroup, bool, bool)` -- and that sets the
+        /// **wrapper's CanvasGroup** to alpha 0.3 and `interactable` false. It never
+        /// touches `Toggle.interactable`, which is the serialized field this used to
+        /// read, so the mirror reported "live" while every real tab beside it was grey.
+        /// <see cref="MirrorGroup"/> is that CanvasGroup, and it is the signal that
+        /// actually moves.
         /// </summary>
         internal AnimatedToggle Mirror;
+
+        /// <summary>
+        /// The template tab wrapper's CanvasGroup -- the thing the game actually sets when
+        /// it locks the bar. See the note on <see cref="Mirror"/>.
+        /// </summary>
+        internal CanvasGroup MirrorGroup;
 
         private Transform _glow;
         private CanvasGroup _group;
@@ -966,23 +994,73 @@ namespace Blackjack.Client
             _group.blocksRaycasts = true;
         }
 
+        /// <summary>
+        /// The alpha a locked tab sits at. Not a taste: it is the literal in
+        /// <c>MyExtensions.SetUnlockStatus</c>, which is what every other tab on the row
+        /// is dimmed by, so ours greys out to exactly their shade rather than nearly it.
+        /// </summary>
+        private const float LockedAlpha = 0.3f;
+
         private void Update()
         {
-            if (Mirror == null || _group == null)
+            if (_group == null)
             {
                 return;
             }
 
-            _group.alpha = Mirror.interactable ? 1f : 0.4f;
+            var live = Live;
+
+            _group.alpha = live ? 1f : LockedAlpha;
+            _group.interactable = live;
+
+            // The pointer can already be over the tab at the moment it locks -- queueing
+            // for a raid with the cursor resting on it is exactly that -- and the exit
+            // handler will not fire, so the highlight would stay lit under a dead tab.
+            if (!live && _glow != null && _glow.gameObject.activeSelf)
+            {
+                _glow.gameObject.SetActive(false);
+            }
         }
 
-        private bool Live => Mirror == null || Mirror.interactable;
+        /// <summary>
+        /// Whether the tab is answering at all.
+        ///
+        /// <see cref="TaskBarTab.InRaid"/> is first and stands on its own, because it is
+        /// the one condition this mod must never get wrong: the table is closed at the
+        /// first hint of a raid, and a tab still lit at that moment invites a click that
+        /// is going nowhere. It does not depend on the bar having dimmed itself.
+        ///
+        /// After that it is the template wrapper's CanvasGroup -- see
+        /// <see cref="MirrorGroup"/> -- with the toggle's own
+        /// <see cref="Selectable.IsInteractable"/> as the fallback. That is deliberately
+        /// IsInteractable() and not `interactable`: the latter is the serialized field the
+        /// game never touches, and reading it is what left this tab lit up beside a row of
+        /// grey ones.
+        /// </summary>
+        private bool Live
+        {
+            get
+            {
+                if (TaskBarTab.InRaid)
+                {
+                    return false;
+                }
+
+                if (MirrorGroup != null)
+                {
+                    return MirrorGroup.interactable;
+                }
+
+                return Mirror == null || Mirror.IsInteractable();
+            }
+        }
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            // The bar is hidden rather than destroyed by a raid, so this is worth
-            // checking rather than assuming a hidden tab cannot be clicked.
-            if (!Live || TaskBarTab.InRaid)
+            // The bar is hidden rather than destroyed by a raid, so a click arriving here
+            // during one is worth guarding against rather than assuming away. Live covers
+            // that case as well as the locked-row one.
+            if (!Live)
             {
                 return;
             }
