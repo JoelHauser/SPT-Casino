@@ -6,7 +6,7 @@ using SPTarkov.Server.Core.Utils;
 
 namespace SlotMachine.Server;
 
-public record RouletteConfig
+public record SlotConfig
 {
     /// <summary>
     /// Logs every request, every bet placed and every spin. Noisy in
@@ -40,22 +40,22 @@ public class SlotLog : ISlotLog
         try
         {
             Config = fileUtil.FileExists(configPath)
-                ? jsonUtil.Deserialize<RouletteConfig>(fileUtil.ReadFile(configPath)) ?? new RouletteConfig()
-                : new RouletteConfig();
+                ? jsonUtil.Deserialize<SlotConfig>(fileUtil.ReadFile(configPath)) ?? new SlotConfig()
+                : new SlotConfig();
         }
         catch (Exception ex)
         {
             // A broken config must never stop the mod loading. That failure looks
             // identical to the mod being rejected by the version gate, which is the
             // one thing this logging exists to tell apart.
-            Config = new RouletteConfig();
+            Config = new SlotConfig();
             _logger.Error($"{Prefix} slots.config.json is unreadable, using defaults -- {ex.Message}");
         }
     }
 
     public string ModFolder { get; }
 
-    public RouletteConfig Config { get; }
+    public SlotConfig Config { get; }
 
     public bool Verbose => Config.VerboseLogging;
 

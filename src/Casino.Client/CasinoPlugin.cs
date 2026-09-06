@@ -70,6 +70,8 @@ namespace Casino.Client
             Poker.Client.PokerClientPlugin.Log = Logger;
             Blackjack.Client.BlackjackClientPlugin.Instance = this;
             Blackjack.Client.BlackjackClientPlugin.Log = Logger;
+            SlotMachine.Client.SlotClientPlugin.Instance = this;
+            SlotMachine.Client.SlotClientPlugin.Log = Logger;
 
             ShowTaskBarTab = Config.Bind(
                 "Menu",

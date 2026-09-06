@@ -41,6 +41,16 @@ namespace Poker.Client
     }
 }
 
+namespace SlotMachine.Client
+{
+    internal static class SlotClientPlugin
+    {
+        internal static BaseUnityPlugin Instance;
+
+        internal static ManualLogSource Log;
+    }
+}
+
 namespace Blackjack.Client
 {
     internal static class BlackjackClientPlugin

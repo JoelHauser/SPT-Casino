@@ -2,33 +2,39 @@
 
   <PropertyGroup>
     <!--
-      net472 because that is what the game's mono runtime loads.
+      net472 because that is what the game's mono runtime loads. This is the one
+      project here that is not .NET 10, because it runs inside EFT rather than
+      inside the server.
     -->
     <TargetFramework>net472</TargetFramework>
-    <RootNamespace>Casino.Client</RootNamespace>
-    <AssemblyName>Casino.Client</AssemblyName>
+    <RootNamespace>SlotMachine.Client</RootNamespace>
+    <AssemblyName>SlotMachine.Client</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <Version>1.0.1</Version>
+    <Version>0.1.0</Version>
 
-    <!--
-      The three tables are compiled in from where they already live rather than
-      copied here. They are unchanged: the panels never referenced the task bar, the
-      escape patch or the menu icon, so lifting the entrance out from under them took
-      nothing with it. See Shims.cs for the one thing they did reach for.
-    -->
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-
+    <!-- Everything below is referenced straight out of an install. -->
     <SPTPath Condition="'$(SPTPath)' == ''">H:\SPT4.1.X</SPTPath>
-    <SPTPath Condition="'$(SPTPath)' != ''">$(SPTPath.TrimEnd(''))</SPTPath>
+    <SPTPath Condition="'$(SPTPath)' != ''">$(SPTPath.TrimEnd('\'))</SPTPath>
     <GameManaged>$(SPTPath)\EscapeFromTarkov_Data\Managed</GameManaged>
     <SptPlugins>$(SPTPath)\BepInEx\plugins\spt</SptPlugins>
     <BepInExCore>$(SPTPath)\BepInEx\core</BepInExCore>
 
+    <!--
+      4.1.3's PluginValidator reads a plugin's references to spt-* and requires the
+      major.minor to match the running server. A plugin built against a 4.0 or 3.11
+      install is rejected outright, so this must be built against the install it will
+      run on.
+    -->
     <AssemblySearchPaths>$(GameManaged);$(AssemblySearchPaths)</AssemblySearchPaths>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <EnableDefaultItems>true</EnableDefaultItems>
   </PropertyGroup>
 
+  <!--
+    Fails the build rather than letting the compiler report thirty missing types.
+    A wrong SPTPath is the likeliest way this project breaks on a new machine.
+  -->
   <Target Name="ValidateSPTPath" BeforeTargets="BeforeBuild">
     <Error Condition="!Exists('$(GameManaged)\Assembly-CSharp.dll')"
            Text="SPTPath ('$(SPTPath)') is not an SPT install root -- no EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll." />
@@ -37,39 +43,11 @@
   </Target>
 
   <ItemGroup>
-    <!-- The casino itself: one entrance, one lobby, one escape key. -->
-    <Compile Include="*.cs" />
-
     <!--
-      One copy of what every table draws with. These were a file per table, identical
-      but for the name stamped through them, and compiling all three into one assembly
-      made that duplication ship rather than merely exist.
+      The drawing code every table shares: one copy, in src/Casino.Shared, compiled
+      into whoever is building. See the root CLAUDE.md.
     -->
     <Compile Include="..\Casino.Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!--
-      The tables, as they are. Deliberately NOT included from each mod: its
-      ClientPlugin (there is one plugin now), its TaskBarTab and MenuIcon and
-      TabCrowding (there is one tab now), and its EscapePatch (three Harmony patches
-      on one method, replaced by CasinoEscape).
-    -->
-    <Compile Include="..\Roulette.Client\RoulettePanel.cs"  Link="Games\Roulette\RoulettePanel.cs" />
-    <Compile Include="..\Roulette.Client\WheelView.cs"      Link="Games\Roulette\WheelView.cs" />
-    <Compile Include="..\Roulette.Client\ClothView.cs"      Link="Games\Roulette\ClothView.cs" />
-    <Compile Include="..\Roulette.Client\RouletteApi.cs"    Link="Games\Roulette\RouletteApi.cs" />
-
-    <Compile Include="..\Poker.Client\PokerPanel.cs"        Link="Games\Poker\PokerPanel.cs" />
-    <Compile Include="..\Poker.Client\PokerApi.cs"          Link="Games\Poker\PokerApi.cs" />
-
-    <Compile Include="..\Blackjack.Client\BlackjackPanel.cs" Link="Games\Blackjack\BlackjackPanel.cs" />
-    <Compile Include="..\Blackjack.Client\BlackjackApi.cs"   Link="Games\Blackjack\BlackjackApi.cs" />
-
-    <Compile Include="..\SlotMachine.Client\SlotPanel.cs" Link="Games\SlotMachine\SlotPanel.cs" />
-    <Compile Include="..\SlotMachine.Client\ReelView.cs"  Link="Games\SlotMachine\ReelView.cs" />
-    <Compile Include="..\SlotMachine.Client\LeverView.cs" Link="Games\SlotMachine\LeverView.cs" />
-    <Compile Include="..\SlotMachine.Client\SlotApi.cs"   Link="Games\SlotMachine\SlotApi.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -155,5 +133,30 @@
       <Private>false</Private>
     </Reference>
   </ItemGroup>
+
+  <!--
+    Copies the built plugin into the install. Off by default so an ordinary build
+    cannot touch a running game.
+  -->
+  <!--
+    The art sits beside the DLL rather than being embedded: the ball and the chip faces
+    load from disk next to Instance.Info.Location, and a missing file falls back to
+    something drawn rather than failing.
+
+    There is no wheel image. It was a photograph once, with the wrong number of
+    pockets; the wheel is drawn from the server's own pocket list now.
+  -->
+  <ItemGroup>
+    <BallArt Include="assets\ball.png" />
+    <ChipArt Include="assets\chips\*.png" />
+  </ItemGroup>
+
+  <Target Name="DeployToSPT" AfterTargets="Build" Condition="'$(DeployToSPT)' == 'true'">
+    <MakeDir Directories="$(SPTPath)\BepInEx\plugins\SlotMachine\chips" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SPTPath)\BepInEx\plugins\SlotMachine" />
+    <Copy SourceFiles="@(BallArt)" DestinationFolder="$(SPTPath)\BepInEx\plugins\SlotMachine" />
+    <Copy SourceFiles="@(ChipArt)" DestinationFolder="$(SPTPath)\BepInEx\plugins\SlotMachine\chips" />
+    <Message Importance="high" Text="Deployed $(TargetFileName) + art to $(SPTPath)\BepInEx\plugins\SlotMachine" />
+  </Target>
 
 </Project>

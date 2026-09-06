@@ -3,11 +3,11 @@
     Builds SPT Casino and, with -InstallPath, installs it over a real SPT folder.
 
 .DESCRIPTION
-    Builds and installs the whole of SPT Casino: one plugin carrying all three tables,
-    and the three server mods they talk to.
+    Builds and installs the whole of SPT Casino: one plugin carrying every table,
+    and the server mods they talk to.
 
     One folder each side. SPT loads every .dll in a mod folder into a single mod and
-    registers the injectables from all of them, so the four server assemblies sit
+    registers the injectables from all of them, so the server assemblies sit
     together under user/mods/Casino. The one thing it will not tolerate is two
     IModMetadata classes in one folder, which is why exactly one of them declares it.
 
@@ -17,7 +17,7 @@
     without a line of it changing.
 
     -InstallPath also REMOVES the old per-game plugin folders. Leaving them installed
-    gives four tabs on the bar and four Harmony patches on the same method, which is
+    gives a tab per retired game on the bar and a Harmony patch each on the same method, which is
     the single most likely way this upgrade goes wrong.
 #>
 [CmdletBinding()]
@@ -41,7 +41,7 @@ $version = '1.0.1'
 # three-part version because BepInEx expects one, and the release is named the way it
 # is published.
 $release = '1.0.1'
-$tables = @('Blackjack', 'Poker', 'Roulette')
+$tables = @('Blackjack', 'Poker', 'Roulette', 'SlotMachine')
 $plugin = Join-Path $root 'src\Casino.Client\Casino.Client.csproj'
 $stage = Join-Path $root 'dist\casino'
 
@@ -100,9 +100,14 @@ foreach ($name in $wanted) {
 
 # One config per table, named apart. They were all called config.json when each table
 # had a folder to itself, and in one folder that would be one file read three times.
+# Named for the table's own config file rather than derived from the folder: the
+# slot machine's routes are /slots/*, so its config is slots.config.json and a
+# derived slotmachine.config.json would be a file nothing reads.
+$configs = @{ Blackjack = 'blackjack'; Poker = 'poker'; Roulette = 'roulette'; SlotMachine = 'slots' }
 foreach ($table in $tables) {
-    $config = Join-Path $root ("src\{0}.Server\{1}.config.json" -f $table, $table.ToLower())
+    $config = Join-Path $root ("src\{0}.Server\{1}.config.json" -f $table, $configs[$table])
     if (Test-Path $config) { Copy-Item $config -Destination $modDir -Force }
+    else { throw "no config for $table at $config" }
 }
 
 $assemblies = (Get-ChildItem $modDir -Filter *.dll | Measure-Object).Count

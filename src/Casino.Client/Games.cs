@@ -77,6 +77,15 @@ namespace Casino.Client
                 () => Roulette.Client.RoulettePanel.IsOpen,
                 Roulette.Client.RoulettePanel.Open,
                 Roulette.Client.RoulettePanel.Close),
+
+            new Table(
+                "SLOTS",
+                "tile-slotmachine.png",
+                'C',
+                "Five reels, 243 ways. Pull the handle.",
+                () => SlotMachine.Client.SlotPanel.IsOpen,
+                SlotMachine.Client.SlotPanel.Open,
+                SlotMachine.Client.SlotPanel.Close),
         };
 
         /// <summary>The table the player is at, or null if they are in the lobby.</summary>
