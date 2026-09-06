@@ -18,7 +18,7 @@ public class Startup(BlackjackLog log, StatsStore stats) : IOnLoad
     {
         var rules = new Rules();
 
-        log.Banner($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
+        log.Success($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
         log.Banner($"mod folder: {log.ModFolder}");
         log.Banner($"stats file: {stats.FilePath} ({(stats.Writable ? "writable" : "NOT WRITABLE")})");
         log.Banner("routes: POST /blackjack/ping, /deal, /action, /state, /stats");

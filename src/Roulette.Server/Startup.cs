@@ -15,7 +15,7 @@ public class Startup(RouletteLog log) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        log.Banner($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
+        log.Success($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
         log.Banner($"mod folder: {log.ModFolder}");
         log.Banner("routes: POST /roulette/ping, /place, /remove, /clear, /spin, /state, /leave");
         log.Banner($"item event: {RouletteActions.Sync}, so the stash keeps up without a reload");
