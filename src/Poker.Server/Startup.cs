@@ -15,7 +15,10 @@ public class Startup(PokerLog log) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        log.Success($"v{TableInfo.Version} ready -- five-seat hold'em, real roubles. Detail in poker.config.json.");
+        // A letter at a time, straight to the console. The logger cannot do this:
+        // it takes one colour a line and escapes any markup in the message.
+        // See Casino.Server.Banner.
+        Casino.Server.Banner.Rainbow($"[Poker] v{TableInfo.Version} ready -- five-seat hold'em, real roubles. Detail in poker.config.json.");
 
         // One line on a normal start. The rest of the block is what a mod author wants
         // and a player scrolls past, and there are three tables printing it -- about
