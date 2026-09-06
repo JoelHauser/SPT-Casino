@@ -15,16 +15,12 @@ public class Startup(PokerLog log) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        // A letter at a time, straight to the console. The logger cannot do this:
-        // it takes one colour a line and escapes any markup in the message.
-        // See Casino.Server.Banner.
-        Casino.Server.Banner.Rainbow($"[Poker] v{TableInfo.Version} ready -- five-seat hold'em, real roubles. Detail in poker.config.json.");
 
-        // One line on a normal start. The rest of the block is what a mod author wants
-        // and a player scrolls past, and there are three tables printing it -- about
-        // twenty-five lines of somebody's console for a card game they have not opened
-        // yet. It is all still here behind the verbose switch, which is also what
-        // decides whether every request gets logged while they play.
+        // Silent unless asked. Casino.Server.Startup prints the one line the casino
+        // needs at boot; everything below is a mod author's view of one table, and
+        // three of them was about twenty-five lines of somebody's console for a card
+        // game they had not opened yet. The same switch decides whether every request
+        // gets logged while they play.
         if (!log.Verbose)
         {
             return Task.CompletedTask;

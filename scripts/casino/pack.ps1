@@ -207,6 +207,7 @@ Write-Host "Installed the server half to $target\SPT_Runtime\user\mods\Casino" -
 
 Write-Host ''
 Write-Host "SPT Casino $version is installed. Restart the server." -ForegroundColor Cyan
-Write-Host 'Look for a [Casino] client loaded line in BepInEx/LogOutput.log, and a' -ForegroundColor Cyan
-Write-Host 'block from each table in the server console. Silence from a table means' -ForegroundColor Cyan
-Write-Host 'the version gate rather than a bug in it.' -ForegroundColor Cyan
+Write-Host 'Look for a [Casino] client loaded line in BepInEx/LogOutput.log, and one' -ForegroundColor Cyan
+Write-Host '[Casino] line in the server console. Silence there means the version gate' -ForegroundColor Cyan
+Write-Host 'rather than a bug. Per-table detail is behind VerboseLogging in the' -ForegroundColor Cyan
+Write-Host 'config files beside the mod.' -ForegroundColor Cyan
