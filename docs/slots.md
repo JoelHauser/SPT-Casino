@@ -5,8 +5,9 @@ Server mod in C# (.NET 10) against SPT 4.1.3; the panel is compiled into the one
 casino plugin. It plays for **roubles, dollars or euros** -- the first table here that
 takes anything but roubles.
 
-**The reels actually spin and the lever actually pulls.** Both were stated
-requirements rather than polish. See "The reels" and "The lever".
+**The reels actually spin.** That was a stated requirement rather than polish; see
+"The reels". There was a draggable lever too, for one afternoon, until it was replaced
+by a SPIN button at the player's request -- see "The lever, and what it cost".
 
 Fourth in a family. Blackjack, Poker and Roulette between them already solved the
 money, the two transports, the entrance and escape handling. Nearly all of this
@@ -145,8 +146,11 @@ so a typo would spend a currency the player never chose.
 
 ## The client
 
-`src/SlotMachine.Client/`, compiled into `Casino.Client` like every other table. Four
-files: `SlotPanel`, `ReelView`, `LeverView`, `SlotApi`.
+`src/SlotMachine.Client/`, compiled into `Casino.Client` like every other table.
+Three files: `SlotPanel`, `ReelView`, `SlotApi`.
+
+**Everything lives inside one frame.** The first layout scattered pieces across a
+full-screen canvas at hand-picked coordinates, and it hid a crash: see below.
 
 ### The reels
 
@@ -205,18 +209,64 @@ a belt with as many keycards on it as medkits reads as a machine about to pay ou
 a fact, which is the only honest arrangement: reels that chose where to stop would be
 reels the client could be made to lie with. Same as the roulette wheel.
 
-### The lever
+### The lever, and what it cost
 
-`LeverView.cs`. A real one. Press and drag and the arm follows your hand; let go past
-`Commit = 0.45f` of its 132-unit throw and it fires and springs back, let go short of
-it and it springs back without firing. **A control you can begin and then not commit
-to is a different thing from a button**, and this one spends money.
+There was a draggable lever: press, drag down, and past 45% of its throw it fired and
+sprang back. It is gone -- the player asked for a SPIN button -- and it is worth a
+section anyway, because of how it failed.
 
-It fires at the moment the arm *snaps back*, not at pointer-up, because the reels
-starting as the handle flies up is the whole feel of the thing.
+`LeverView.Build` did this:
 
-A click with no drag still counts as a pull, and there is a SPIN button beside it, for
-anyone who does not realise the handle moves.
+```csharp
+var arm = NewBox("Arm", root, Color.clear);   // NewBox already adds an Image
+var grab = arm.gameObject.AddComponent<Image>();
+grab.color = new Color(0f, 0f, 0f, 0.004f);   // NullReferenceException
+```
+
+**`Graphic` is `[DisallowMultipleComponent]`, so `AddComponent<Image>` returns null**
+on an object that already has one. Not an exception, not a compile error: a null, and
+the NRE lands a line later on something that looks unrelated.
+
+What made it expensive was the layout. `Build` threw halfway down, `Open` caught and
+logged it, and the half that had been built -- title, cabinet, reels -- **looked like a
+finished panel with a few things missing**, so the report that came back was "the
+paytable isn't showing" rather than "it crashed". The paytable, the stake line, the
+status and the buttons had simply never been created.
+
+Two lessons, both now in the code:
+
+* **Build the whole panel inside one frame**, positioned from that frame's edges. A
+  partial build then leaves an obvious hole rather than a plausible panel.
+* **Check the log first.** It said `NullReferenceException at LeverView.Build` on the
+  first line anybody looked at.
+
+### The spin button
+
+Where the lever was, on the right of the reels: a red disc that says SPIN, and greys
+to `...` while the reels are turning. `Pull` refuses a second spin anyway; the greying
+is so the machine looks like it is refusing rather than like it missed the click.
+
+### The win lines
+
+**A 243-ways machine has no paylines.** That is the whole difference between it and
+the twenty-line machines the lines are borrowed from: a win is any position on each
+reel, so there is no fixed set of paths to print down the side of the cabinet, and
+none of them exist until the reels have stopped.
+
+So they are drawn afterwards, one per winning way: a coloured polyline through the
+middle of every symbol it claims, with a numbered badge on the left, capped at
+`MaxLines = 12` because a big win runs to dozens and past about a dozen the machine is
+a ball of string. The rest are counted in words -- "Showing 12 of 27 ways".
+
+The ways are **worked out on the client**, from the grid and the winning symbol: which
+rows hold it on each reel it ran through, then every combination of those. That count
+is exactly what the server calls `Ways`, arrived at independently -- so a line through
+anything but matching symbols means the two disagree and one of them is wrong. It is a
+free cross-check on the settlement, drawn on screen.
+
+uGUI has no line renderer. A segment is a thin `Image` with its pivot on the left,
+sized to the gap and rotated to face along it, which is the whole of what a line
+renderer would be.
 
 ### The paytable down the side
 
@@ -266,6 +316,23 @@ broken, where a plain tile looks like a symbol nobody has drawn yet.
 - Request bodies are PascalCase. SPT binds case-sensitively, so lowercase keys bind
   nothing and every field silently takes its default.
 
+## Installing while the server is up
+
+`pack.ps1` **skips the whole server half if any of its assemblies is locked**, warns,
+and installs the plugin anyway. The server holds its DLLs open, most edits here are to
+the client, and demanding a shutdown for a panel tweak is how a build script teaches
+somebody to stop running it.
+
+It also removes stale files -- but only files the stage does not contain, and never
+`data\`, where the house records what it owes an interrupted player. `Copy-Item`
+merges rather than replaces, so eight renamed symbol files sat in the plugin folder
+after the art landed until this was fixed.
+
+An earlier version of this cleared the folders outright and then demanded a shutdown
+on a hash mismatch. Both were wrong: the first would have deleted the escrow, and the
+second fired constantly, because **two builds of unchanged sources do not come out
+byte-identical here** even with deterministic builds on.
+
 ## Verifying
 
 ```
@@ -291,14 +358,14 @@ for Roulette; rerun it after changing `SlotService`.
 - Engine: 17 tests. RTP 92.510%, computed and simulated.
 - Server: 15 money tests, mutation-checked 9/9. Routes `/slots/ping` and `/slots/pull`,
   item event `SlotsSync`.
-- Client: panel, reels, lever, stake stepper, currency switch, and a paytable read
-  from the ping response rather than written into the panel. Fourth tile in the lobby.
+- Client: panel, reels, SPIN button, stake stepper, currency switch, a paytable read
+  from the ping response, and win lines drawn over the reels. Fourth tile in the lobby.
 - Art: nine rendered items, in. No placeholders left.
 - `pack.ps1` builds and installs it with the rest of the casino.
 
-### Not yet seen on screen
+### Seen on screen once
 
-Nothing here has been played. The specific things to watch on the first run:
+2026-09-06, and it found the lever crash above. What is still unwatched:
 
 - Whether the reels read as spinning at the game's framerate, or strobe. If they
   strobe, `PeakCellsPerSecond` is the dial and `MaxCellsPerFrame` is the reason.
@@ -310,6 +377,10 @@ Nothing here has been played. The specific things to watch on the first run:
   relative to the reel block, not the screen.
 - Whether the rouble counter behind the panel gives the result away. It should not:
   `Resync` is deferred. Roulette needed two goes at this.
+- Whether the win lines read at a glance or as a tangle. `MaxLines` is the dial.
+- Whether the frame is a sensible size on an ultrawide. It is 1240x700 against a
+  1920x1080 reference matched on height, so it scales with the height and leaves more
+  margin the wider the screen gets.
 - A LEDX five-of-a-kind has never been seen and will not be for a long time. The
   payout-splitting path in `Bank.Credit` for very large wins is still unexercised
   here, as it is in Roulette.

@@ -204,31 +204,93 @@ foreach ($old in $tables) {
     }
 }
 
-# Cleared rather than copied over. Copy-Item merges, so a file this build no longer
-# produces -- a renamed symbol, a dropped assembly -- would sit in the install for
-# ever and the plugin would still find it. Safe to empty: nothing but this script
-# writes here.
-$installedPlugin = Join-Path $target 'BepInEx\plugins\Casino'
-if (Test-Path $installedPlugin) { Remove-Item $installedPlugin -Recurse -Force }
+# Copy-Item merges rather than replaces, so a file this build no longer produces -- a
+# renamed symbol, a dropped assembly -- would sit in the install for ever and the mod
+# would still find it. Eight renamed slot symbols did exactly that.
+#
+# So stale files are removed, and ONLY stale ones: anything the stage does not also
+# contain. Emptying the folders outright is the obvious version and it is wrong twice
+# over. It deletes data\, where the house records what it owes a player whose hand was
+# interrupted; and it fails outright on the assemblies while the server has them open,
+# which is most of the time anybody runs this.
+$modDir = Join-Path $target 'SPT_Runtime\user\mods\Casino'
+
+function Get-Stale {
+    param([string]$Stage, [string]$Installed, [string[]]$Keep = @())
+
+    $found = @()
+    if (-not (Test-Path $Installed)) { return $found }
+
+    $wanted = @{}
+    foreach ($file in Get-ChildItem $Stage -Recurse -File) {
+        $wanted[$file.FullName.Substring($Stage.Length).TrimStart('\')] = $true
+    }
+
+    foreach ($file in Get-ChildItem $Installed -Recurse -File) {
+        $relative = $file.FullName.Substring($Installed.Length).TrimStart('\')
+
+        if ($wanted.ContainsKey($relative)) { continue }
+        if ($Keep | Where-Object { $relative -like "$_*" }) { continue }
+
+        $found += $relative
+    }
+
+    return $found
+}
+
+function Remove-Stale {
+    param([string]$Stage, [string]$Installed, [string[]]$Keep = @())
+
+    foreach ($relative in (Get-Stale -Stage $Stage -Installed $Installed -Keep $Keep)) {
+        Remove-Item (Join-Path $Installed $relative) -Force
+        Write-Host "  removed stale $relative" -ForegroundColor DarkYellow
+    }
+}
+
+Remove-Stale `
+    -Stage (Join-Path $stage 'BepInEx\plugins\Casino') `
+    -Installed (Join-Path $target 'BepInEx\plugins\Casino')
 
 Copy-Item (Join-Path $stage 'BepInEx') -Destination $target -Recurse -Force
 Write-Host "Installed the plugin to $target\BepInEx\plugins\Casino" -ForegroundColor Green
 
-# The server folder the same way, but keeping data\ -- that is where the house
-# records what it owes a player whose hand was interrupted, and emptying it would
-# quietly cancel those debts. See Casino.Server.LegacyData.
-$installedMod = Join-Path $target 'SPT_Runtime\user\mods\Casino'
-if (Test-Path $installedMod) {
-    Get-ChildItem $installedMod -Force |
-        Where-Object { $_.Name -ne 'data' } |
-        Remove-Item -Recurse -Force
+# The server half is skipped while the server is running.
+#
+# It holds its assemblies open, so writing over them fails -- and most edits here are
+# to the client, which does not need the server stopped at all. Demanding a shutdown
+# for a panel tweak is how a build script teaches somebody to skip it.
+#
+# A warning rather than an error, and the whole server half is skipped rather than
+# partly written: half an installed mod folder is a worse place to leave somebody than
+# an untouched one. If server code did change, the line below is the one that says so.
+$modStage = Join-Path $stage 'SPT_Runtime\user\mods\Casino'
+$locked = @()
+
+foreach ($dll in Get-ChildItem $modDir -Filter *.dll -ErrorAction SilentlyContinue) {
+    try {
+        $handle = [System.IO.File]::Open($dll.FullName, 'Open', 'ReadWrite', 'None')
+        $handle.Close()
+    }
+    catch {
+        $locked += $dll.Name
+    }
 }
 
-Copy-Item (Join-Path $stage 'SPT_Runtime') -Destination $target -Recurse -Force
-Write-Host "Installed the server half to $target\SPT_Runtime\user\mods\Casino" -ForegroundColor Green
+if ($locked.Count -gt 0) {
+    Write-Host ''
+    Write-Host "The SPT server is running -- the server half was NOT installed." -ForegroundColor Yellow
+    Write-Host "The plugin was, so a client-only change is already live: restart the game." -ForegroundColor Yellow
+    Write-Host "If you changed server code, stop the server and run this again." -ForegroundColor Yellow
+}
+else {
+    Remove-Stale -Stage $modStage -Installed $modDir -Keep @('data')
+
+    Copy-Item (Join-Path $stage 'SPT_Runtime') -Destination $target -Recurse -Force
+    Write-Host "Installed the server half to $modDir" -ForegroundColor Green
+}
 
 Write-Host ''
-Write-Host "SPT Casino $version is installed. Restart the server." -ForegroundColor Cyan
+Write-Host "SPT Casino $version is installed." -ForegroundColor Cyan
 Write-Host 'Look for a [Casino] client loaded line in BepInEx/LogOutput.log, and one' -ForegroundColor Cyan
 Write-Host '[Casino] line in the server console. Silence there means the version gate' -ForegroundColor Cyan
 Write-Host 'rather than a bug. Per-table detail is behind VerboseLogging in the' -ForegroundColor Cyan

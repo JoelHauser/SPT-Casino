@@ -435,6 +435,19 @@ namespace SlotMachine.Client
             }
         }
 
+        /// <summary>
+        /// The middle of reel <paramref name="reel"/>, in the reel root's own space.
+        ///
+        /// Public because the win lines are drawn over the reels by the panel, and a
+        /// line that does not go through the middle of the symbol it is claiming is
+        /// worse than no line.
+        /// </summary>
+        internal static float ReelX(int reel) =>
+            (-Width * 0.5f) + (reel * (Cell + Gutter)) + (Cell * 0.5f);
+
+        /// <summary>The middle of row <paramref name="row"/> of the window.</summary>
+        internal static float RowY(int row) => (1 - row) * Cell;
+
         /// <summary>Where cell <paramref name="i"/> sits. It never sits anywhere else.</summary>
         private static float RestingY(int i) => (((Cells - 1) * 0.5f) - i) * Cell;
 
