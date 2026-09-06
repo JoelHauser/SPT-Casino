@@ -32,6 +32,12 @@ namespace Poker.Client
         internal static BaseUnityPlugin Instance;
 
         internal static ManualLogSource Log;
+
+        /// <summary>
+        /// What sitting down costs, in roubles. Bound by
+        /// <see cref="Casino.Client.CasinoPlugin"/> and settable from the F12 menu.
+        /// </summary>
+        internal static ConfigEntry<int> BuyIn;
     }
 }
 

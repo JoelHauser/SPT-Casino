@@ -85,6 +85,18 @@ namespace Casino.Client
                 "Sits the tab with CHARACTER and the rest instead of beside MAIN MENU and HIDEOUT. "
                 + "The tab moves a second or two after this is changed.");
 
+            Poker.Client.PokerClientPlugin.BuyIn = Config.Bind(
+                "Poker",
+                "Buy-in",
+                1_000_000,
+                new ConfigDescription(
+                    "What sitting down at the poker table costs, in roubles, and the size of "
+                    + "the chip stack you get for it. The blinds stay at 10,000 / 20,000 "
+                    + "whatever this is set to, so a smaller buy-in is a shorter stack and a "
+                    + "livelier game rather than a cheaper one. Rounded to the nearest 10,000, "
+                    + "because that is the smallest chip the table can draw.",
+                    new AcceptableValueRange<int>(200_000, 5_000_000)));
+
             Blackjack.Client.BlackjackClientPlugin.EnforceTableMaximum = Config.Bind(
                 "Blackjack",
                 "Enforce the table maximum",

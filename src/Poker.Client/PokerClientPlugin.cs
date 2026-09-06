@@ -57,6 +57,9 @@ namespace Poker.Client
         /// </summary>
         internal static ConfigEntry<bool> TabOnRight;
 
+        /// <summary>What sitting down costs, in roubles. See the casino's own binding.</summary>
+        internal static ConfigEntry<int> BuyIn;
+
         private void Awake()
         {
             Instance = this;
@@ -72,6 +75,14 @@ namespace Poker.Client
                 true,
                 "Adds POKER to the bar along the bottom of the menu, so the table opens "
                 + "from the hideout, the flea market or a trader screen and not just the main menu.");
+
+            BuyIn = Config.Bind(
+                "Poker",
+                "Buy-in",
+                1_000_000,
+                new ConfigDescription(
+                    "What sitting down costs, in roubles, and the chip stack you get for it.",
+                    new AcceptableValueRange<int>(200_000, 5_000_000)));
 
             TabOnRight = Config.Bind(
                 "Menu",

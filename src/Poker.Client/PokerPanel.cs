@@ -295,12 +295,48 @@ namespace Poker.Client
 
         // ---------------------------------------------------------------- actions
 
-        /// <summary>Seats, chips and blinds, in one place so the label cannot lie.</summary>
+        /// <summary>
+        /// Seats and blinds, in one place so the label cannot lie.
+        ///
+        /// Both fixed. Five seats is what the engine caps at, and the blinds stay put
+        /// so that changing the buy-in changes how deep the table is rather than what
+        /// game it is.
+        /// </summary>
         private const int TableSeats = 5;
 
-        private const int BuyInChips = 1_000_000;
-
         private const int BigBlindChips = 20_000;
+
+        /// <summary>
+        /// What sitting down costs, from the F12 menu.
+        ///
+        /// Read every time rather than cached, so a player who changes it does not have
+        /// to restart the game to see the button change price.
+        ///
+        /// Clamped and rounded here rather than trusted. The setting's own range keeps
+        /// the slider honest, but a config file is a text file somebody can type into,
+        /// and two floors matter: the server refuses anything under ten big blinds, and
+        /// a stack that is not a whole number of 10,000 chips is one the table cannot
+        /// draw. Going out of range would be refused by the server anyway -- this only
+        /// decides whether the player finds out before or after pressing the button.
+        /// </summary>
+        private static int BuyInChips
+        {
+            get
+            {
+                var chosen = PokerClientPlugin.BuyIn?.Value ?? DefaultBuyIn;
+                var clamped = Mathf.Clamp(chosen, BigBlindChips * 10, MaxBuyIn);
+
+                return (clamped / ChipStep) * ChipStep;
+            }
+        }
+
+        private const int DefaultBuyIn = 1_000_000;
+
+        /// <summary>The most the server's rouble wallet takes. See WalletInfo.</summary>
+        private const int MaxBuyIn = 5_000_000;
+
+        /// <summary>The smallest chip the table draws with.</summary>
+        private const int ChipStep = 10_000;
 
         /// <summary>Thousands separators without depending on the machine's locale.</summary>
         private static string Roubles(int amount) =>
@@ -413,7 +449,8 @@ namespace Poker.Client
 
             SetStatus(
                 TableSeats + " seats, blinds 10k / 20k."
-                + "     Buying in costs " + Roubles(BuyInChips) + " roubles from your stash."
+                + "     Buying in costs " + Roubles(BuyInChips) + " roubles from your stash"
+                + " (" + (BuyInChips / BigBlindChips) + " big blinds, set it in the F12 menu)."
                 + " You take back whatever is in front of you when you stand up.");
 
             BuildActions(new[]

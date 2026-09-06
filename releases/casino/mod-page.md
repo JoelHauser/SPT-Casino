@@ -56,8 +56,10 @@ No-limit Texas hold'em, five handed — you and four of the house's regulars.
 The bots are named out of the game's own PMC nickname list, so the seat that just three-bet you is called something you have seen on a killboard. They play their own game: position, pot odds, and personalities that bluff at different rates.
 
 - Blinds 10,000 / 20,000
-- Buy in for 1,000,000
+- Buy in for 1,000,000 by default — **set it yourself in the F12 menu**, anywhere from 200,000 to 5,000,000
 - Roubles only
+
+The blinds stay put whatever you set, so a smaller buy-in is a shorter stack and a livelier game rather than a cheaper one. 200,000 is ten big blinds; 5,000,000 is two hundred and fifty.
 
 Your stack is yours. Stand up whenever you like and it goes back to your stash — and if the server dies mid-session, it is given back the next time you sit down.
 
