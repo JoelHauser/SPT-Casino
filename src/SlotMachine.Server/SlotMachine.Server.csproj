@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SlotMachine.Server</RootNamespace>
+    <AssemblyName>SlotMachine.Server</AssemblyName>
+
+    <Version>1.0.0</Version>
+
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SPTarkov.Server.Core" Version="4.1.2">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\SlotMachine.Game\SlotMachine.Game.csproj" />
+    <ProjectReference Include="..\Casino.Server\Casino.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="slots.config.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
