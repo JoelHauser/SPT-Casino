@@ -17,8 +17,10 @@ public class Startup(BlackjackLog log, StatsStore stats) : IOnLoad
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
         var rules = new Rules();
-
-        log.Success($"v{TableInfo.Version} ready -- six decks, real currency. Detail in blackjack.config.json.");
+        // A letter at a time, straight to the console. The logger cannot do this:
+        // it takes one colour a line and escapes any markup in the message.
+        // See Casino.Server.Banner.
+        Casino.Server.Banner.Rainbow($"[Blackjack] v{TableInfo.Version} ready -- six decks, real currency. Detail in blackjack.config.json.");
 
         // One line on a normal start. The rest of the block is what a mod author wants
         // and a player scrolls past, and there are three tables printing it -- about
