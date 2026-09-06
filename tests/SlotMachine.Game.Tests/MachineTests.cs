@@ -8,7 +8,7 @@ public class MachineTests
     /// <summary>
     /// A run has to start on the first reel.
     ///
-    /// The rule that stops a slot paying on nearly every spin. Four LEDX on reels two
+    /// The rule that stops a slot paying on nearly every spin. Four keycard on reels two
     /// to five is worth nothing at all, and a player who does not know that will think
     /// the machine robbed them.
     /// </summary>
@@ -17,21 +17,21 @@ public class MachineTests
     {
         var machine = new Machine();
 
-        // Find a stop on reel one showing no LEDX, and stops on the rest that do.
-        var first = StopWithout(0, Symbol.Ledx);
-        var rest = Enumerable.Range(1, Reels.Count - 1).Select(r => StopWith(r, Symbol.Ledx));
+        // Find a stop on reel one showing no keycard, and stops on the rest that do.
+        var first = StopWithout(0, Symbol.Keycard);
+        var rest = Enumerable.Range(1, Reels.Count - 1).Select(r => StopWith(r, Symbol.Keycard));
 
         var pull = machine.StopAt([first, .. rest], 1_000);
 
-        Assert.DoesNotContain(pull.Wins, w => w.Symbol == Symbol.Ledx);
+        Assert.DoesNotContain(pull.Wins, w => w.Symbol == Symbol.Keycard);
     }
 
     /// <summary>Two of a kind is a near miss, not a win.</summary>
     [Fact]
     public void TwoOfAKindPaysNothing()
     {
-        Assert.Equal(0, Paytable.Of(Symbol.Ledx, 2));
-        Assert.Equal(0, Paytable.Of(Symbol.Bandage, 2));
+        Assert.Equal(0, Paytable.Of(Symbol.Keycard, 2));
+        Assert.Equal(0, Paytable.Of(Symbol.Medkit, 2));
         Assert.Equal(3, Paytable.MinRun);
     }
 
@@ -44,20 +44,20 @@ public class MachineTests
     public void RepeatsOnOneReelMultiplyTheWin()
     {
         var machine = new Machine();
-        var stops = Enumerable.Range(0, Reels.Count).Select(r => StopWith(r, Symbol.Bandage)).ToArray();
+        var stops = Enumerable.Range(0, Reels.Count).Select(r => StopWith(r, Symbol.Medkit)).ToArray();
 
         var pull = machine.StopAt(stops, 1_000);
-        var win = Assert.Single(pull.Wins.Where(w => w.Symbol == Symbol.Bandage));
+        var win = Assert.Single(pull.Wins.Where(w => w.Symbol == Symbol.Medkit));
 
         var expectedWays = 1;
 
         for (var reel = 0; reel < win.Reels; reel++)
         {
-            expectedWays *= Reels.Window(reel, stops[reel]).Count(s => s == Symbol.Bandage);
+            expectedWays *= Reels.Window(reel, stops[reel]).Count(s => s == Symbol.Medkit);
         }
 
         Assert.Equal(expectedWays, win.Ways);
-        Assert.Equal(1_000L * Paytable.Of(Symbol.Bandage, win.Reels) * win.Ways, win.Paid);
+        Assert.Equal(1_000L * Paytable.Of(Symbol.Medkit, win.Reels) * win.Ways, win.Paid);
     }
 
     /// <summary>What is paid is the sum of what each symbol paid, and nothing else.</summary>
@@ -82,15 +82,15 @@ public class MachineTests
     public void TheStakeIsNotReturnedOnTopOfAWin()
     {
         var machine = new Machine();
-        var stops = Enumerable.Range(0, Reels.Count).Select(r => StopWith(r, Symbol.Ledx)).ToArray();
+        var stops = Enumerable.Range(0, Reels.Count).Select(r => StopWith(r, Symbol.Keycard)).ToArray();
 
         var pull = machine.StopAt(stops, 1_000);
-        var win = pull.Wins.First(w => w.Symbol == Symbol.Ledx);
+        var win = pull.Wins.First(w => w.Symbol == Symbol.Keycard);
 
-        // The LEDX win itself, not the whole pull: those stops light other symbols up
+        // The keycard win itself, not the whole pull: those stops light other symbols up
         // as well, and asserting on the total was this test failing for the wrong
         // reason rather than finding anything.
-        Assert.Equal(1_000L * Paytable.Of(Symbol.Ledx, 5) * win.Ways, win.Paid);
+        Assert.Equal(1_000L * Paytable.Of(Symbol.Keycard, 5) * win.Ways, win.Paid);
         Assert.Equal(pull.Paid - 1_000, pull.Profit);
     }
 

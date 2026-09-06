@@ -68,12 +68,12 @@ symbols, divide by the stake, and that is the RTP. No simulation, no enumeration
 `Reels.cs`. Five reels of **30 stops**, nine symbols, three rows visible.
 
 ```
-        Bnd Crk Rnd Scr Wir Bat Coin Gpu Ledx
-reel 1   5   5   4   4   4   3    2    2   1
-reel 2   5   5   4   4   4   3    2    2   1
-reel 3   5   5   5   4   4   3    2    1   1
-reel 4   6   5   5   4   4   3    1    1   1
-reel 5   6   6   5   4   4   2    1    1   1
+        Med Ammo Gren Helm Tag  RUB  GP  BTC Key
+reel 1   5    5    4    4   4   3    2    2   1
+reel 2   5    5    4    4   4   3    2    2   1
+reel 3   5    5    5    4   4   3    2    1   1
+reel 4   6    5    5    4   4   3    1    1   1
+reel 5   6    6    5    4   4   2    1    1   1
 ```
 
 **Every symbol appears at least once on every reel**, and there is a test that says
@@ -90,17 +90,22 @@ positions were silently overwritten by every later one.
 
 `Paytable.cs`, multipliers on the stake, for 3 / 4 / 5 reels. `MinRun = 3`.
 
-| Symbol | 3 | 4 | 5 |
-| --- | --- | --- | --- |
-| Bandage | 1 | 1 | 1 |
-| Crackers | 1 | 1 | 2 |
-| Round | 1 | 2 | 2 |
-| Screwdriver | 1 | 2 | 5 |
-| Wires | 1 | 2 | 5 |
-| Green battery | 2 | 4 | 12 |
-| GP coin | 5 | 20 | 80 |
-| GPU | 10 | 50 | 250 |
-| LEDX | 25 | 150 | 1000 |
+| Symbol | Enum | 3 | 4 | 5 |
+| --- | --- | --- | --- | --- |
+| AI-2 medkit | `Medkit` | 1 | 1 | 1 |
+| 7.62x51 ammo box | `AmmoBox` | 1 | 1 | 2 |
+| Grenade | `Grenade` | 1 | 2 | 2 |
+| Helmet | `Helmet` | 1 | 2 | 5 |
+| BEAR dog tag | `DogTag` | 1 | 2 | 5 |
+| Rouble stack | `Roubles` | 2 | 4 | 12 |
+| GP coin | `GpCoin` | 5 | 20 | 80 |
+| Bitcoin | `Bitcoin` | 10 | 50 | 250 |
+| Violet Labs keycard | `Keycard` | 25 | 150 | 1000 |
+
+The set was placeholder loot names until 2026-09-06 (bandage, crackers, screwdriver
+and so on) and was renamed to match the artwork that arrived. **The strips and the
+multipliers did not move**, so neither did the 92.510%: it was a rename, and the test
+that guards the return proves it was only a rename.
 
 Solved numerically against the strips to land on 92.5%. The low symbols pay about what
 they cost because they hit constantly; the top of the table is where the machine is
@@ -145,23 +150,56 @@ files: `SlotPanel`, `ReelView`, `LeverView`, `SlotApi`.
 
 ### The reels
 
-`ReelView.cs`. A reel is **a belt, not a slideshow.** The naive version swaps three
-sprites a few times, which reads as flickering because nothing ever moves. This builds
-a column of nine cells behind a `Mask`ed three-cell window, slides the whole column,
-and recycles cells off the bottom back to the top.
+`ReelView.cs`, and the only genuinely hard part of this table.
 
-Two numbers matter:
+**The cells never move. The symbols do.** Nine cells sit at fixed positions behind a
+`Mask`ed three-cell window. What travels is a read head over a strip: cell *i* shows
+`strip[i - floor(position)]`, and the column slides by the fractional part of the
+position. Advance the position by one and every symbol has moved down exactly one
+cell, seamlessly, for as long as you like.
 
-- **`MaxCellsPerFrame = 0.85f`.** Past about one cell per frame the belt stops being a
-  blur and becomes a row of separate pictures -- the same strobing that took three
-  rounds to find on the roulette ball.
-- **`Stagger = 0.42f`.** Each reel runs longer than the one before it, so they come to
+The version before this recycled cells -- moved the lowest to the top and gave it a
+new face. It looked right and it was wrong: **once a cell has been moved, its array
+index no longer says where it is**, and the landing symbols were being written to
+indices 3, 4 and 5 on the assumption that those were the window. They were, until the
+first recycle. With fixed cells, 3, 4 and 5 are the window always and that class of
+bug cannot happen. It was never seen on screen; it was found rewriting the motion.
+
+**The motion is a real reel's, not a wheel winding down.** A physical reel snaps up to
+speed, holds flat out, decelerates into its stop, and thumps against the detent. The
+first version eased off from the first frame, which is a completely different thing to
+watch. So:
+
+| | |
+| --- | --- |
+| `SpinUp = 0.10` | smoothstep from a standstill to full speed |
+| `HoldUntil = 0.62` | flat out, which is most of the spin |
+| then | a squared ease-out, long, where all the tension is |
+| `Overshoot = 0.16` | of a cell past the stop, sprung back over `SettleSeconds` |
+
+That last bounce is the difference between stopping and *landing*.
+
+`Travelled(u)` is the **exact integral** of that profile rather than a per-frame
+accumulation, so the reel arrives on its stop to the pixel on a machine dropping
+frames as well as on one that is not.
+
+Two other numbers matter:
+
+- **`PeakCellsPerSecond = 22`**, chosen under `MaxCellsPerFrame = 0.85`. Past about a
+  cell a frame the belt stops being a blur and becomes a row of separate pictures --
+  the same strobing that took three rounds to find on the roulette ball. 22 is 0.73 of
+  a cell at 30fps and 0.37 at 60, so it holds up on a bad frame rate too.
+- **`Stagger = 0.34`.** Each reel runs longer than the one before it, so they come to
   rest left to right. Five reels stopping together reads as a picture appearing rather
-  than as anything spinning, and that stagger is most of what makes a slot feel like
-  one.
+  than as anything spinning.
 
-The landing symbols are written into the window when the belt is within about a cell
-of home, so they arrive already moving rather than appearing.
+The total travel is **rounded to whole cells** and the landing symbols are written
+into the strip at the place the reel will rest on, so the reel is spinning towards its
+answer from the first frame. Nothing is swapped in at the last moment.
+
+The belt scrolling past is random rather than the true 30-stop strip -- nobody can
+read it at speed -- but it is **weighted low** (two draws, keep the cheaper), because
+a belt with as many keycards on it as medkits reads as a machine about to pay out.
 
 **The server settled the pull before the first frame drew.** The spin is theatre over
 a fact, which is the only honest arrangement: reels that chose where to stop would be
@@ -180,6 +218,19 @@ starting as the handle flies up is the whole feel of the thing.
 A click with no drag still counts as a pull, and there is a SPIN button beside it, for
 anyone who does not realise the handle moves.
 
+### The paytable down the side
+
+Nine rows, richest first: the artwork, the name, and what 3, 4 and 5 of them pay --
+written as `25x 150x 1000x` rather than as bare numbers in unlabelled columns. A
+paytable nobody can read is a machine that looks like it pays at random.
+
+**Every number comes from the ping response.** Nothing about the payouts is written
+into the client, so the panel cannot advertise something the machine does not give.
+`NameOf` is the one exception and it is presentation only -- it maps `Keycard` to
+"VIOLET KEYCARD" and falls through to the server's own name for anything it does not
+recognise, so a symbol added on the server shows up on an old client looking plain
+rather than looking broken.
+
 ### The stash is told late
 
 `SlotPanel.Resync` holds the `SlotsSync` item event until the reels stop. The money
@@ -190,10 +241,18 @@ wheel, twice.** Closing mid-spin settles the debt on the way out.
 
 ## The art
 
-Nine placeholder symbols in `src/SlotMachine.Client/assets/symbols/`, named for the
-lowercase symbol name. `FaceFor` falls back to a drawn box on a missing file -- a reel
-with holes in it looks broken where a plain tile looks like a symbol nobody has drawn
-yet. Replacing a file is the whole of swapping in real art.
+Nine rendered items in `src/SlotMachine.Client/assets/symbols/`, **named for the
+lowercase symbol name** -- that filename is the entire binding between the enum and
+the picture, so renaming a symbol means renaming a file.
+
+They arrived as 1254px transparent PNGs and are processed down to 168px squares:
+cropped to the alpha bounding box first, so a grenade and a rouble stack end up the
+same visual weight instead of one floating in its own padding, then centred on
+transparency rather than stretched, because a squashed helmet reads as a bad
+screenshot.
+
+`FaceFor` falls back to a drawn box on a missing file -- a reel with holes in it looks
+broken, where a plain tile looks like a symbol nobody has drawn yet.
 
 `assets/tile-slotmachine.png` in `Casino.Client` is the lobby tile.
 
@@ -234,6 +293,7 @@ for Roulette; rerun it after changing `SlotService`.
   item event `SlotsSync`.
 - Client: panel, reels, lever, stake stepper, currency switch, and a paytable read
   from the ping response rather than written into the panel. Fourth tile in the lobby.
+- Art: nine rendered items, in. No placeholders left.
 - `pack.ps1` builds and installs it with the rest of the casino.
 
 ### Not yet seen on screen
@@ -241,7 +301,11 @@ for Roulette; rerun it after changing `SlotService`.
 Nothing here has been played. The specific things to watch on the first run:
 
 - Whether the reels read as spinning at the game's framerate, or strobe. If they
-  strobe, `MaxCellsPerFrame` is the dial.
+  strobe, `PeakCellsPerSecond` is the dial and `MaxCellsPerFrame` is the reason.
+- Whether the overshoot-and-settle reads as a thump or as a wobble. `Overshoot` and
+  `SettleSeconds` are one dial between them.
+- Whether the paytable is legible at 1080p. It is 372 units wide beside a 680-unit
+  cabinet, which fits, but the type is small.
 - Whether the lever's throw is reachable at 1080p and at ultrawide -- it is positioned
   relative to the reel block, not the screen.
 - Whether the rouble counter behind the panel gives the result away. It should not:
@@ -252,5 +316,6 @@ Nothing here has been played. The specific things to watch on the first run:
 
 ### Open items
 
-- Real symbol art. The nine placeholders are generated and deliberately plain.
 - No autoplay, and no plans for one.
+- The reels are silent. A ratchet on the spin and a thump on each stop would do more
+  for the feel than anything left on this list.

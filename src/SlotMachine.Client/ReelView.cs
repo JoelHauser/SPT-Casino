@@ -12,24 +12,45 @@ namespace SlotMachine.Client
     /// <summary>
     /// The five reels, and the only part of this that is actually hard.
     ///
-    /// ## A reel is a strip, not a slideshow
+    /// ## How a real reel moves, and how this one does
     ///
-    /// The naive version swaps three sprites a few times and stops. It reads as
-    /// flickering rather than spinning, because nothing ever moves. This builds a
-    /// column of symbol cells taller than the window it shows through, slides the whole
-    /// column, and recycles cells off the bottom back to the top -- so what the eye
-    /// follows is one continuous belt.
+    /// A physical reel is a printed band on a drum. It **snaps up to speed, holds flat
+    /// out, then decelerates into its stop and thumps against the detent.** It does not
+    /// slow down from the first frame, which is what the first version of this did and
+    /// why it read as a wheel winding down rather than a reel being spun.
+    ///
+    /// So the motion here is a real velocity profile, integrated exactly:
+    ///
+    /// * `SpinUp` (the first tenth) -- smoothstep from a standstill to full speed.
+    /// * flat out until `HoldUntil`, which is most of the spin.
+    /// * a squared ease-out into the stop, which is long, and is where the tension is.
+    /// * an overshoot of `Overshoot` of a cell, sprung back over `SettleSeconds`. That
+    ///   last bounce is the whole difference between stopping and *landing*.
+    ///
+    /// ## The cells do not move. The symbols do.
+    ///
+    /// Nine cells sit at fixed positions behind a masked three-cell window and never
+    /// move relative to each other. What travels is a **read head** over a strip: cell
+    /// *i* shows `strip[i - floor(position)]`, and the whole column slides by the
+    /// fractional part of the position. Advance the position by one and every symbol
+    /// has moved down exactly one cell, seamlessly, forever.
+    ///
+    /// The version before this recycled cells -- moved the lowest to the top and gave
+    /// it a new face. It looked right and it was wrong: once a cell has been moved, the
+    /// array index no longer says where a cell *is*, so writing the landing symbols to
+    /// indices 3, 4 and 5 scattered them up and down the belt. With fixed cells, 3, 4
+    /// and 5 are the window, always, and that class of bug cannot happen.
     ///
     /// ## Stopping on the answer
     ///
-    /// The server has already decided where every reel lands before the first frame is
-    /// drawn. The spin is theatre over a settled fact, which is the only honest way
-    /// round: reels that chose their own stopping place would be reels the client could
-    /// be made to lie with.
+    /// The server decided every stop before the first frame drew, so the total travel
+    /// is rounded to a whole number of cells and the landing symbols are written into
+    /// the strip **at the place the reel is going to rest on**. The reel then simply
+    /// spins there. Nothing is swapped in at the last moment and nothing appears.
     ///
-    /// Each reel runs for its own duration, so they come to rest left to right. That
-    /// stagger is most of what makes a slot feel like a slot -- five reels stopping
-    /// together reads as a picture appearing rather than as anything spinning.
+    /// The spin is theatre over a settled fact, which is the only honest way round:
+    /// reels that chose their own stopping place would be reels the client could be
+    /// made to lie with. Same arrangement as the roulette wheel.
     /// </summary>
     internal static class ReelView
     {
@@ -40,28 +61,48 @@ namespace SlotMachine.Client
         private const float Gutter = 10f;
 
         /// <summary>
-        /// How many cells each reel carries.
-        ///
-        /// Three show; the rest are the belt above and below. Enough that the column
-        /// can slide a whole cell height several times before recycling, which is what
-        /// keeps the motion continuous rather than jumping.
+        /// How many cells each reel carries. Three show; the rest are the belt above and
+        /// below, which is what the mask hides and what makes the window look cut into
+        /// something continuous.
         /// </summary>
         private const int Cells = 9;
 
-        private const float MinDuration = 0.9f;
+        /// <summary>
+        /// How long a strip is while it is turning.
+        ///
+        /// Longer than any single spin travels, so the landing symbols written into it
+        /// are not also passing the window three times on the way. Not the real 30-stop
+        /// strip: what scrolls past is unreadable at speed, and reproducing the true
+        /// order would cost a lookup a frame to say nothing.
+        /// </summary>
+        private const int StripLength = 64;
 
-        /// <summary>Each reel runs a little longer than the one before it.</summary>
-        private const float Stagger = 0.42f;
+        /// <summary>Full speed, in cells per second.</summary>
+        private const float PeakCellsPerSecond = 22f;
 
         /// <summary>
-        /// How far a reel may travel in one frame, as a fraction of a cell.
+        /// The ceiling <see cref="PeakCellsPerSecond"/> was chosen under.
         ///
-        /// Past about one cell per frame the symbols stop being a moving belt and
-        /// become a row of separate pictures -- the same strobing that took three
-        /// rounds to find on the roulette ball. Capping the speed is what keeps it a
-        /// blur instead.
+        /// Past about one cell per frame the symbols stop being a moving belt and become
+        /// a row of separate pictures -- the same strobing that took three rounds to
+        /// find on the roulette ball. 22 cells a second is 0.73 of a cell at 30fps and
+        /// 0.37 at 60, so it stays a blur on a bad frame rate as well as a good one.
         /// </summary>
         private const float MaxCellsPerFrame = 0.85f;
+
+        private const float SpinUp = 0.10f;
+
+        private const float HoldUntil = 0.62f;
+
+        /// <summary>How far past its stop a reel throws itself, in cells.</summary>
+        private const float Overshoot = 0.16f;
+
+        private const float SettleSeconds = 0.11f;
+
+        private const float MinDuration = 1.05f;
+
+        /// <summary>Each reel runs a little longer than the one before it.</summary>
+        private const float Stagger = 0.34f;
 
         private static readonly Color Face = new Color(0.09f, 0.10f, 0.11f, 1f);
         private static readonly Color Edge = new Color(0.42f, 0.36f, 0.22f, 1f);
@@ -71,6 +112,8 @@ namespace SlotMachine.Client
 
         private static RectTransform[] _columns;
         private static Image[][] _cells;
+        private static string[][] _strips;
+        private static float[] _positions;
         private static string[] _symbols;
 
         internal static bool Spinning { get; private set; }
@@ -88,7 +131,7 @@ namespace SlotMachine.Client
         /// </param>
         internal static GameObject Build(Transform parent, IReadOnlyList<string> symbols)
         {
-            _symbols = symbols is { Count: > 0 } ? [.. symbols] : ["Bandage"];
+            _symbols = symbols is { Count: > 0 } ? [.. symbols] : ["Medkit"];
 
             var root = NewBox("Reels", parent, Color.white);
             root.sizeDelta = new Vector2(Width + 28f, Height + 28f);
@@ -99,6 +142,8 @@ namespace SlotMachine.Client
 
             _columns = new RectTransform[5];
             _cells = new Image[5][];
+            _strips = new string[5][];
+            _positions = new float[5];
 
             var left = -Width * 0.5f;
 
@@ -118,20 +163,23 @@ namespace SlotMachine.Client
 
                 _columns[reel] = column;
                 _cells[reel] = new Image[Cells];
+                _strips[reel] = NewStrip(new System.Random(reel * 7919));
 
                 for (var i = 0; i < Cells; i++)
                 {
+                    // Set once and never moved again. See the class comment.
                     var cell = NewBox("Cell" + i, column, Color.white);
                     cell.sizeDelta = new Vector2(Cell - 6f, Cell - 6f);
-                    cell.anchoredPosition = new Vector2(0f, TopOf(i));
+                    cell.anchoredPosition = new Vector2(0f, RestingY(i));
 
                     var image = cell.GetComponent<Image>();
                     image.preserveAspect = true;
                     image.raycastTarget = false;
-                    image.sprite = FaceFor(_symbols[(reel + i) % _symbols.Length]);
 
                     _cells[reel][i] = image;
                 }
+
+                Render(reel);
             }
 
             return root.gameObject;
@@ -142,13 +190,21 @@ namespace SlotMachine.Client
         ///
         /// For a machine built before the server answered: the reels fall back to a
         /// single symbol so they are not empty, and this puts the real set in once it
-        /// arrives rather than leaving a column of bandages spinning forever.
+        /// arrives rather than leaving a column of medkits spinning forever.
         /// </summary>
         internal static void Restock(IReadOnlyList<string> symbols)
         {
-            if (symbols is { Count: > 0 })
+            if (symbols is not { Count: > 0 } || _strips == null)
             {
-                _symbols = [.. symbols];
+                return;
+            }
+
+            _symbols = [.. symbols];
+
+            for (var reel = 0; reel < 5; reel++)
+            {
+                _strips[reel] = NewStrip(new System.Random(reel * 7919));
+                Render(reel);
             }
         }
 
@@ -164,15 +220,9 @@ namespace SlotMachine.Client
 
             for (var reel = 0; reel < 5 && reel < grid.Count; reel++)
             {
-                _columns[reel].anchoredPosition = Vector2.zero;
-
-                for (var row = 0; row < 3 && row < grid[reel].Count; row++)
-                {
-                    // Cells 3, 4 and 5 are the three in the window when the belt sits
-                    // at rest. See TopOf.
-                    _cells[reel][3 + row].sprite = FaceFor(grid[reel][row]);
-                    _cells[reel][3 + row].color = Color.white;
-                }
+                _positions[reel] = 0f;
+                WriteLanding(reel, 0, grid[reel]);
+                Render(reel);
             }
         }
 
@@ -198,11 +248,13 @@ namespace SlotMachine.Client
                 }
             }
 
-            var running = 5;
+            var running = 0;
 
-            for (var reel = 0; reel < 5; reel++)
+            for (var reel = 0; reel < 5 && reel < grid.Count; reel++)
             {
-                host.StartCoroutine(SpinOne(reel, MinDuration + (reel * Stagger), grid[reel], () => running--));
+                running++;
+                host.StartCoroutine(
+                    SpinOne(reel, MinDuration + (reel * Stagger), grid[reel], () => running--));
             }
 
             while (running > 0)
@@ -215,99 +267,153 @@ namespace SlotMachine.Client
         }
 
         /// <summary>
-        /// One reel: run, slow, and drop the answer into the window as it settles.
+        /// One reel: up to speed, flat out, ease down, thump.
         ///
-        /// The symbols scrolling past are picked at random because nobody can read them
-        /// at speed and pretending otherwise costs a strip lookup per frame. The three
-        /// that matter are written in when the belt is within a cell of home, which is
-        /// late enough that they arrive already moving rather than appearing.
+        /// The travel is a whole number of cells and the landing symbols are written to
+        /// where that leaves the window, so the reel is spinning towards them from the
+        /// first frame rather than having them dropped in at the end.
         /// </summary>
-        private static IEnumerator SpinOne(int reel, float duration, IReadOnlyList<string> landing, Action done)
+        private static IEnumerator SpinOne(
+            int reel, float duration, IReadOnlyList<string> landing, Action done)
         {
-            var column = _columns[reel];
-            var random = new System.Random(reel * 7919 + Environment.TickCount);
-            var elapsed = 0f;
-            var offset = 0f;
-            var placed = false;
+            var random = new System.Random((reel * 7919) + Environment.TickCount);
 
-            while (elapsed < duration)
+            // A fresh belt each spin, so the same order does not scroll past five times
+            // running and give the machine a pattern.
+            _strips[reel] = NewStrip(random);
+
+            var from = Mathf.Floor(_positions[reel]);
+
+            // Rounded to whole cells: a reel that stops a third of a cell along is a
+            // reel showing half of four symbols.
+            var travel = Mathf.Round(PeakCellsPerSecond * duration * ProfileArea);
+            var rest = (int)(from + travel);
+
+            WriteLanding(reel, rest, landing);
+
+            for (var elapsed = 0f; elapsed < duration; elapsed += Time.unscaledDeltaTime)
             {
-                elapsed += Time.unscaledDeltaTime;
+                var u = Mathf.Clamp01(elapsed / duration);
 
-                // Fast, then easing off. The last quarter is where a slot earns its
-                // tension, so the curve is deliberately slow to let go.
-                var t = Mathf.Clamp01(elapsed / duration);
-                var speed = Mathf.Lerp(1f, 0.06f, Mathf.SmoothStep(0f, 1f, t));
-                var step = Mathf.Min(speed * Cell * 34f * Time.unscaledDeltaTime, Cell * MaxCellsPerFrame);
+                // The overshoot is carried by the same curve, so the reel arrives past
+                // its stop still travelling rather than jumping there.
+                _positions[reel] = from + ((travel + Overshoot) * Travelled(u) / ProfileArea);
+                Render(reel);
 
-                offset += step;
+                yield return null;
+            }
 
-                while (offset >= Cell)
-                {
-                    offset -= Cell;
-                    Recycle(reel, random);
-                }
+            // The bounce back onto the detent.
+            for (var t = 0f; t < SettleSeconds; t += Time.unscaledDeltaTime)
+            {
+                _positions[reel] = rest + (Overshoot * (1f - Mathf.SmoothStep(0f, 1f, t / SettleSeconds)));
+                Render(reel);
 
-                if (!placed && t > 0.86f)
-                {
-                    placed = true;
-
-                    for (var row = 0; row < 3 && row < landing.Count; row++)
-                    {
-                        _cells[reel][3 + row].sprite = FaceFor(landing[row]);
-                    }
-                }
-
-                column.anchoredPosition = new Vector2(0f, offset);
                 yield return null;
             }
 
             // Home exactly. A reel resting a pixel or two off its cell is the sort of
             // thing nobody can name but everybody sees.
-            column.anchoredPosition = Vector2.zero;
-
-            for (var row = 0; row < 3 && row < landing.Count; row++)
-            {
-                _cells[reel][3 + row].sprite = FaceFor(landing[row]);
-            }
+            //
+            // Wrapped to the strip length as well: the faces are read modulo it, so this
+            // draws identically while keeping the position small. A float counting cells
+            // for a whole session would eventually be coarser than the cell it is
+            // measuring.
+            _positions[reel] = Wrap(rest, StripLength);
+            Render(reel);
 
             done?.Invoke();
         }
 
         /// <summary>
-        /// Moves the bottom cell to the top and gives it a new face, which is what makes
-        /// a finite column behave like an endless belt.
+        /// How far a reel has gone at <paramref name="u"/> of its spin: the exact
+        /// integral of the velocity profile described on the class.
+        ///
+        /// Analytic rather than accumulated per frame, so the reel lands on its stop to
+        /// the pixel on a machine dropping frames as well as on one that is not.
         /// </summary>
-        private static void Recycle(int reel, System.Random random)
+        private static float Travelled(float u)
         {
-            var cells = _cells[reel];
-            var lowest = 0;
-
-            for (var i = 1; i < cells.Length; i++)
+            if (u <= SpinUp)
             {
-                if (cells[i].rectTransform.anchoredPosition.y < cells[lowest].rectTransform.anchoredPosition.y)
-                {
-                    lowest = i;
-                }
+                // The integral of smoothstep, 3x^2 - 2x^3, is x^3 - x^4/2.
+                var x = u / SpinUp;
+                return SpinUp * ((x * x * x) - (x * x * x * x * 0.5f));
             }
 
-            var highest = 0;
+            var upArea = SpinUp * 0.5f;
 
-            for (var i = 1; i < cells.Length; i++)
+            if (u <= HoldUntil)
             {
-                if (cells[i].rectTransform.anchoredPosition.y > cells[highest].rectTransform.anchoredPosition.y)
-                {
-                    highest = i;
-                }
+                return upArea + (u - SpinUp);
             }
 
-            cells[lowest].rectTransform.anchoredPosition =
-                new Vector2(0f, cells[highest].rectTransform.anchoredPosition.y + Cell);
+            // The integral of (1-x)^2 is (1 - (1-x)^3) / 3.
+            var fall = 1f - ((u - HoldUntil) / (1f - HoldUntil));
 
-            cells[lowest].sprite = FaceFor(_symbols[random.Next(_symbols.Length)]);
+            return upArea + (HoldUntil - SpinUp) + ((1f - HoldUntil) * (1f - (fall * fall * fall)) / 3f);
         }
 
-        /// <summary>Lights the three rows a win ran through, and dims the rest.</summary>
+        /// <summary>The whole area under the profile, which is <c>Travelled(1)</c>.</summary>
+        private static float ProfileArea =>
+            (SpinUp * 0.5f) + (HoldUntil - SpinUp) + ((1f - HoldUntil) / 3f);
+
+        /// <summary>
+        /// Draws a reel at its current position: the column slid by the fractional part,
+        /// and every cell showing the symbol the read head puts under it.
+        /// </summary>
+        private static void Render(int reel)
+        {
+            var position = _positions[reel];
+            var whole = Mathf.FloorToInt(position);
+            var strip = _strips[reel];
+
+            _columns[reel].anchoredPosition = new Vector2(0f, -(position - whole) * Cell);
+
+            for (var i = 0; i < Cells; i++)
+            {
+                _cells[reel][i].sprite = FaceFor(strip[Wrap(i - whole, strip.Length)]);
+            }
+        }
+
+        /// <summary>
+        /// Writes the three symbols the reel is going to stop on into the strip, at the
+        /// place the window will be sitting over when it does.
+        /// </summary>
+        private static void WriteLanding(int reel, int rest, IReadOnlyList<string> landing)
+        {
+            var strip = _strips[reel];
+
+            for (var row = 0; row < 3 && row < landing.Count; row++)
+            {
+                strip[Wrap(3 + row - rest, strip.Length)] = landing[row];
+            }
+        }
+
+        /// <summary>
+        /// A belt to scroll past. Weighted towards the low symbols the way the real
+        /// strips are, because a belt with as many keycards on it as medkits reads as a
+        /// machine about to pay out.
+        /// </summary>
+        private static string[] NewStrip(System.Random random)
+        {
+            var strip = new string[StripLength];
+
+            for (var i = 0; i < StripLength; i++)
+            {
+                // Biased low: two draws, keep the earlier symbol. The paytable arrives
+                // from the server ordered cheapest first, so this is roughly the shape
+                // of the real strips without needing to know their counts.
+                var a = random.Next(_symbols.Length);
+                var b = random.Next(_symbols.Length);
+
+                strip[i] = _symbols[Math.Min(a, b)];
+            }
+
+            return strip;
+        }
+
+        /// <summary>Lights the reels a win ran through, and dims the rest.</summary>
         internal static void Highlight(IReadOnlyList<int> reelsWon)
         {
             if (_cells == null)
@@ -323,13 +429,16 @@ namespace SlotMachine.Client
 
                 for (var row = 0; row < 3; row++)
                 {
-                    _cells[reel][3 + row].color = on ? (lit ? WinTint : Color.white) : new Color(1f, 1f, 1f, 0.32f);
+                    _cells[reel][3 + row].color =
+                        on ? (lit ? WinTint : Color.white) : new Color(1f, 1f, 1f, 0.32f);
                 }
             }
         }
 
-        /// <summary>Where cell <paramref name="i"/> sits when the belt is at rest.</summary>
-        private static float TopOf(int i) => ((Cells - 1) * 0.5f - i) * Cell;
+        /// <summary>Where cell <paramref name="i"/> sits. It never sits anywhere else.</summary>
+        private static float RestingY(int i) => (((Cells - 1) * 0.5f) - i) * Cell;
+
+        private static int Wrap(int value, int length) => ((value % length) + length) % length;
 
         /// <summary>
         /// A symbol's artwork, for anyone else who needs to draw one -- the paytable

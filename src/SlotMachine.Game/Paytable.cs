@@ -17,7 +17,7 @@ namespace SlotMachine.Game;
 /// ## Read as a multiple of the whole stake
 ///
 /// One spin buys all 243 ways, so the payout is a multiple of what was staked rather
-/// than of some per-line fraction. A five-symbol LEDX at 400x on a 50,000 rouble spin
+/// than of some per-line fraction. A five-symbol keycard at 1000x on a 50,000 rouble spin
 /// pays 20,000,000.
 /// </summary>
 public static class Paytable
@@ -35,7 +35,7 @@ public static class Paytable
     ///
     /// The first draft was picked and hoped for. It paid **681%** -- the low symbols
     /// looked modest at payline scale, but a ways win multiplies by how many times the
-    /// symbol landed on each reel, and bandages alone were giving back three times the
+    /// symbol landed on each reel, and medkits alone were giving back three times the
     /// stake. That is what a computed return is for.
     ///
     /// Low symbols pay very little, which surprises people reading a paytable and is
@@ -46,41 +46,41 @@ public static class Paytable
     {
         3 => symbol switch
         {
-            Symbol.Bandage => 1,
-            Symbol.Crackers => 1,
-            Symbol.Round => 1,
-            Symbol.Screwdriver => 1,
-            Symbol.Wires => 1,
-            Symbol.GreenBattery => 2,
+            Symbol.Medkit => 1,
+            Symbol.AmmoBox => 1,
+            Symbol.Grenade => 1,
+            Symbol.Helmet => 1,
+            Symbol.DogTag => 1,
+            Symbol.Roubles => 2,
             Symbol.GpCoin => 5,
-            Symbol.Gpu => 10,
-            Symbol.Ledx => 25,
+            Symbol.Bitcoin => 10,
+            Symbol.Keycard => 25,
             _ => 0,
         },
         4 => symbol switch
         {
-            Symbol.Bandage => 1,
-            Symbol.Crackers => 1,
-            Symbol.Round => 2,
-            Symbol.Screwdriver => 2,
-            Symbol.Wires => 2,
-            Symbol.GreenBattery => 4,
+            Symbol.Medkit => 1,
+            Symbol.AmmoBox => 1,
+            Symbol.Grenade => 2,
+            Symbol.Helmet => 2,
+            Symbol.DogTag => 2,
+            Symbol.Roubles => 4,
             Symbol.GpCoin => 20,
-            Symbol.Gpu => 50,
-            Symbol.Ledx => 150,
+            Symbol.Bitcoin => 50,
+            Symbol.Keycard => 150,
             _ => 0,
         },
         5 => symbol switch
         {
-            Symbol.Bandage => 1,
-            Symbol.Crackers => 2,
-            Symbol.Round => 2,
-            Symbol.Screwdriver => 5,
-            Symbol.Wires => 5,
-            Symbol.GreenBattery => 12,
+            Symbol.Medkit => 1,
+            Symbol.AmmoBox => 2,
+            Symbol.Grenade => 2,
+            Symbol.Helmet => 5,
+            Symbol.DogTag => 5,
+            Symbol.Roubles => 12,
             Symbol.GpCoin => 80,
-            Symbol.Gpu => 250,
-            Symbol.Ledx => 1000,
+            Symbol.Bitcoin => 250,
+            Symbol.Keycard => 1000,
             _ => 0,
         },
         _ => 0,

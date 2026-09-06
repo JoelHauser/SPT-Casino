@@ -210,7 +210,7 @@ namespace SlotMachine.Client
 
                 SetPaid(paid);
                 SetStatus(
-                    $"{reels} {symbol} on {ways} way{(ways == 1 ? string.Empty : "s")}."
+                    $"{reels} x {NameOf(symbol)} on {ways} way{(ways == 1 ? string.Empty : "s")}."
                     + (wins is { Count: > 1 } ? $"  And {wins.Count - 1} more." : string.Empty));
 
                 ReelView.Highlight(
@@ -302,8 +302,8 @@ namespace SlotMachine.Client
                 foreach (var reel in reels)
                 {
                     grid.Add(reel is JArray rows
-                        ? [.. rows.Select(r => (string)r ?? "Bandage")]
-                        : new List<string> { "Bandage", "Bandage", "Bandage" });
+                        ? [.. rows.Select(r => (string)r ?? "Medkit")]
+                        : new List<string> { "Medkit", "Medkit", "Medkit" });
                 }
             }
 
@@ -404,15 +404,24 @@ namespace SlotMachine.Client
         }
 
         /// <summary>
-        /// What the machine pays, down the left-hand side.
+        /// What the machine pays, down the side of the cabinet.
         ///
-        /// Nine rows, richest first, because that is the order anybody reads a paytable
-        /// in. Multipliers on the stake rather than absolute amounts -- the stake is
-        /// three currencies and a column of roubles would be wrong in two of them.
+        /// Written out as **"3 helmets = 1x"** rather than as a grid of bare numbers,
+        /// because a paytable nobody can read is a machine that looks like it pays at
+        /// random. Every row names the symbol, shows it, and gives all three runs.
+        ///
+        /// Richest first, which is the order anybody reads a paytable in. Multipliers
+        /// on the stake rather than amounts -- the stake is three currencies, and a
+        /// column of roubles would be wrong in two of them.
+        ///
+        /// The numbers come from the server's ping response. Nothing here is written
+        /// into the client, so the panel cannot advertise a payout the machine does not
+        /// give.
         /// </summary>
         private static void BuildPaytable(Transform parent)
         {
-            const float RowHeight = 34f;
+            const float RowHeight = 42f;
+            const float PanelWidth = 372f;
 
             var ordered = Symbols
                 .OrderByDescending(s => Pays.TryGetValue(s, out var p) ? p[2] : 0)
@@ -424,43 +433,105 @@ namespace SlotMachine.Client
             }
 
             var panel = NewBox("Paytable", parent, Color.white);
-            panel.sizeDelta = new Vector2(300f, (ordered.Count * RowHeight) + 62f);
-            panel.anchoredPosition = new Vector2(-620f, 70f);
+            panel.sizeDelta = new Vector2(PanelWidth, (ordered.Count * RowHeight) + 128f);
+            panel.anchoredPosition = new Vector2(-628f, 70f);
 
             var frame = panel.GetComponent<Image>();
             frame.sprite = Textures.RoundedBox(10, new Color(0.11f, 0.11f, 0.13f, 1f), Edge, 2);
             frame.type = Image.Type.Sliced;
 
-            var top = (panel.sizeDelta.y * 0.5f) - 24f;
+            var top = (panel.sizeDelta.y * 0.5f) - 26f;
 
-            var heading = NewText("Heading", panel, "PAYS   3     4     5", 16f);
-            heading.rectTransform.anchoredPosition = new Vector2(0f, top);
-            heading.rectTransform.sizeDelta = new Vector2(270f, 20f);
-            heading.color = new Color(0.62f, 0.60f, 0.56f, 1f);
+            var title = NewText("PayTitle", panel, "PAYTABLE", 20f);
+            title.rectTransform.anchoredPosition = new Vector2(0f, top);
+            title.rectTransform.sizeDelta = new Vector2(PanelWidth - 24f, 24f);
+            title.color = Gold;
+
+            var rule = NewText(
+                "PayRule",
+                panel,
+                "Matching symbols from the leftmost reel.",
+                14f);
+
+            rule.rectTransform.anchoredPosition = new Vector2(0f, top - 22f);
+            rule.rectTransform.sizeDelta = new Vector2(PanelWidth - 24f, 18f);
+            rule.color = new Color(0.60f, 0.58f, 0.54f, 1f);
+
+            // The column heads say what the three numbers are, in the words the rows
+            // would use if there were room to write them out nine times over.
+            var heads = NewText("PayHeads", panel, "x3      x4      x5", 15f);
+            heads.rectTransform.anchoredPosition = new Vector2(78f, top - 46f);
+            heads.rectTransform.sizeDelta = new Vector2(212f, 18f);
+            heads.alignment = TextAlignmentOptions.Right;
+            heads.color = new Color(0.60f, 0.58f, 0.54f, 1f);
 
             for (var i = 0; i < ordered.Count; i++)
             {
                 var symbol = ordered[i];
-                var y = top - 28f - (i * RowHeight);
+                var y = top - 74f - (i * RowHeight);
 
                 var face = NewBox("Face_" + symbol, panel, Color.white);
-                face.sizeDelta = new Vector2(28f, 28f);
-                face.anchoredPosition = new Vector2(-116f, y);
+                face.sizeDelta = new Vector2(34f, 34f);
+                face.anchoredPosition = new Vector2(-(PanelWidth * 0.5f) + 30f, y);
 
                 var image = face.GetComponent<Image>();
                 image.sprite = ReelView.Artwork(symbol);
                 image.preserveAspect = true;
                 image.raycastTarget = false;
 
+                var name = NewText("Name_" + symbol, panel, NameOf(symbol), 15f);
+                name.rectTransform.anchoredPosition = new Vector2(-58f, y);
+                name.rectTransform.sizeDelta = new Vector2(150f, RowHeight);
+                name.alignment = TextAlignmentOptions.Left;
+                name.color = i < 3 ? Gold : Ink;
+
                 var pays = Pays.TryGetValue(symbol, out var p) ? p : [0, 0, 0];
 
-                var row = NewText("Row_" + symbol, panel, $"{pays[0],4}  {pays[1],4}  {pays[2],5}", 17f);
-                row.rectTransform.anchoredPosition = new Vector2(46f, y);
-                row.rectTransform.sizeDelta = new Vector2(200f, RowHeight);
+                var row = NewText(
+                    "Row_" + symbol,
+                    panel,
+                    $"{pays[0],4}x {pays[1],5}x {pays[2],6}x",
+                    16f);
+
+                row.rectTransform.anchoredPosition = new Vector2(78f, y);
+                row.rectTransform.sizeDelta = new Vector2(212f, RowHeight);
                 row.alignment = TextAlignmentOptions.Right;
                 row.color = i < 3 ? Gold : Ink;
             }
+
+            var note = NewText(
+                "PayNote",
+                panel,
+                "x your stake, and again by how many ways it landed.",
+                13f);
+
+            note.rectTransform.anchoredPosition =
+                new Vector2(0f, -(panel.sizeDelta.y * 0.5f) + 22f);
+
+            note.rectTransform.sizeDelta = new Vector2(PanelWidth - 20f, 18f);
+            note.color = new Color(0.55f, 0.53f, 0.50f, 1f);
         }
+
+        /// <summary>
+        /// What a symbol is called on the paytable and in the win line.
+        ///
+        /// Presentation only, and deliberately falls through to the server's own name
+        /// for anything it does not know -- a symbol added on the server should appear
+        /// on an old client looking plain, not looking broken.
+        /// </summary>
+        private static string NameOf(string symbol) => symbol switch
+        {
+            "Medkit" => "AI-2 MEDKIT",
+            "AmmoBox" => "7.62 AMMO",
+            "Grenade" => "GRENADE",
+            "Helmet" => "HELMET",
+            "DogTag" => "BEAR TAG",
+            "Roubles" => "ROUBLE STACK",
+            "GpCoin" => "GP COIN",
+            "Bitcoin" => "BITCOIN",
+            "Keycard" => "VIOLET KEYCARD",
+            _ => symbol?.ToUpperInvariant() ?? string.Empty,
+        };
 
         private static void Refresh()
         {

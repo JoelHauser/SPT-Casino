@@ -12,26 +12,26 @@ namespace SlotMachine.Game;
 public enum Symbol
 {
     /// <summary>Low. The filler that makes near misses happen.</summary>
-    Bandage,
+    Medkit,
 
-    Crackers,
+    AmmoBox,
 
-    Round,
+    Grenade,
 
     /// <summary>Mid.</summary>
-    Screwdriver,
+    Helmet,
 
-    Wires,
+    DogTag,
 
-    GreenBattery,
+    Roubles,
 
     /// <summary>High.</summary>
     GpCoin,
 
-    Gpu,
+    Bitcoin,
 
     /// <summary>The top symbol. One stop on every reel and no more.</summary>
-    Ledx,
+    Keycard,
 }
 
 /// <summary>
@@ -48,7 +48,7 @@ public enum Symbol
 ///
 /// **Every symbol appears at least once on every reel.** Otherwise its five-of-a-kind
 /// is not merely rare, it is impossible, and a paytable would be advertising a prize
-/// that cannot be won. The first draft of this file had exactly that fault: the LEDX
+/// that cannot be won. The first draft of this file had exactly that fault: the keycard
 /// row was zero everywhere.
 /// </summary>
 public static class Reels
@@ -67,7 +67,7 @@ public static class Reels
 
     private static readonly Symbol[][] Strips =
     [
-        //       bandage crackers round screw wires batt  gp  gpu ledx
+        //       medkit ammo  gren  helm  tag  RUB  gp  BTC key
         Strip(5, 5, 4, 4, 4, 3, 2, 2, 1),
         Strip(5, 5, 4, 4, 4, 3, 2, 2, 1),
         Strip(5, 5, 5, 4, 4, 3, 2, 1, 1),
@@ -115,20 +115,20 @@ public static class Reels
     /// repeats.
     /// </summary>
     private static Symbol[] Strip(
-        int bandage, int crackers, int round, int screwdriver,
-        int wires, int battery, int gp, int gpu, int ledx)
+        int medkit, int ammo, int grenade, int helmet,
+        int dogTag, int roubles, int gp, int bitcoin, int keycard)
     {
         var counts = new (Symbol Symbol, int Count)[]
         {
-            (Symbol.Bandage, bandage),
-            (Symbol.Crackers, crackers),
-            (Symbol.Round, round),
-            (Symbol.Screwdriver, screwdriver),
-            (Symbol.Wires, wires),
-            (Symbol.GreenBattery, battery),
+            (Symbol.Medkit, medkit),
+            (Symbol.AmmoBox, ammo),
+            (Symbol.Grenade, grenade),
+            (Symbol.Helmet, helmet),
+            (Symbol.DogTag, dogTag),
+            (Symbol.Roubles, roubles),
             (Symbol.GpCoin, gp),
-            (Symbol.Gpu, gpu),
-            (Symbol.Ledx, ledx),
+            (Symbol.Bitcoin, bitcoin),
+            (Symbol.Keycard, keycard),
         };
 
         var pool = new List<Symbol>();
@@ -154,7 +154,7 @@ public static class Reels
         }
 
         // A taken[] rather than checking the strip for an empty value: default(Symbol)
-        // is Bandage, a real symbol, so an unwritten slot and a bandage are the same
+        // is Medkit, a real symbol, so an unwritten stop and a medkit are the same
         // thing to look at. The first draft of this method used that as its marker.
         var strip = new Symbol[pool.Count];
         var taken = new bool[pool.Count];

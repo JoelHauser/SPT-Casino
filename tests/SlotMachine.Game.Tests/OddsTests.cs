@@ -99,8 +99,9 @@ public class OddsTests
     /// <summary>
     /// The top symbol is the rarest and the bottom one the most common, on every reel.
     ///
-    /// Not a detail: it is the whole shape of the game. A paytable that pays LEDX four
-    /// hundred times the stake only works while LEDX is the hardest thing to land.
+    /// Not a detail: it is the whole shape of the game. A paytable that pays the keycard a
+    /// thousand times the stake only works while the keycard is the hardest thing to
+    /// land.
     /// </summary>
     [Fact]
     public void TheReelsAreOrderedFromCommonToRare()
@@ -109,12 +110,12 @@ public class OddsTests
         {
             var strip = Reels.Of(reel);
 
-            var bandages = strip.Count(s => s == Symbol.Bandage);
-            var ledx = strip.Count(s => s == Symbol.Ledx);
+            var medkits = strip.Count(s => s == Symbol.Medkit);
+            var keycard = strip.Count(s => s == Symbol.Keycard);
 
             Assert.True(
-                bandages > ledx,
-                $"reel {reel + 1} has {bandages} bandages and {ledx} LEDX, which is the wrong way round.");
+                medkits > keycard,
+                $"reel {reel + 1} has {medkits} medkits and {keycard} keycards, which is the wrong way round.");
         }
     }
 
@@ -127,8 +128,8 @@ public class OddsTests
     [Fact]
     public void TheLastReelIsTheMeanest()
     {
-        var first = Odds.ExpectedCount(0, Symbol.Ledx) + Odds.ExpectedCount(0, Symbol.Gpu);
-        var last = Odds.ExpectedCount(Reels.Count - 1, Symbol.Ledx) + Odds.ExpectedCount(Reels.Count - 1, Symbol.Gpu);
+        var first = Odds.ExpectedCount(0, Symbol.Keycard) + Odds.ExpectedCount(0, Symbol.Bitcoin);
+        var last = Odds.ExpectedCount(Reels.Count - 1, Symbol.Keycard) + Odds.ExpectedCount(Reels.Count - 1, Symbol.Bitcoin);
 
         Assert.True(last <= first, "the last reel is no meaner than the first, so nothing is holding the top prizes back.");
     }

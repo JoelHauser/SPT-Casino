@@ -204,8 +204,25 @@ foreach ($old in $tables) {
     }
 }
 
+# Cleared rather than copied over. Copy-Item merges, so a file this build no longer
+# produces -- a renamed symbol, a dropped assembly -- would sit in the install for
+# ever and the plugin would still find it. Safe to empty: nothing but this script
+# writes here.
+$installedPlugin = Join-Path $target 'BepInEx\plugins\Casino'
+if (Test-Path $installedPlugin) { Remove-Item $installedPlugin -Recurse -Force }
+
 Copy-Item (Join-Path $stage 'BepInEx') -Destination $target -Recurse -Force
 Write-Host "Installed the plugin to $target\BepInEx\plugins\Casino" -ForegroundColor Green
+
+# The server folder the same way, but keeping data\ -- that is where the house
+# records what it owes a player whose hand was interrupted, and emptying it would
+# quietly cancel those debts. See Casino.Server.LegacyData.
+$installedMod = Join-Path $target 'SPT_Runtime\user\mods\Casino'
+if (Test-Path $installedMod) {
+    Get-ChildItem $installedMod -Force |
+        Where-Object { $_.Name -ne 'data' } |
+        Remove-Item -Recurse -Force
+}
 
 Copy-Item (Join-Path $stage 'SPT_Runtime') -Destination $target -Recurse -Force
 Write-Host "Installed the server half to $target\SPT_Runtime\user\mods\Casino" -ForegroundColor Green
