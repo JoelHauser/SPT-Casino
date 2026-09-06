@@ -35,7 +35,7 @@ public class RouletteLog : IRouletteLog
         // System.IO.Path inside the class and breaks every Path.Combine in it.
         ModFolder = modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly());
 
-        var configPath = System.IO.Path.Combine(ModFolder, "config.json");
+        var configPath = System.IO.Path.Combine(ModFolder, "roulette.config.json");
 
         try
         {
@@ -49,7 +49,7 @@ public class RouletteLog : IRouletteLog
             // identical to the mod being rejected by the version gate, which is the
             // one thing this logging exists to tell apart.
             Config = new RouletteConfig();
-            _logger.Error($"{Prefix} config.json is unreadable, using defaults -- {ex.Message}");
+            _logger.Error($"{Prefix} roulette.config.json is unreadable, using defaults -- {ex.Message}");
         }
     }
 

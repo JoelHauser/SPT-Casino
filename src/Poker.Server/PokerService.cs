@@ -34,7 +34,7 @@ public class PokerService(
 
         return new PingResponse
         {
-            ModVersion = new ModMetadata().Version.ToString(),
+            ModVersion = TableInfo.Version,
             SessionId = sessionId.ToString(),
             HasProfile = known,
             Balances = known

@@ -33,7 +33,10 @@ public class OutstandingStake
 [Injectable(InjectionType.Singleton)]
 public class EscrowStore : IEscrowStore
 {
-    private const string FileName = "escrow.json";
+    private const string FileName = "escrow-blackjack.json";
+
+    /// <summary>What this file was called when this table was its own mod.</summary>
+    private const string LegacyFileName = "escrow.json";
 
     private readonly ISptLogger<EscrowStore> _logger;
     private readonly FileUtil _fileUtil;
@@ -58,7 +61,34 @@ public class EscrowStore : IEscrowStore
 
         _fileUtil.CreateDirectory(folder);
         _path = System.IO.Path.Combine(folder, FileName);
+
+        // Named per table because all three now share one mod folder, and all three
+        // used to call this escrow.json. One file with three writers would have been
+        // three tables overwriting each other's record of money they owe.
+        //
+        // Which means the old file is somewhere this would never look, so it is
+        // imported once. See Casino.Server.LegacyData.
         _held = Load();
+
+        if (_held.IsEmpty)
+        {
+            var carried = Casino.Server.LegacyData.Find(
+                modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly()),
+                "Blackjack",
+                LegacyFileName);
+
+            if (carried is not null)
+            {
+                _held = Load(carried);
+
+                if (!_held.IsEmpty)
+                {
+                    _logger.Info(
+                        $"[Blackjack] carried {_held.Count} unfinished session(s) over from {carried}.");
+                    Flush();
+                }
+            }
+        }
 
         if (!_held.IsEmpty)
         {
@@ -125,21 +155,27 @@ public class EscrowStore : IEscrowStore
         }
     }
 
-    private ConcurrentDictionary<string, OutstandingStake> Load()
+    /// <summary>
+    /// Reads the record. <paramref name="from"/> is how the old file gets imported
+    /// when the tables moved into one folder; everything else reads the live one.
+    /// </summary>
+    private ConcurrentDictionary<string, OutstandingStake> Load(string? from = null)
     {
-        if (!_fileUtil.FileExists(_path))
+        var source = from ?? _path;
+
+        if (!_fileUtil.FileExists(source))
         {
             return new ConcurrentDictionary<string, OutstandingStake>();
         }
 
         try
         {
-            var loaded = _jsonUtil.Deserialize<Dictionary<string, OutstandingStake>>(_fileUtil.ReadFile(_path));
+            var loaded = _jsonUtil.Deserialize<Dictionary<string, OutstandingStake>>(_fileUtil.ReadFile(source));
             return new ConcurrentDictionary<string, OutstandingStake>(loaded ?? []);
         }
         catch (Exception ex)
         {
-            _logger.Error($"Blackjack: escrow file at {_path} is unreadable -- {ex.Message}");
+            _logger.Error($"Blackjack: escrow file at {source} is unreadable -- {ex.Message}");
             return new ConcurrentDictionary<string, OutstandingStake>();
         }
     }

@@ -6,10 +6,10 @@
     Builds and installs the whole of SPT Casino: one plugin carrying all three tables,
     and the three server mods they talk to.
 
-    The server halves stay separate, each on its own routes with its own GUID, because
-    that is where the money lives and the merge deliberately did not go near it. They
-    are still part of the same install: a casino with no server mods loads, draws a
-    lobby, and every table fails on its first request.
+    One folder each side. SPT loads every .dll in a mod folder into a single mod and
+    registers the injectables from all of them, so the four server assemblies sit
+    together under user/mods/Casino. The one thing it will not tolerate is two
+    IModMetadata classes in one folder, which is why exactly one of them declares it.
 
     The art is one folder. The three mods' asset trees were byte-identical everywhere
     they overlapped -- 59 of 61 files appear in more than one and not one of them
@@ -53,10 +53,10 @@ $built = Get-ChildItem -Recurse -Path (Join-Path $root 'src\Casino.Client\bin\Re
     Sort-Object LastWriteTime | Select-Object -Last 1
 if (-not $built) { throw 'no Casino.Client.dll under src\Casino.Client\bin\Release' }
 
-Write-Host 'Building the three server mods...' -ForegroundColor Cyan
-foreach ($table in $tables) {
-    dotnet build (Join-Path $root "src\$table.Server\$table.Server.csproj") -c Release --nologo -v q
-    if ($LASTEXITCODE -ne 0) { throw "$table.Server did not build ($LASTEXITCODE)" }
+Write-Host 'Building the server half...' -ForegroundColor Cyan
+foreach ($project in @('Casino') + $tables) {
+    dotnet build (Join-Path $root "src\$project.Server\$project.Server.csproj") -c Release --nologo -v q
+    if ($LASTEXITCODE -ne 0) { throw "$project.Server did not build ($LASTEXITCODE)" }
 }
 
 # --- stage -----------------------------------------------------------------------
@@ -78,27 +78,35 @@ foreach ($game in @('Casino', 'Roulette', 'Poker', 'Blackjack')) {
 $art = (Get-ChildItem $pluginDir -Recurse -File | Measure-Object).Count - 1
 Write-Host "Staged the plugin and $art art file(s)." -ForegroundColor Green
 
-# The server mods, one folder each under SPT_Runtime. That prefix is part of the path
-# inside the zip, not the folder you extract into: dropping it produces something that
-# looks right and installs nothing.
+# One server folder, holding every assembly. SPT_Runtime is part of the path inside the
+# zip rather than the folder you extract into: dropping that prefix produces something
+# that looks right and installs nothing.
+$modDir = Join-Path $stage 'SPT_Runtime\user\mods\Casino'
+New-Item -ItemType Directory -Force -Path $modDir | Out-Null
+
+$wanted = @('Casino.Server.dll', 'Casino.Server.pdb')
 foreach ($table in $tables) {
-    $modDir = Join-Path $stage "SPT_Runtime\user\mods\$table"
-    New-Item -ItemType Directory -Force -Path $modDir | Out-Null
-
-    $serverBin = Join-Path $root "src\$table.Server\bin\Release"
-
-    foreach ($name in @("$table.Server.dll", "$table.Server.pdb", "$table.Game.dll", "$table.Game.pdb")) {
-        $file = Get-ChildItem -Recurse -Path $serverBin -Filter $name -ErrorAction SilentlyContinue |
-            Sort-Object LastWriteTime | Select-Object -Last 1
-        if ($file) { Copy-Item $file.FullName -Destination $modDir -Force }
-        elseif ($name -notlike '*.pdb') { throw "no $name under $serverBin" }
-    }
-
-    $config = Join-Path $root "src\$table.Server\config.json"
-    if (Test-Path $config) { Copy-Item $config -Destination $modDir -Force }
-
-    Write-Host "  staged the $table server mod" -ForegroundColor DarkGray
+    $wanted += @("$table.Server.dll", "$table.Server.pdb", "$table.Game.dll", "$table.Game.pdb")
 }
+
+foreach ($name in $wanted) {
+    $file = Get-ChildItem -Recurse -Path (Join-Path $root 'src') -Filter $name -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -like '*\bin\Release\*' } |
+        Sort-Object LastWriteTime | Select-Object -Last 1
+
+    if ($file) { Copy-Item $file.FullName -Destination $modDir -Force }
+    elseif ($name -notlike '*.pdb') { throw "no $name under any src\*\bin\Release" }
+}
+
+# One config per table, named apart. They were all called config.json when each table
+# had a folder to itself, and in one folder that would be one file read three times.
+foreach ($table in $tables) {
+    $config = Join-Path $root ("src\{0}.Server\{1}.config.json" -f $table, $table.ToLower())
+    if (Test-Path $config) { Copy-Item $config -Destination $modDir -Force }
+}
+
+$assemblies = (Get-ChildItem $modDir -Filter *.dll | Measure-Object).Count
+Write-Host "Staged the server half: $assemblies assemblies in one folder." -ForegroundColor Green
 
 # --- zip ---------------------------------------------------------------------------
 if ($Zip) {
@@ -158,7 +166,7 @@ if (-not (Test-Path (Join-Path $target 'BepInEx'))) {
 # patches. Moved aside rather than deleted: they are somebody's working install.
 $retired = Join-Path $target 'BepInEx\plugins\_replaced-by-SPT-Casino'
 
-foreach ($old in @('Blackjack', 'Poker', 'Roulette')) {
+foreach ($old in $tables) {
     $dir = Join-Path $target "BepInEx\plugins\$old"
     if (Test-Path $dir) {
         New-Item -ItemType Directory -Force -Path $retired | Out-Null
@@ -169,13 +177,33 @@ foreach ($old in @('Blackjack', 'Poker', 'Roulette')) {
     }
 }
 
+# The old server folders too. Left in place they are still whole mods with their own
+# metadata, so SPT would load them beside this one and register every route twice.
+#
+# Moved rather than deleted, and that is not politeness: each carries a data folder
+# holding what the house owes a player whose hand was interrupted, and the tables look
+# in here for it on first run. See Casino.Server.LegacyData.
+# Beside user/mods, never inside it: SPT walks every directory under mods and throws
+# "No Assemblies found in path" at Critical on one holding no assemblies. Parking the
+# old mods in there traded three folders for a stack trace on every boot.
+$retiredMods = Join-Path $target "SPT_Runtime\user\_replaced-by-SPT-Casino"
+
+foreach ($old in $tables) {
+    $dir = Join-Path $target "SPT_Runtime\user\mods\$old"
+    if (Test-Path $dir) {
+        New-Item -ItemType Directory -Force -Path $retiredMods | Out-Null
+        $to = Join-Path $retiredMods $old
+        if (Test-Path $to) { Remove-Item $to -Recurse -Force }
+        Move-Item $dir -Destination $to -Force
+        Write-Host "Retired the old $old server mod to $to" -ForegroundColor Yellow
+    }
+}
+
 Copy-Item (Join-Path $stage 'BepInEx') -Destination $target -Recurse -Force
 Write-Host "Installed the plugin to $target\BepInEx\plugins\Casino" -ForegroundColor Green
 
 Copy-Item (Join-Path $stage 'SPT_Runtime') -Destination $target -Recurse -Force
-foreach ($table in $tables) {
-    Write-Host "Installed the $table server mod to $target\SPT_Runtime\user\mods\$table" -ForegroundColor Green
-}
+Write-Host "Installed the server half to $target\SPT_Runtime\user\mods\Casino" -ForegroundColor Green
 
 Write-Host ''
 Write-Host "SPT Casino $version is installed. Restart the server." -ForegroundColor Cyan

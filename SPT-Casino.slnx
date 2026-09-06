@@ -18,6 +18,7 @@
       solution as the place the code is edited. They are no longer shipped.
     -->
     <Project Path="src/Casino.Client/Casino.Client.csproj" />
+    <Project Path="src/Casino.Server/Casino.Server.csproj" />
   </Folder>
   <Folder Name="/Blackjack/">
     <Project Path="src/Blackjack.Game/Blackjack.Game.csproj" />
