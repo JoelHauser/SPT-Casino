@@ -22,8 +22,8 @@ public class Startup(PokerLog log) : IOnLoad
 
         // Said plainly and at boot, because from here on the mod takes real currency
         // out of a real stash and a player deserves to know that before they sit down.
-        log.Info("THIS MOD MOVES MONEY. One chip is one rouble: the buy-in is debited when");
-        log.Info("you sit down and whatever is left is paid back when you stand up.");
+        log.Notice("THIS MOD MOVES MONEY. One chip is one rouble: the buy-in is debited when");
+        log.Notice("you sit down and whatever is left is paid back when you stand up.");
 
         // Stack limits are deliberately NOT reported here. PostLoad + 1 is not last:
         // BarterItemsStacks rewrites every one of them about half a second after this

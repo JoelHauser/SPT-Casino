@@ -23,9 +23,9 @@ public class Startup(RouletteLog log) : IOnLoad
 
         // Said plainly and at boot, because this is the line that stops being true
         // quietly. It moves roubles now.
-        log.Info("THIS TABLE PLAYS FOR REAL ROUBLES. The stake leaves your stash when the");
-        log.Info("wheel turns and the return is paid back when it stops. Chips on the cloth");
-        log.Info("cost nothing until you spin.");
+        log.Notice("THIS TABLE PLAYS FOR REAL ROUBLES. The stake leaves your stash when the");
+        log.Notice("wheel turns and the return is paid back when it stops. Chips on the cloth");
+        log.Notice("cost nothing until you spin.");
 
         // Stack limits are deliberately NOT reported here. PostLoad + 1 is not last:
         // BarterItemsStacks rewrites every one of them about half a second after this
