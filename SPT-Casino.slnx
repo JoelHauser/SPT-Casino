@@ -20,6 +20,14 @@
     <Project Path="src/Casino.Client/Casino.Client.csproj" />
     <Project Path="src/Casino.Server/Casino.Server.csproj" />
   </Folder>
+  <Folder Name="/SlotMachine/">
+    <!--
+      The newest table. Engine and tests only so far: five reels, three rows, 243
+      ways, and a return computed rather than measured. No server or client yet.
+    -->
+    <Project Path="src/SlotMachine.Game/SlotMachine.Game.csproj" />
+    <Project Path="tests/SlotMachine.Game.Tests/SlotMachine.Game.Tests.csproj" />
+  </Folder>
   <Folder Name="/Blackjack/">
     <Project Path="src/Blackjack.Game/Blackjack.Game.csproj" />
     <Project Path="src/Blackjack.Server/Blackjack.Server.csproj" />
