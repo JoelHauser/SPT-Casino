@@ -15,17 +15,17 @@ public class Startup(RouletteLog log) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        log.Success($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
-        log.Info($"mod folder: {log.ModFolder}");
-        log.Info("routes: POST /roulette/ping, /place, /remove, /clear, /spin, /state, /leave");
-        log.Info($"item event: {RouletteActions.Sync}, so the stash keeps up without a reload");
-        log.Info("single-zero European wheel -- 37 pockets, 2.70% to the house on every bet");
+        log.Banner($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
+        log.Banner($"mod folder: {log.ModFolder}");
+        log.Banner("routes: POST /roulette/ping, /place, /remove, /clear, /spin, /state, /leave");
+        log.Banner($"item event: {RouletteActions.Sync}, so the stash keeps up without a reload");
+        log.Banner("single-zero European wheel -- 37 pockets, 2.70% to the house on every bet");
 
         // Said plainly and at boot, because this is the line that stops being true
         // quietly. It moves roubles now.
-        log.Notice("THIS TABLE PLAYS FOR REAL ROUBLES. The stake leaves your stash when the");
-        log.Notice("wheel turns and the return is paid back when it stops. Chips on the cloth");
-        log.Notice("cost nothing until you spin.");
+        log.Banner("THIS TABLE PLAYS FOR REAL ROUBLES. The stake leaves your stash when the");
+        log.Banner("wheel turns and the return is paid back when it stops. Chips on the cloth");
+        log.Banner("cost nothing until you spin.");
 
         // Stack limits are deliberately NOT reported here. PostLoad + 1 is not last:
         // BarterItemsStacks rewrites every one of them about half a second after this
@@ -35,8 +35,8 @@ public class Startup(RouletteLog log) : IOnLoad
 
         if (log.Verbose)
         {
-            log.Info("verbose logging is ON -- every request and every spin will be logged.");
-            log.Info("turn it off in roulette.config.json once things are working.");
+            log.Banner("verbose logging is ON -- every request and every spin will be logged.");
+            log.Banner("turn it off in roulette.config.json once things are working.");
         }
 
         return Task.CompletedTask;

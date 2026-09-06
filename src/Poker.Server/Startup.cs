@@ -15,15 +15,15 @@ public class Startup(PokerLog log) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        log.Success($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
-        log.Info($"mod folder: {log.ModFolder}");
-        log.Info("routes: POST /poker/ping, /sit, /deal, /act, /state, /leave");
-        log.Info("no-limit Texas Hold'em, up to five seats, against bots that bet back");
+        log.Banner($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
+        log.Banner($"mod folder: {log.ModFolder}");
+        log.Banner("routes: POST /poker/ping, /sit, /deal, /act, /state, /leave");
+        log.Banner("no-limit Texas Hold'em, up to five seats, against bots that bet back");
 
         // Said plainly and at boot, because from here on the mod takes real currency
         // out of a real stash and a player deserves to know that before they sit down.
-        log.Notice("THIS MOD MOVES MONEY. One chip is one rouble: the buy-in is debited when");
-        log.Notice("you sit down and whatever is left is paid back when you stand up.");
+        log.Banner("THIS MOD MOVES MONEY. One chip is one rouble: the buy-in is debited when");
+        log.Banner("you sit down and whatever is left is paid back when you stand up.");
 
         // Stack limits are deliberately NOT reported here. PostLoad + 1 is not last:
         // BarterItemsStacks rewrites every one of them about half a second after this
@@ -33,8 +33,8 @@ public class Startup(PokerLog log) : IOnLoad
 
         if (log.Verbose)
         {
-            log.Info("verbose logging is ON -- every request and every bot decision will be logged.");
-            log.Info("turn it off in poker.config.json once things are working.");
+            log.Banner("verbose logging is ON -- every request and every bot decision will be logged.");
+            log.Banner("turn it off in poker.config.json once things are working.");
         }
 
         return Task.CompletedTask;

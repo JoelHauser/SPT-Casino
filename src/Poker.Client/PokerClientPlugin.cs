@@ -82,7 +82,9 @@ namespace Poker.Client
                 1_000_000,
                 new ConfigDescription(
                     "What sitting down costs, in roubles, and the chip stack you get for it.",
-                    new AcceptableValueRange<int>(200_000, 5_000_000)));
+                    new AcceptableValueList<int>(
+                        200_000, 500_000, 1_000_000, 1_500_000,
+                        2_000_000, 3_000_000, 4_000_000, 5_000_000)));
 
             TabOnRight = Config.Bind(
                 "Menu",

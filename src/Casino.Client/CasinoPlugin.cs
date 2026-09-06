@@ -93,9 +93,17 @@ namespace Casino.Client
                     "What sitting down at the poker table costs, in roubles, and the size of "
                     + "the chip stack you get for it. The blinds stay at 10,000 / 20,000 "
                     + "whatever this is set to, so a smaller buy-in is a shorter stack and a "
-                    + "livelier game rather than a cheaper one. Rounded to the nearest 10,000, "
-                    + "because that is the smallest chip the table can draw.",
-                    new AcceptableValueRange<int>(200_000, 5_000_000)));
+                    + "livelier game rather than a cheaper one. The figure in brackets is how "
+                    + "many big blinds deep that leaves you.",
+                    new AcceptableValueList<int>(
+                        200_000,      // 10 big blinds
+                        500_000,      // 25
+                        1_000_000,    // 50
+                        1_500_000,    // 75
+                        2_000_000,    // 100
+                        3_000_000,    // 150
+                        4_000_000,    // 200
+                        5_000_000))); // 250
 
             Blackjack.Client.BlackjackClientPlugin.EnforceTableMaximum = Config.Bind(
                 "Blackjack",
