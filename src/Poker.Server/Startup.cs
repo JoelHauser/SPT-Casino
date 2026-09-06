@@ -15,7 +15,7 @@ public class Startup(PokerLog log) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        log.Banner($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
+        log.Success($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
         log.Banner($"mod folder: {log.ModFolder}");
         log.Banner("routes: POST /poker/ping, /sit, /deal, /act, /state, /leave");
         log.Banner("no-limit Texas Hold'em, up to five seats, against bots that bet back");

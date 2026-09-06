@@ -90,8 +90,7 @@ public class BlackjackLog
     /// All three tables use the same gold on purpose. They print three blocks in a row
     /// and they are one mod; three different colours would say otherwise.
     /// </summary>
-    public void Success(string message) =>
-        _logger.LogWithColor($"{Prefix} {message}", Spectre.Console.Color.Gold1);
+    public void Success(string message) => _logger.Success($"{Prefix} {message}");
 
     public void Error(string message, Exception? ex = null) =>
         _logger.Error($"{Prefix} {message}{(ex is null ? "" : $" -- {ex.GetType().Name}: {ex.Message}")}");
