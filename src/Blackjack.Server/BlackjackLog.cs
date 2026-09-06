@@ -57,9 +57,31 @@ public class BlackjackLog
 
     public bool Verbose => Config.VerboseLogging;
 
+    /// <summary>
+    /// Something the reader has to see, in orange.
+    ///
+    /// Kept for the handful of lines that say real money moves. Those were the same
+    /// grey as the route list, which is the wrong weight for the one thing in the block
+    /// somebody could be surprised by later.
+    /// </summary>
+    public void Notice(string message) =>
+        _logger.LogWithColor($"{Prefix} {message}", Spectre.Console.Color.Orange1);
+
     public void Info(string message) => _logger.Info($"{Prefix} {message}");
 
-    public void Success(string message) => _logger.Success($"{Prefix} {message}");
+    /// <summary>
+    /// The headline line, in the casino's gold.
+    ///
+    /// `ISptLogger` has `LogWithColor(data, textColor, backgroundColor, ex)` taking a
+    /// `Spectre.Console.Color`, which is what the mods with colour in their startup
+    /// block are using. It comes through the SPT package already, so there is nothing
+    /// to reference.
+    ///
+    /// All three tables use the same gold on purpose. They print three blocks in a row
+    /// and they are one mod; three different colours would say otherwise.
+    /// </summary>
+    public void Success(string message) =>
+        _logger.LogWithColor($"{Prefix} {message}", Spectre.Console.Color.Gold1);
 
     public void Error(string message, Exception? ex = null) =>
         _logger.Error($"{Prefix} {message}{(ex is null ? "" : $" -- {ex.GetType().Name}: {ex.Message}")}");
