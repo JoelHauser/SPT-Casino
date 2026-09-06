@@ -312,12 +312,15 @@ namespace Poker.Client
         /// Read every time rather than cached, so a player who changes it does not have
         /// to restart the game to see the button change price.
         ///
-        /// Clamped and rounded here rather than trusted. The setting's own range keeps
-        /// the slider honest, but a config file is a text file somebody can type into,
-        /// and two floors matter: the server refuses anything under ten big blinds, and
-        /// a stack that is not a whole number of 10,000 chips is one the table cannot
-        /// draw. Going out of range would be refused by the server anyway -- this only
-        /// decides whether the player finds out before or after pressing the button.
+        /// Clamped and rounded here rather than trusted, even though the setting is now
+        /// a list of round figures and cannot be dragged to an awkward one.
+        ///
+        /// The list is what the F12 menu offers; the config file behind it is a text
+        /// file somebody can type any integer into, and two floors matter then: the
+        /// server refuses anything under ten big blinds, and a stack that is not a whole
+        /// number of 10,000 chips is one the table cannot draw. Out of range would be
+        /// refused by the server anyway -- this only decides whether the player finds
+        /// out before pressing the button or after.
         /// </summary>
         private static int BuyInChips
         {

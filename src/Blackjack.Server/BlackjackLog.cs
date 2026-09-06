@@ -67,6 +67,16 @@ public class BlackjackLog
     public void Notice(string message) =>
         _logger.LogWithColor($"{Prefix} {message}", Spectre.Console.Color.Orange1);
 
+    /// <summary>
+    /// A startup line, in the next colour along.
+    ///
+    /// The cycle is shared across all three tables -- see
+    /// <see cref="Casino.Server.Palette"/> -- so the block reads as one run of colour
+    /// rather than three that each start over.
+    /// </summary>
+    public void Banner(string message) =>
+        _logger.LogWithColor($"{Prefix} {message}", Casino.Server.Palette.Next());
+
     public void Info(string message) => _logger.Info($"{Prefix} {message}");
 
     /// <summary>

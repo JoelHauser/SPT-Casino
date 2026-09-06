@@ -18,12 +18,12 @@ public class Startup(BlackjackLog log, StatsStore stats) : IOnLoad
     {
         var rules = new Rules();
 
-        log.Success($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
-        log.Info($"mod folder: {log.ModFolder}");
-        log.Info($"stats file: {stats.FilePath} ({(stats.Writable ? "writable" : "NOT WRITABLE")})");
-        log.Info("routes: POST /blackjack/ping, /deal, /action, /state, /stats");
-        log.Info($"item events: {BlackjackActions.Deal}, {BlackjackActions.Play}");
-        log.Info(
+        log.Banner($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
+        log.Banner($"mod folder: {log.ModFolder}");
+        log.Banner($"stats file: {stats.FilePath} ({(stats.Writable ? "writable" : "NOT WRITABLE")})");
+        log.Banner("routes: POST /blackjack/ping, /deal, /action, /state, /stats");
+        log.Banner($"item events: {BlackjackActions.Deal}, {BlackjackActions.Play}");
+        log.Banner(
             $"table: {rules.DeckCount} decks, dealer {(rules.DealerHitsSoft17 ? "hits" : "stands on")} soft 17, "
             + "naturals pay 3:2 in currency and even money in valuables");
 
@@ -35,8 +35,8 @@ public class Startup(BlackjackLog log, StatsStore stats) : IOnLoad
 
         if (log.Verbose)
         {
-            log.Info("verbose logging is ON -- every request and every rouble will be logged.");
-            log.Info("turn it off in blackjack.config.json once things are working.");
+            log.Banner("verbose logging is ON -- every request and every rouble will be logged.");
+            log.Banner("turn it off in blackjack.config.json once things are working.");
         }
 
         if (!stats.Writable)
