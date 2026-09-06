@@ -13,7 +13,7 @@ public record BlackjackConfig
     /// noisy in normal play; the point of it is the first run on a new SPT build,
     /// where the interesting failures are all in code that has never executed.
     /// </summary>
-    public bool VerboseLogging { get; init; } = true;
+    public bool VerboseLogging { get; init; } = false;
 }
 
 /// <summary>
