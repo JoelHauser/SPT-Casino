@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Blackjack.Game\Blackjack.Game.csproj" />
+    <ProjectReference Include="..\Casino.Server\Casino.Server.csproj" />
   </ItemGroup>
 
 </Project>

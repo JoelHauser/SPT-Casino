@@ -183,7 +183,7 @@ public class BlackjackService(
         return new PingResponse
         {
             Ok = true,
-            ModVersion = new ModMetadata().Version.ToString(),
+            ModVersion = TableInfo.Version,
             SessionId = sessionId.ToString(),
             HasProfile = known,
             Balances = known

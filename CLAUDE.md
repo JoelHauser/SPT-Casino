@@ -4,10 +4,10 @@
 behind it -- **Blackjack**, **Poker** and **Roulette**. It was three separate mods
 until 2026-09-05, and the seams are still visible on purpose.
 
-**One plugin, three server mods.** `src/Casino.Client` is the only thing installed
-into `BepInEx/plugins`; the three server halves stay separate under
-`SPT_Runtime/user/mods`, each on its own routes with its own GUID. That split is
-deliberate and there is a hazard in closing it -- see "Merging the servers".
+**One folder each side.** `BepInEx/plugins/Casino` and `SPT_Runtime/user/mods/Casino`.
+The server folder holds seven assemblies -- a metadata one plus a `.Server` and a
+`.Game` per table -- and SPT is perfectly happy with that. See "One folder, seven
+assemblies".
 
 **Read the per-mod notes as well as this file.** This one holds only what is true of
 all three; everything specific lives next door and is much longer:
@@ -29,7 +29,8 @@ repo's front page before the merge.
 src/Casino.Client/        the only plugin. Tab, lobby, welcome card, escape key
 src/Casino.Shared/        one copy of what every table draws with. No project of its own
 src/<Table>.Client/       each table's panel and views. NOT shipped as plugins
-src/<Table>.Server/       each table's server mod, still separate, still its own GUID
+src/Casino.Server/        the one IModMetadata, and the legacy-data finder
+src/<Table>.Server/       each table's server code. No metadata of its own any more
 src/<Table>.Game/         the rules, no SPT types, unit tested
 tests/<Table>.*.Tests/
 tools/<Table>.Console/    a harness that plays the game in a terminal
@@ -195,16 +196,49 @@ the three server mods first. It could. Do not block a release on this again.
 scripts/casino/pack.ps1 -Zip     # releases/casino/SPT_CasinoV1.0.zip
 ```
 
-## Merging the servers
+## One folder, seven assemblies
 
-Not done, and there is a landmine in it: **all three `EscrowStore`s write
-`escrow.json`.** One mod folder would be one file with three writers silently
-overwriting each other, and that file is the record of money the house owes a player
-whose spin was interrupted. If it is ever done, namespace the files per table *and*
-read the old paths once on upgrade, or somebody with an in-flight stake loses it.
+Read out of `SPT.Server.dll` rather than guessed, because the shape of the install
+depends on it:
 
-There is no user-facing reason to do it. The three server mods install and load
-perfectly well side by side.
+- `ModLoader.LoadMods` walks `Directory.GetDirectories("./user/mods/")` and calls
+  `LoadMod` once per **folder**.
+- `LoadMod` does `new DirectoryInfo(path).GetFiles()`, loads **every** `.dll` it finds,
+  and hangs them all off one `SptMod.Assemblies`.
+- `RegisterSptServicesAsync` walks that whole list, so every `[Injectable]` in every
+  assembly is registered.
+- `LoadModMetadata` runs `SingleOrDefault` over the types implementing `IModMetadata`
+  and throws **"Duplicate mod metadata found for mod at path"** on the second.
+
+So the rule is: **one folder, one metadata, as many assemblies as you like.** That is
+why `Casino.Server` exists and is almost empty, and why the three tables carry a
+`TableInfo` with their version on it instead of an `IModMetadata`. Their versions are
+still their own -- Blackjack is on 1.1.4 inside a casino on 1.0.0 -- because they
+describe the table rather than the download.
+
+**Do not put the parked folder inside `user/mods`.** SPT tries to load every directory
+under there, and one holding no assemblies throws `No Assemblies found in path` at
+Critical on every boot. That was traded for three folders once already; the install
+script parks old mods in `user/_replaced-by-SPT-Casino`, beside `mods` rather than in
+it.
+
+### The two collisions one folder creates
+
+**`config.json`** was the same name in all three, so one file would have been read
+three times. They are `blackjack.config.json`, `poker.config.json` and
+`roulette.config.json` now.
+
+**`escrow.json` was the dangerous one**, and it is the record of money the house owes
+a player whose hand or spin was interrupted. Three writers on one path would have been
+three tables overwriting each other's. They are `escrow-<table>.json`, and because the
+old file is now somewhere the new code would never look, each store imports it once on
+first run -- see `Casino.Server.LegacyData`, which checks both where the folder was and
+where the install script parks it.
+
+Proven rather than assumed: a record for 4,250,000 was planted in a retired Roulette
+folder, the server was restarted, and it arrived in `escrow-roulette.json` under the
+new folder. Then it was deleted, because it named a real session and would have paid
+out money nobody staked.
 
 ## Keeping these notes honest
 

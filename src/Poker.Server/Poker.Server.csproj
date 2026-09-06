@@ -23,10 +23,11 @@
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
     <ProjectReference Include="..\Poker.Game\Poker.Game.csproj" />
+    <ProjectReference Include="..\Casino.Server\Casino.Server.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="config.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="poker.config.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

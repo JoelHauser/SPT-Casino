@@ -16,10 +16,9 @@ public class Startup(BlackjackLog log, StatsStore stats) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        var metadata = new ModMetadata();
         var rules = new Rules();
 
-        log.Success($"v{metadata.Version} loaded -- built for SPT {metadata.SptVersion}");
+        log.Success($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
         log.Info($"mod folder: {log.ModFolder}");
         log.Info($"stats file: {stats.FilePath} ({(stats.Writable ? "writable" : "NOT WRITABLE")})");
         log.Info("routes: POST /blackjack/ping, /deal, /action, /state, /stats");
@@ -37,7 +36,7 @@ public class Startup(BlackjackLog log, StatsStore stats) : IOnLoad
         if (log.Verbose)
         {
             log.Info("verbose logging is ON -- every request and every rouble will be logged.");
-            log.Info("turn it off in config.json once things are working.");
+            log.Info("turn it off in blackjack.config.json once things are working.");
         }
 
         if (!stats.Writable)

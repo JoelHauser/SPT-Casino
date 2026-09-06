@@ -15,9 +15,7 @@ public class Startup(PokerLog log) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        var metadata = new ModMetadata();
-
-        log.Success($"v{metadata.Version} loaded -- built for SPT {metadata.SptVersion}");
+        log.Success($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
         log.Info($"mod folder: {log.ModFolder}");
         log.Info("routes: POST /poker/ping, /sit, /deal, /act, /state, /leave");
         log.Info("no-limit Texas Hold'em, up to five seats, against bots that bet back");
@@ -36,7 +34,7 @@ public class Startup(PokerLog log) : IOnLoad
         if (log.Verbose)
         {
             log.Info("verbose logging is ON -- every request and every bot decision will be logged.");
-            log.Info("turn it off in config.json once things are working.");
+            log.Info("turn it off in poker.config.json once things are working.");
         }
 
         return Task.CompletedTask;

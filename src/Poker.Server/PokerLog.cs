@@ -35,7 +35,7 @@ public class PokerLog : IPokerLog
         // System.IO.Path inside the class and breaks every Path.Combine in it.
         ModFolder = modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly());
 
-        var configPath = System.IO.Path.Combine(ModFolder, "config.json");
+        var configPath = System.IO.Path.Combine(ModFolder, "poker.config.json");
 
         try
         {
@@ -49,7 +49,7 @@ public class PokerLog : IPokerLog
             // identical to the mod being rejected by the version gate, which is the
             // one thing this logging exists to tell apart.
             Config = new PokerConfig();
-            _logger.Error($"{Prefix} config.json is unreadable, using defaults -- {ex.Message}");
+            _logger.Error($"{Prefix} poker.config.json is unreadable, using defaults -- {ex.Message}");
         }
     }
 

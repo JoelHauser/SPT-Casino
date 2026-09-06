@@ -83,17 +83,23 @@ Pick a chip from the tray and click a spot. **Right-click takes one back off.** 
 
 Extract into your SPT folder — the one that holds `SPT_Runtime` — and start the server.
 
-**Delete my old Blackjack and Poker mods first.** They are tables inside this one now. Remove whichever of these folders you have:
+**Delete my old Blackjack and Poker mods first.** They are tables inside this one now, and it installs as one folder on each side: `BepInEx/plugins/Casino` and `SPT_Runtime/user/mods/Casino`.
+
+Remove whichever of these you have:
 
 ```
 BepInEx/plugins/Blackjack
 BepInEx/plugins/Poker
 BepInEx/plugins/Roulette
+
+SPT_Runtime/user/mods/Blackjack
+SPT_Runtime/user/mods/Poker
+SPT_Runtime/user/mods/Roulette
 ```
 
-The server-side folders under `SPT_Runtime/user/mods/` can stay — this overwrites them.
+Leaving the old plugins gives you three tabs on the bar instead of one, and three copies of the same key handler arguing over the escape key. Leaving the old server mods gives you every route registered twice.
 
-Leaving the old plugins in place gives you three tabs on the bar instead of one, and three copies of the same key handler arguing over the escape key.
+**If you were mid-hand when you last played**, move those `user/mods` folders somewhere else rather than deleting them, launch once, and then delete them. Each keeps a small record of anything the house still owes you, and the casino imports it on first run.
 
 The first time an account walks in, a card explains what the money does. Read it once and it never comes back.
 

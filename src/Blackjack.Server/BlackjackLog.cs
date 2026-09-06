@@ -34,7 +34,7 @@ public class BlackjackLog
         var folder = modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly());
         ModFolder = folder;
 
-        var path = Path.Combine(folder, "config.json");
+        var path = Path.Combine(folder, "blackjack.config.json");
         try
         {
             Config = fileUtil.FileExists(path)
@@ -47,7 +47,7 @@ public class BlackjackLog
             // identical to the mod being rejected outright, which is the one failure
             // this logging exists to tell apart.
             Config = new BlackjackConfig();
-            _logger.Error($"{Prefix} config.json is unreadable, using defaults -- {ex.Message}");
+            _logger.Error($"{Prefix} blackjack.config.json is unreadable, using defaults -- {ex.Message}");
         }
     }
 
