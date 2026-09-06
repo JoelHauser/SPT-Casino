@@ -22,11 +22,14 @@
   </Folder>
   <Folder Name="/SlotMachine/">
     <!--
-      The newest table. Engine and tests only so far: five reels, three rows, 243
-      ways, and a return computed rather than measured. No server or client yet.
+      The newest table. Engine and server so far: five reels, three rows, 243 ways,
+      a return computed rather than measured, and a money path that has been
+      mutation-checked. No client yet.
     -->
     <Project Path="src/SlotMachine.Game/SlotMachine.Game.csproj" />
     <Project Path="tests/SlotMachine.Game.Tests/SlotMachine.Game.Tests.csproj" />
+    <Project Path="src/SlotMachine.Server/SlotMachine.Server.csproj" />
+    <Project Path="tests/SlotMachine.Server.Tests/SlotMachine.Server.Tests.csproj" />
   </Folder>
   <Folder Name="/Blackjack/">
     <Project Path="src/Blackjack.Game/Blackjack.Game.csproj" />
