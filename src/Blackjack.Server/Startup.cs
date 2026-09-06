@@ -18,7 +18,18 @@ public class Startup(BlackjackLog log, StatsStore stats) : IOnLoad
     {
         var rules = new Rules();
 
-        log.Success($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
+        log.Success($"v{TableInfo.Version} ready -- six decks, real currency. Detail in blackjack.config.json.");
+
+        // One line on a normal start. The rest of the block is what a mod author wants
+        // and a player scrolls past, and there are three tables printing it -- about
+        // twenty-five lines of somebody's console for a card game they have not opened
+        // yet. It is all still here behind the verbose switch, which is also what
+        // decides whether every request gets logged while they play.
+        if (!log.Verbose)
+        {
+            return Task.CompletedTask;
+        }
+
         log.Banner($"mod folder: {log.ModFolder}");
         log.Banner($"stats file: {stats.FilePath} ({(stats.Writable ? "writable" : "NOT WRITABLE")})");
         log.Banner("routes: POST /blackjack/ping, /deal, /action, /state, /stats");
@@ -32,12 +43,6 @@ public class Startup(BlackjackLog log, StatsStore stats) : IOnLoad
         // line runs, so anything printed now is the base database value and wrong on
         // any server with an item mod. They are reported on first contact instead,
         // which is the earliest moment the answer is trustworthy.
-
-        if (log.Verbose)
-        {
-            log.Banner("verbose logging is ON -- every request and every rouble will be logged.");
-            log.Banner("turn it off in blackjack.config.json once things are working.");
-        }
 
         if (!stats.Writable)
         {

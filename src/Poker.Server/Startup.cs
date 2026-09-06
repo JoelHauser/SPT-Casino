@@ -15,7 +15,18 @@ public class Startup(PokerLog log) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        log.Success($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
+        log.Success($"v{TableInfo.Version} ready -- five-seat hold'em, real roubles. Detail in poker.config.json.");
+
+        // One line on a normal start. The rest of the block is what a mod author wants
+        // and a player scrolls past, and there are three tables printing it -- about
+        // twenty-five lines of somebody's console for a card game they have not opened
+        // yet. It is all still here behind the verbose switch, which is also what
+        // decides whether every request gets logged while they play.
+        if (!log.Verbose)
+        {
+            return Task.CompletedTask;
+        }
+
         log.Banner($"mod folder: {log.ModFolder}");
         log.Banner("routes: POST /poker/ping, /sit, /deal, /act, /state, /leave");
         log.Banner("no-limit Texas Hold'em, up to five seats, against bots that bet back");
@@ -30,12 +41,6 @@ public class Startup(PokerLog log) : IOnLoad
         // line runs, so anything printed now is the base database value and wrong on
         // any server with an item mod. They are reported on first contact instead,
         // which is the earliest the answer is trustworthy.
-
-        if (log.Verbose)
-        {
-            log.Banner("verbose logging is ON -- every request and every bot decision will be logged.");
-            log.Banner("turn it off in poker.config.json once things are working.");
-        }
 
         return Task.CompletedTask;
     }
