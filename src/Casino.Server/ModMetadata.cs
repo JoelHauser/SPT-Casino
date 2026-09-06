@@ -37,7 +37,7 @@ public record ModMetadata : IModMetadata
 
     public List<string>? Contributors { get; init; }
 
-    public SemanticVersioning.Version Version { get; init; } = new("1.0.0");
+    public SemanticVersioning.Version Version { get; init; } = new("1.0.1");
 
     /// <summary>
     /// Targets SPT 4.1.3. "~4.1.3" is >=4.1.3 &lt;4.2.0, so it also covers later 4.1
