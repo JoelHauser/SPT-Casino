@@ -39,8 +39,28 @@ namespace SlotMachine.Client
 
         private const float FrameWidth = 1240f;
         private const float FrameHeight = 700f;
-        private const float PayWidth = 340f;
-        private const float PayRow = 40f;
+        private const float PayWidth = 380f;
+        private const float PayRow = 42f;
+
+        /// <summary>Breathing room inside the paytable's own frame.</summary>
+        private const float PayInset = 16f;
+
+        private const float PayGap = 28f;
+        private const float SpinGap = 26f;
+        private const float SpinSize = 164f;
+
+        /// <summary>
+        /// The paytable, the reels and the spin button, side by side, centred in the
+        /// frame.
+        ///
+        /// Measured rather than nudged. The first version placed each piece at a
+        /// hand-picked offset from the left edge, which is how the paytable's names
+        /// ended up starting five units to the LEFT of the icons they were labelling.
+        /// </summary>
+        private static float ContentWidth =>
+            PayWidth + PayGap + (ReelView.Width + 28f) + SpinGap + SpinSize;
+
+        private static float ContentLeft => -ContentWidth * 0.5f;
 
         /// <summary>
         /// How many winning ways get a line drawn through them.
@@ -60,6 +80,13 @@ namespace SlotMachine.Client
         private static readonly Color ButtonFace = new Color(0.17f, 0.17f, 0.19f, 1f);
         private static readonly Color SpinRed = new Color(0.62f, 0.14f, 0.14f, 1f);
         private static readonly Color SpinDead = new Color(0.28f, 0.16f, 0.16f, 1f);
+
+        /// <summary>
+        /// How thick a win line is. Thin, deliberately: it is drawn over photographs of
+        /// items, and the frames around the winning symbols carry the meaning. A fat
+        /// line over the artwork is a line the player has to look past.
+        /// </summary>
+        private const float LineWidth = 3f;
 
         /// <summary>
         /// One colour per drawn way. Chosen to stay apart on a dark cabinet -- the whole
@@ -367,6 +394,19 @@ namespace SlotMachine.Client
                     rows.Add(here);
                 }
 
+                var colour = LineColours[drawn % LineColours.Length];
+
+                // The cells first, once for the whole win, so the frames sit under every
+                // line that runs through them. Drawing them per way would stack nine
+                // identical outlines on one symbol and turn the edge into a smear.
+                for (var reel = 0; reel < rows.Count; reel++)
+                {
+                    foreach (var row in rows[reel])
+                    {
+                        MarkCell(reel, row, colour);
+                    }
+                }
+
                 foreach (var way in Ways(rows))
                 {
                     if (drawn >= MaxLines)
@@ -374,7 +414,7 @@ namespace SlotMachine.Client
                         return drawn;
                     }
 
-                    DrawWay(way, LineColours[drawn % LineColours.Length], drawn);
+                    DrawWay(way, colour, drawn);
                     drawn++;
                 }
             }
@@ -424,20 +464,59 @@ namespace SlotMachine.Client
         }
 
         /// <summary>
-        /// One way, as a numbered badge and a run of segments through the middle of
-        /// every symbol it claims.
+        /// Rings one winning symbol.
+        ///
+        /// The frames do most of the work of saying what won -- a line tells you the
+        /// shape of a way, a frame tells you which symbols are in it, and the second is
+        /// the thing a player actually looks for. The first version had lines and no
+        /// frames, and a bare polyline over five photographs reads as a scratch on the
+        /// screen.
+        /// </summary>
+        private static void MarkCell(int reel, int row, Color colour)
+        {
+            var mark = NewBox($"Cell_{reel}_{row}", _lines, Color.white);
+            mark.sizeDelta = new Vector2(ReelView.Cell - 12f, ReelView.Cell - 12f);
+            mark.anchoredPosition = new Vector2(ReelView.ReelX(reel), ReelView.RowY(row));
+
+            var image = mark.GetComponent<Image>();
+
+            // A wash of the colour inside a bright edge of it. The wash is what stops
+            // the frame reading as a sticker sitting on top of the symbol.
+            image.sprite = Textures.RoundedBox(
+                12,
+                new Color(colour.r, colour.g, colour.b, 0.13f),
+                new Color(colour.r, colour.g, colour.b, 0.85f),
+                3);
+
+            image.type = Image.Type.Sliced;
+            image.raycastTarget = false;
+        }
+
+        /// <summary>
+        /// One way: a numbered badge and a run through the middle of every symbol it
+        /// claims.
+        ///
+        /// Drawn in three passes, and the order is the whole reason it reads at all:
+        ///
+        /// 1. a dark halo under everything, so the line survives crossing a bright
+        ///    rouble stack as well as a dark grenade;
+        /// 2. the line itself;
+        /// 3. a dot at each corner, because two rotated rectangles meeting at an angle
+        ///    leave a notch on the outside of the turn, and a notch on every corner is
+        ///    most of what made the first version look broken.
         /// </summary>
         private static void DrawWay(int[] way, Color colour, int index)
         {
-            // Two ways through the same cells would sit exactly on top of each other,
-            // so each is nudged. Small enough to still read as going through the symbol,
-            // big enough to count them.
-            var nudge = ((index % 5) - 2) * 5f;
+            // Two ways through the same cells would sit exactly on top of each other, so
+            // each is nudged a little. Small, now that the frames say which symbols are
+            // involved and the line only has to show the shape.
+            var nudge = ((index % 5) - 2) * 4f;
 
+            var overhang = 12f;
             var points = new List<Vector2>
             {
                 new Vector2(
-                    ReelView.ReelX(0) - (ReelView.Cell * 0.5f) - 26f,
+                    ReelView.ReelX(0) - (ReelView.Cell * 0.5f) - overhang,
                     ReelView.RowY(way[0]) + nudge),
             };
 
@@ -447,30 +526,43 @@ namespace SlotMachine.Client
             }
 
             points.Add(new Vector2(
-                ReelView.ReelX(way.Length - 1) + (ReelView.Cell * 0.5f) + 26f,
+                ReelView.ReelX(way.Length - 1) + (ReelView.Cell * 0.5f) + overhang,
                 ReelView.RowY(way[way.Length - 1]) + nudge));
+
+            var halo = new Color(0f, 0f, 0f, 0.55f);
 
             for (var i = 0; i < points.Count - 1; i++)
             {
-                Segment(points[i], points[i + 1], colour);
+                Segment(points[i], points[i + 1], halo, LineWidth + 3.5f);
+            }
+
+            for (var i = 0; i < points.Count - 1; i++)
+            {
+                Segment(points[i], points[i + 1], colour, LineWidth);
+            }
+
+            // Corners only: the ends are covered by the badge and the overhang.
+            for (var i = 1; i < points.Count - 1; i++)
+            {
+                Joint(points[i], colour);
             }
 
             // A numbered tag on the left, the way a payline machine numbers its lines.
             var badge = NewBox("Badge" + index, _lines, Color.white);
-            badge.sizeDelta = new Vector2(26f, 26f);
-            badge.anchoredPosition = points[0];
+            badge.sizeDelta = new Vector2(24f, 24f);
+            badge.anchoredPosition = points[0] + new Vector2(-14f, 0f);
 
             var face = badge.GetComponent<Image>();
-            face.sprite = Textures.RoundedBox(12, colour, new Color(0f, 0f, 0f, 0.6f), 2);
+            face.sprite = Textures.RoundedBox(11, colour, new Color(0f, 0f, 0f, 0.65f), 2);
             face.type = Image.Type.Sliced;
             face.raycastTarget = false;
 
-            var number = NewText("BadgeText", badge, (index + 1).ToString(), 15f);
+            var number = NewText("BadgeText", badge, (index + 1).ToString(), 14f);
             number.rectTransform.anchorMin = Vector2.zero;
             number.rectTransform.anchorMax = Vector2.one;
             number.rectTransform.offsetMin = Vector2.zero;
             number.rectTransform.offsetMax = Vector2.zero;
-            number.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+            number.color = new Color(0.06f, 0.06f, 0.06f, 1f);
         }
 
         /// <summary>
@@ -478,17 +570,33 @@ namespace SlotMachine.Client
         /// along it. uGUI has no line renderer, and a rotated rect is the whole of what
         /// one would be.
         /// </summary>
-        private static void Segment(Vector2 from, Vector2 to, Color colour)
+        private static void Segment(Vector2 from, Vector2 to, Color colour, float width)
         {
             var delta = to - from;
 
             var bar = NewBox("Segment", _lines, colour);
             bar.pivot = new Vector2(0f, 0.5f);
-            bar.sizeDelta = new Vector2(delta.magnitude, 4f);
+            bar.sizeDelta = new Vector2(delta.magnitude, width);
             bar.anchoredPosition = from;
             bar.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
 
             bar.GetComponent<Image>().raycastTarget = false;
+        }
+
+        /// <summary>
+        /// A round cap on a corner, filling the notch two rotated rectangles leave
+        /// between them. What a line renderer would call a joint.
+        /// </summary>
+        private static void Joint(Vector2 at, Color colour)
+        {
+            var dot = NewBox("Joint", _lines, Color.white);
+            dot.sizeDelta = new Vector2(LineWidth + 3.5f, LineWidth + 3.5f);
+            dot.anchoredPosition = at;
+
+            var image = dot.GetComponent<Image>();
+            image.sprite = Textures.RoundedBox(8, colour, colour, 0);
+            image.type = Image.Type.Sliced;
+            image.raycastTarget = false;
         }
 
         private static void ClearLines()
@@ -610,7 +718,6 @@ namespace SlotMachine.Client
             frameImage.type = Image.Type.Sliced;
 
             var top = FrameHeight * 0.5f;
-            var left = -FrameWidth * 0.5f;
 
             var title = NewText("Title", frame, "SLOTS", 34f);
             title.rectTransform.anchoredPosition = new Vector2(0f, top - 42f);
@@ -627,10 +734,10 @@ namespace SlotMachine.Client
             ways.rectTransform.sizeDelta = new Vector2(FrameWidth - 40f, 24f);
             ways.color = Dim;
 
-            BuildPaytable(frame, left, top);
+            BuildPaytable(frame, top);
 
             // The reels, and the lines over them, in the space the paytable leaves.
-            var reelsX = left + 24f + PayWidth + 28f + ((ReelView.Width + 28f) * 0.5f);
+            var reelsX = ContentLeft + PayWidth + PayGap + ((ReelView.Width + 28f) * 0.5f);
             const float reelsY = 34f;
 
             var reels = ReelView.Build(frame, Symbols);
@@ -675,9 +782,9 @@ namespace SlotMachine.Client
         private static void BuildSpinButton(RectTransform frame, float reelsX, float reelsY)
         {
             var button = NewBox("Spin", frame, Color.white);
-            button.sizeDelta = new Vector2(164f, 164f);
-            button.anchoredPosition =
-                new Vector2(reelsX + ((ReelView.Width + 28f) * 0.5f) + 26f + 82f, reelsY);
+            button.sizeDelta = new Vector2(SpinSize, SpinSize);
+            button.anchoredPosition = new Vector2(
+                reelsX + ((ReelView.Width + 28f) * 0.5f) + SpinGap + (SpinSize * 0.5f), reelsY);
 
             _spinFace = button.GetComponent<Image>();
 
@@ -726,8 +833,29 @@ namespace SlotMachine.Client
         /// is written into the client, so the panel cannot advertise something the
         /// machine does not give.
         /// </summary>
-        private static void BuildPaytable(RectTransform frame, float left, float top)
+        private static void BuildPaytable(RectTransform frame, float top)
         {
+            const float IconSize = 36f;
+
+            // Three right-aligned columns rather than one string of padded numbers. The
+            // padded version lines up in a monospaced font and in nothing else, and the
+            // game's font is not monospaced.
+            var edge = (PayWidth * 0.5f) - PayInset;
+            var columns = new[]
+            {
+                new { Head = "x3", Width = 52f, Right = edge - 128f },
+                new { Head = "x4", Width = 58f, Right = edge - 68f },
+                new { Head = "x5", Width = 66f, Right = edge },
+            };
+
+            var iconX = -(PayWidth * 0.5f) + PayInset + (IconSize * 0.5f);
+
+            // The name starts a clear gap to the RIGHT of the icon's right edge. Written
+            // as that sentence rather than as a number, because the number was wrong: the
+            // names used to begin five units before the icons ended.
+            var nameLeft = iconX + (IconSize * 0.5f) + 16f;
+            var nameWidth = columns[0].Right - columns[0].Width - 12f - nameLeft;
+
             var ordered = Symbols
                 .OrderByDescending(s => Pays.TryGetValue(s, out var p) ? p[2] : 0)
                 .ToList();
@@ -735,9 +863,9 @@ namespace SlotMachine.Client
             PayFaces.Clear();
 
             var panel = NewBox("Paytable", frame, Color.white);
-            panel.sizeDelta = new Vector2(PayWidth, (Math.Max(ordered.Count, 1) * PayRow) + 100f);
+            panel.sizeDelta = new Vector2(PayWidth, (Math.Max(ordered.Count, 1) * PayRow) + 104f);
             panel.anchoredPosition = new Vector2(
-                left + 24f + (PayWidth * 0.5f), top - 102f - (panel.sizeDelta.y * 0.5f));
+                ContentLeft + (PayWidth * 0.5f), top - 102f - (panel.sizeDelta.y * 0.5f));
 
             var face = panel.GetComponent<Image>();
             face.sprite = Textures.RoundedBox(10, new Color(0.09f, 0.09f, 0.11f, 1f), Edge, 2);
@@ -750,11 +878,16 @@ namespace SlotMachine.Client
             heading.rectTransform.sizeDelta = new Vector2(PayWidth - 24f, 24f);
             heading.color = Gold;
 
-            var heads = NewText("PayHeads", panel, "x3       x4        x5", 15f);
-            heads.rectTransform.anchoredPosition = new Vector2(62f, payTop - 28f);
-            heads.rectTransform.sizeDelta = new Vector2(196f, 18f);
-            heads.alignment = TextAlignmentOptions.Right;
-            heads.color = Dim;
+            foreach (var column in columns)
+            {
+                var head = NewText("Head_" + column.Head, panel, column.Head, 15f);
+                head.rectTransform.anchoredPosition =
+                    new Vector2(column.Right - (column.Width * 0.5f), payTop - 28f);
+
+                head.rectTransform.sizeDelta = new Vector2(column.Width, 18f);
+                head.alignment = TextAlignmentOptions.Right;
+                head.color = Dim;
+            }
 
             if (ordered.Count == 0)
             {
@@ -767,11 +900,12 @@ namespace SlotMachine.Client
             for (var i = 0; i < ordered.Count; i++)
             {
                 var symbol = ordered[i];
-                var y = payTop - 56f - (i * PayRow);
+                var y = payTop - 58f - (i * PayRow);
+                var colour = i < 3 ? Gold : Ink;
 
                 var art = NewBox("Face_" + symbol, panel, Color.white);
-                art.sizeDelta = new Vector2(34f, 34f);
-                art.anchoredPosition = new Vector2(-(PayWidth * 0.5f) + 28f, y);
+                art.sizeDelta = new Vector2(IconSize, IconSize);
+                art.anchoredPosition = new Vector2(iconX, y);
 
                 var image = art.GetComponent<Image>();
                 image.sprite = ReelView.Artwork(symbol);
@@ -781,20 +915,26 @@ namespace SlotMachine.Client
                 PayFaces[symbol] = image;
 
                 var name = NewText("Name_" + symbol, panel, NameOf(symbol), 14f);
-                name.rectTransform.anchoredPosition = new Vector2(-60f, y);
-                name.rectTransform.sizeDelta = new Vector2(140f, PayRow);
+                name.rectTransform.anchoredPosition = new Vector2(nameLeft + (nameWidth * 0.5f), y);
+                name.rectTransform.sizeDelta = new Vector2(nameWidth, PayRow);
                 name.alignment = TextAlignmentOptions.Left;
-                name.color = i < 3 ? Gold : Ink;
+                name.overflowMode = TextOverflowModes.Ellipsis;
+                name.color = colour;
 
                 var pays = Pays.TryGetValue(symbol, out var p) ? p : [0, 0, 0];
 
-                var row = NewText(
-                    "Row_" + symbol, panel, $"{pays[0],4}x {pays[1],5}x {pays[2],6}x", 16f);
+                for (var c = 0; c < columns.Length; c++)
+                {
+                    var cell = NewText(
+                        $"Pay_{symbol}_{columns[c].Head}", panel, $"{pays[c]}x", 16f);
 
-                row.rectTransform.anchoredPosition = new Vector2(62f, y);
-                row.rectTransform.sizeDelta = new Vector2(196f, PayRow);
-                row.alignment = TextAlignmentOptions.Right;
-                row.color = i < 3 ? Gold : Ink;
+                    cell.rectTransform.anchoredPosition =
+                        new Vector2(columns[c].Right - (columns[c].Width * 0.5f), y);
+
+                    cell.rectTransform.sizeDelta = new Vector2(columns[c].Width, PayRow);
+                    cell.alignment = TextAlignmentOptions.Right;
+                    cell.color = colour;
+                }
             }
 
             var note = NewText(
@@ -953,10 +1093,10 @@ namespace SlotMachine.Client
             "Grenade" => "GRENADE",
             "Helmet" => "HELMET",
             "DogTag" => "BEAR TAG",
-            "Roubles" => "ROUBLE STACK",
+            "Roubles" => "ROUBLES",
             "GpCoin" => "GP COIN",
             "Bitcoin" => "BITCOIN",
-            "Keycard" => "VIOLET KEYCARD",
+            "Keycard" => "LABS KEYCARD",
             _ => symbol?.ToUpperInvariant() ?? string.Empty,
         };
 

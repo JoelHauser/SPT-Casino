@@ -253,10 +253,24 @@ the twenty-line machines the lines are borrowed from: a win is any position on e
 reel, so there is no fixed set of paths to print down the side of the cabinet, and
 none of them exist until the reels have stopped.
 
-So they are drawn afterwards, one per winning way: a coloured polyline through the
-middle of every symbol it claims, with a numbered badge on the left, capped at
-`MaxLines = 12` because a big win runs to dozens and past about a dozen the machine is
-a ball of string. The rest are counted in words -- "Showing 12 of 27 ways".
+So they are drawn afterwards. **The frames do most of the work and the lines do the
+rest** -- every winning symbol gets a rounded outline with a wash of the win's colour
+inside it, and each way gets a polyline through the middle of the symbols it claims,
+with a numbered badge on the left. Capped at `MaxLines = 12`, because a big win runs
+to dozens; the rest are counted in words -- "Showing 12 of 27 ways".
+
+The first version was lines alone, 4px and hard-edged, and it read as a scratch on the
+screen. Three things fixed it:
+
+* **Frames.** A line tells you the shape of a way; a frame tells you which symbols are
+  in it, and the second is what a player actually looks for. Drawn once per win rather
+  than once per way -- nine identical outlines stacked on one symbol turn the edge into
+  a smear.
+* **A dark halo under the line**, 3.5 units wider. The line crosses a bright rouble
+  stack and a dark grenade in the same run, and a single colour cannot sit on both.
+* **A dot at every corner.** Two rotated rectangles meeting at an angle leave a notch
+  on the outside of the turn. A notch on every corner was most of what looked broken.
+  It is what a line renderer would call a joint.
 
 The ways are **worked out on the client**, from the grid and the winning symbol: which
 rows hold it on each reel it ran through, then every combination of those. That count
@@ -268,7 +282,7 @@ uGUI has no line renderer. A segment is a thin `Image` with its pivot on the lef
 sized to the gap and rotated to face along it, which is the whole of what a line
 renderer would be.
 
-### The paytable down the side
+### The paytable down the side, and measuring instead of nudging
 
 Nine rows, richest first: the artwork, the name, and what 3, 4 and 5 of them pay --
 written as `25x 150x 1000x` rather than as bare numbers in unlabelled columns. A
@@ -277,9 +291,22 @@ paytable nobody can read is a machine that looks like it pays at random.
 **Every number comes from the ping response.** Nothing about the payouts is written
 into the client, so the panel cannot advertise something the machine does not give.
 `NameOf` is the one exception and it is presentation only -- it maps `Keycard` to
-"VIOLET KEYCARD" and falls through to the server's own name for anything it does not
+"LABS KEYCARD" and falls through to the server's own name for anything it does not
 recognise, so a symbol added on the server shows up on an old client looking plain
 rather than looking broken.
+
+The columns are **derived from the panel's own width**, not typed in. The version that
+was typed in had the names starting five units to the *left* of the icons they were
+labelling, which is exactly the kind of thing a hand-picked offset does and a
+subtraction does not. The layout is now: inset, icon, a stated gap, then the name
+filling whatever is left before the first figure column. Same for the three columns of
+multipliers -- they are three right-aligned labels at computed positions, because the
+padded-string version (`$"{pays[0],4}x"`) only lines up in a monospaced font and the
+game's font is not one.
+
+The names are also capped with `TextOverflowModes.Ellipsis`. Font metrics are not
+something to take on trust, and a name that outgrows its column should lose its tail
+rather than run into the numbers.
 
 ### The stash is told late
 
@@ -432,7 +459,8 @@ for Roulette; rerun it after changing `SlotService`.
   relative to the reel block, not the screen.
 - Whether the rouble counter behind the panel gives the result away. It should not:
   `Resync` is deferred. Roulette needed two goes at this.
-- Whether the win lines read at a glance or as a tangle. `MaxLines` is the dial.
+- Whether the win lines read at a glance or as a tangle. `MaxLines` is the dial, and
+  `LineWidth` the other one.
 - Whether the frame is a sensible size on an ultrawide. It is 1240x700 against a
   1920x1080 reference matched on height, so it scales with the height and leaves more
   margin the wider the screen gets.
