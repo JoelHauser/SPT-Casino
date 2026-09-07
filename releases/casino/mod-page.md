@@ -10,7 +10,7 @@ There is no unlock, no hideout requirement and no quest. Install it, and a **CAS
 
 The bar is on every screen outside a raid, so the tables open from the hideout, the flea market or a trader screen without backing out of them first.
 
-**This is a place, not a feature.** The lobby is built to grow: each table is a tile, and new games get added as tiles rather than as new mods with new tabs. Blackjack, hold'em and a single-zero wheel are open so far, and more will arrive in this mod rather than beside it.
+**This is a place, not a feature.** The lobby is built to grow: each table is a tile, and new games get added as tiles rather than as new mods with new tabs. Blackjack, hold'em, a single-zero wheel and a slot machine are open so far, and more will arrive in this mod rather than beside it.
 
 ![SPT Casino](https://i.imgur.com/HPJ7e19.png)
 
@@ -22,7 +22,7 @@ If your stash is too full to take a payout, it arrives in the post instead. Noth
 
 **Your gear is never at stake.** Weapons, armour and rigs cannot be bet.
 
-The house edge is real too, and it does not get tired. Roulette keeps 2.70% of everything staked on it, forever, and the other two are not charity either. Play with what you could lose in a raid.
+The house edge is real too, and it does not get tired. Roulette keeps 2.70% of everything staked on it, forever; the slot machine gives back 92.51% and keeps the rest. Blackjack and poker are not charity either. Play with what you could lose in a raid.
 
 ## The tables {.tabset}
 
@@ -81,6 +81,27 @@ Pick a chip from the tray and click a spot. **Right-click takes one back off.** 
 - Minimum bet 10,000
 - **No house maximum.** A million on a single number pays 36,000,000
 
+### Slots
+
+Five reels, three rows, and **243 ways to win** instead of paylines — any symbol landing on three or more reels running left to right pays, and landing more than once on a reel multiplies the win instead of counting it once. Every icon on the reels is the game's own, drawn from your own installation the way the stash renders yours.
+
+There is nothing to sit down at. No seat, no hand to hold, no chips to build up: walk up, spin, walk away.
+
+- **92.510% back, 7.490% to the house** — computed from the reel strips and the paytable, not measured by spinning it a lot
+- **AUTO** keeps it pulling on its own until you stop it; **SPEED** cycles 1X/2X/4X/6X, and shortens a manual spin too, not only AUTO's
+- Wins climb from WIN through BIG WIN, HUGE WIN and JACKPOT as the multiple grows
+- A STATS button keeps a lifetime record — pulls, hit rate, your best multiple, your current and best streak, staked and returned per currency
+
+Stake roubles, dollars or euros.
+
+| Currency | Minimum | Maximum |
+|---|---|---|
+| Roubles | 5,000 | 50,000 |
+| Dollars | 50 | 500 |
+| Euros | 50 | 500 |
+
+The machine pays up to a thousand times the stake by default. **F12 → Slots → No maximum stake** lifts that ceiling entirely, the same way Blackjack's table maximum works — the cap is the house being careful on your behalf, and you can tell it not to be.
+
 ## Installing
 
 Extract into your SPT folder — the one that holds `SPT_Runtime` — and start the server.
@@ -113,7 +134,7 @@ Escape leaves a table and brings you back to the lobby. Escape again closes the 
 
 ## What is coming
 
-More tables. The lobby was written to take them: adding a game is a tile and a panel, not another mod and another tab competing for space on your bar. If there is a game you want at it, say so.
+More tables. Slots just proved the lobby means it: a tile and a panel, not another mod and another tab. If there is a game you want at it, say so.
 
 ## Requirements
 
