@@ -341,6 +341,16 @@ Anything that earns a word also gets a pop -- scale up past full size and settle
 the same shape as the reels' own overshoot. A number that simply appears is a number
 the eye has already finished reading.
 
+**From `HUGE WIN` up, the banner runs a band of colour along itself.** TMP colours a
+label as a whole, so `Rainbow()` reaches past that and writes the four vertex colours
+of each glyph, giving every letter a hue a little further round the wheel than the last
+and advancing all of them each frame. `ForceMeshUpdate` is called once and not per
+frame: per frame it re-runs auto-sizing as well, and a banner that resizes itself sixty
+times a second hunts visibly for a font size.
+
+Twenty times the stake and up, deliberately. Every tier doing it would make it mean
+nothing.
+
 The banner is **600 units wide with auto-sizing**, which is not decoration: it is
 centred on the reels, the reels are not centred in the frame, and a jackpot on an
 uncapped spin can read `JACKPOT   +50,000,000,000`. Left to grow it would run over the
@@ -352,12 +362,34 @@ stopping at -191.
 
 Typed, with a minus and a plus either side and the currency beside it.
 
-**Three things make the focus visible**, and none of them was enough alone. The caret
-at its default single pixel is invisible on a 1440p screen, so it is three wide, gold,
-and blinking. `onFocusSelectAll` paints the whole number in a gold block the moment the
-box is clicked, which is the part that actually answers "where did my click go".
-And the border lights gold on focus through a `SpriteState`, which says the box has the
-keyboard before anything has been typed.
+It is built by `Casino.Shared.MoneyField`, which both this and Blackjack's wager box
+now use. **Each of them had grown half of it**: Blackjack could write `1,250,000` and
+keep the caret in the right place while you typed, but its caret was TMP's default
+single pixel and effectively invisible; slots had a caret you could see and no
+separators, so a stake read `1250000` and had to be counted by eye.
+
+**Three things make the focus visible** and none was enough alone: a four-pixel gold
+caret blinking at 1.6/sec; `onFocusSelectAll`, which paints the whole number in a gold
+block the instant the box is clicked and is the part that actually answers "where did
+my click go"; and the border lighting gold through a `SpriteState`, which says the box
+has the keyboard even between the caret's blinks.
+
+**Separators move the caret, so the caret is counted in digits.** Inserting a comma to
+its left shifts every character after it, so a caret kept by character index walks
+backwards a place each time the number crosses a thousand -- which is exactly when
+somebody is still typing. `Reformat` converts the position to "how many digits are
+behind me", rewrites the text, and puts the caret back after that many digits.
+
+The content type is `Standard`, not `IntegerNumber`: integer validation refuses to
+display separators and would strip them straight back out. Digits are enforced by
+`onValidateInput` instead, which does the same job and leaves this code's own
+formatting alone.
+
+**Nothing is clamped while you type.** Clamping per keystroke means somebody reaching
+for 50,000 has it snapped to the minimum the instant they have typed a 5, so the ends
+are applied when the box is left. A box left empty falls back to the wallet's minimum
+rather than to the previous value -- restoring the old number would mean the box
+disagreeing with what was just typed into it.
  A stepper alone
 cannot express "I want to spin for 12,345", which is what prompted the server to stop
 requiring multiples of the step.

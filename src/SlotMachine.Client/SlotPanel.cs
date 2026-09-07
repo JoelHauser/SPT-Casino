@@ -85,6 +85,20 @@ namespace SlotMachine.Client
         private const float QuietSize = 30f;
 
         /// <summary>
+        /// The multiple of the stake at which the banner starts running through colours.
+        ///
+        /// Twenty, which is `HUGE WIN` and up. Every tier doing it would make it mean
+        /// nothing -- the point of the rainbow is that most wins do not get one.
+        /// </summary>
+        private const double RainbowFrom = 20d;
+
+        /// <summary>Hues per second the wave travels.</summary>
+        private const float RainbowSpeed = 0.55f;
+
+        /// <summary>How far apart two neighbouring letters sit on the wheel.</summary>
+        private const float RainbowSpread = 0.06f;
+
+        /// <summary>
         /// How thick a win line is. Thin, deliberately: it is drawn over photographs of
         /// items, and the frames around the winning symbols carry the meaning. A fat
         /// line over the artwork is a line the player has to look past.
@@ -151,6 +165,7 @@ namespace SlotMachine.Client
         private static TextMeshProUGUI _walletLabel;
         private static TextMeshProUGUI _paidLabel;
         private static Coroutine _pop;
+        private static Coroutine _rainbow;
         private static RectTransform _lines;
         private static readonly Dictionary<string, Image> PayFaces = new Dictionary<string, Image>();
         private static Image _spinFace;
@@ -170,6 +185,12 @@ namespace SlotMachine.Client
         /// retype the stake while the reels are still turning.
         /// </summary>
         private static long _paidStake;
+
+        /// <summary>
+        /// Set while this code is the one writing to the stake box, so the change
+        /// handler knows the keystroke was its own and leaves it alone.
+        /// </summary>
+        private static bool _rewriting;
 
         internal static bool IsOpen => _root != null && _root.activeSelf && !_closing;
 
@@ -259,6 +280,10 @@ namespace SlotMachine.Client
             // Walking out mid-spin. The money has moved regardless, so the debt to the
             // running game is settled on the way rather than left for a reload.
             Resync();
+
+            // The banner's colour loop would otherwise go on running against a canvas
+            // nobody is looking at.
+            StopRainbow();
 
             _closing = true;
 
@@ -1167,21 +1192,24 @@ namespace SlotMachine.Client
             input.targetGraphic = background;
             input.textViewport = viewport;
             input.textComponent = text;
-            input.contentType = TMP_InputField.ContentType.IntegerNumber;
-            input.characterLimit = 12;
+            input.fontAsset = _font;
+            input.pointSize = 22f;
+
+            // Standard rather than IntegerNumber: the box holds thousands separators
+            // now, and integer validation refuses to display them -- it would strip the
+            // commas straight back out of anything written here. Digits are enforced by
+            // the validator instead, which does the same job and leaves this code's own
+            // formatting alone. Blackjack found this first.
+            input.contentType = TMP_InputField.ContentType.Standard;
+            input.onValidateInput = MoneyField.DigitsOnly;
+
+            // Long enough for any stash, plus the separators that many digits attract.
+            input.characterLimit = 19;
             input.restoreOriginalTextOnEscape = false;
 
-            // Three things, because one of them alone was not enough to see where the
-            // click had landed. The caret at its default single pixel is invisible on a
-            // 1440p screen; selecting the whole number on focus paints a gold block that
-            // cannot be missed; and the border lighting up says the box has the keyboard
-            // even before anything is typed.
-            input.caretColor = Gold;
-            input.customCaretColor = true;
-            input.caretWidth = 3;
-            input.caretBlinkRate = 0.9f;
-            input.selectionColor = new Color(Gold.r, Gold.g, Gold.b, 0.45f);
-            input.onFocusSelectAll = true;
+            MoneyField.MakeCaretVisible(input, Gold);
+
+            input.onValueChanged.AddListener(StakeTyped);
 
             input.transition = Selectable.Transition.SpriteSwap;
 
@@ -1196,7 +1224,10 @@ namespace SlotMachine.Client
 
             // On leaving the box or pressing return, whichever comes first. Both are
             // "I have finished typing a number", and a stake that only took effect on
-            // one of them would be a stake somebody spins without.
+            // one of them would be a stake somebody spins without. The clamping lives
+            // here rather than in StakeTyped, because clamping mid-keystroke means
+            // somebody typing 50,000 has it snapped to the minimum the moment they have
+            // typed a 5.
             input.onEndEdit.AddListener(TypedStake);
 
             return input;
@@ -1217,12 +1248,19 @@ namespace SlotMachine.Client
                 return;
             }
 
-            if (!long.TryParse(typed, out var wanted))
+            if (_stake <= 0)
             {
+                // The box was cleared, or holds something that is not a number. The
+                // smallest spin the wallet takes is the one answer that is always valid
+                // and never a surprise -- restoring the old value would mean the box
+                // disagreeing with what was just typed into it.
+                _stake = limits[0];
                 SetStake();
+                SetStatus($"A spin in {_wallet.ToLowerInvariant()} costs at least {limits[0]:N0}.");
                 return;
             }
 
+            var wanted = _stake;
             var ceiling = Ceiling(limits);
             var clamped = Math.Max(limits[0], Math.Min(ceiling, wanted));
 
@@ -1312,14 +1350,36 @@ namespace SlotMachine.Client
             SetStake();
         }
 
+        /// <summary>
+        /// Every keystroke: the number is regrouped and the caret put back where the
+        /// typist thinks it is.
+        ///
+        /// Nothing is clamped here. Clamping as you type means somebody reaching for
+        /// 50,000 has it snapped to the minimum the instant they have typed a 5. The
+        /// ends are applied when the box is left, in <see cref="TypedStake"/>.
+        /// </summary>
+        private static void StakeTyped(string typed)
+        {
+            if (_rewriting)
+            {
+                return;
+            }
+
+            _rewriting = true;
+            _stake = MoneyField.Reformat(_stakeInput, typed);
+            _rewriting = false;
+        }
+
         private static void SetStake()
         {
             if (_stakeInput != null)
             {
-                // SetTextWithoutNotify: assigning .text raises onEndEdit on some paths,
-                // and a setter that calls the handler that calls the setter is a loop
+                // SetTextWithoutNotify: assigning .text raises the change handlers, and
+                // a setter that calls the handler that calls the setter is a loop
                 // waiting for an excuse.
-                _stakeInput.SetTextWithoutNotify(_stake.ToString());
+                _rewriting = true;
+                _stakeInput.SetTextWithoutNotify(MoneyField.Format(_stake));
+                _rewriting = false;
             }
 
             if (_walletLabel != null)
@@ -1351,6 +1411,8 @@ namespace SlotMachine.Client
                 return;
             }
 
+            StopRainbow();
+
             if (paid is null or 0)
             {
                 _paidLabel.text = string.Empty;
@@ -1374,9 +1436,17 @@ namespace SlotMachine.Client
                 _ => (string.Empty, QuietSize, new Color(0.78f, 0.72f, 0.55f, 1f)),
             };
 
-            _paidLabel.text = string.IsNullOrEmpty(word) ? $"+{won:N0}" : $"{word}   +{won:N0}";
+            // One space, and no plus sign on a tiered win. "WIN   +17,331" reads as two
+            // separate things that happen to be near each other; "WIN 17,331" reads as
+            // a sentence, which is what it is.
+            _paidLabel.text = string.IsNullOrEmpty(word) ? $"+{won:N0}" : $"{word} {won:N0}";
             _paidLabel.fontSizeMax = size;
             _paidLabel.color = colour;
+
+            if (multiple >= RainbowFrom && SlotClientPlugin.Instance != null)
+            {
+                _rainbow = SlotClientPlugin.Instance.StartCoroutine(Rainbow());
+            }
 
             // Anything worth a word gets a pop as well. A number that simply appears is
             // a number the eye has already finished reading.
@@ -1393,6 +1463,69 @@ namespace SlotMachine.Client
             {
                 _paidLabel.rectTransform.localScale = Vector3.one;
             }
+        }
+
+        private static void StopRainbow()
+        {
+            if (_rainbow != null && SlotClientPlugin.Instance != null)
+            {
+                SlotClientPlugin.Instance.StopCoroutine(_rainbow);
+            }
+
+            _rainbow = null;
+        }
+
+        /// <summary>
+        /// Runs a band of colour along the banner, a letter at a time.
+        ///
+        /// TMP colours a label as a whole, so this reaches past that and writes the four
+        /// vertex colours of every visible glyph itself, giving each one a hue a little
+        /// further round the wheel than the last. Advance all of them together every
+        /// frame and the band travels along the word.
+        ///
+        /// `ForceMeshUpdate` is called **once**, not per frame. Per frame it would also
+        /// re-run auto-sizing, and a banner that resizes itself sixty times a second
+        /// hunts visibly for a font size. After that only the colours are pushed, which
+        /// is what <see cref="TMP_VertexDataUpdateFlags.Colors32"/> is for.
+        /// </summary>
+        private static IEnumerator Rainbow()
+        {
+            var label = _paidLabel;
+            label.ForceMeshUpdate();
+
+            var info = label.textInfo;
+            var characters = info.characterCount;
+
+            while (label != null && !string.IsNullOrEmpty(label.text))
+            {
+                for (var i = 0; i < characters; i++)
+                {
+                    var character = info.characterInfo[i];
+
+                    if (!character.isVisible)
+                    {
+                        continue;
+                    }
+
+                    // Saturation held back from full: a pure spectrum on a dark cabinet
+                    // reads as a test pattern rather than as gold going strange.
+                    var hue = Mathf.Repeat((Time.unscaledTime * RainbowSpeed) + (i * RainbowSpread), 1f);
+                    var colour = (Color32)Color.HSVToRGB(hue, 0.62f, 1f);
+
+                    var colours = info.meshInfo[character.materialReferenceIndex].colors32;
+                    var vertex = character.vertexIndex;
+
+                    colours[vertex] = colour;
+                    colours[vertex + 1] = colour;
+                    colours[vertex + 2] = colour;
+                    colours[vertex + 3] = colour;
+                }
+
+                label.UpdateVertexData(TMP_VertexDataUpdateFlags.Colors32);
+                yield return null;
+            }
+
+            _rainbow = null;
         }
 
         /// <summary>
