@@ -49,33 +49,38 @@ namespace SlotMachine.Client
     ///
     /// ## Cached to disk, once
     ///
-    /// A rendered icon is saved beside the plugin as a PNG, so the second launch reads a
-    /// file instead of posing a camera at a helmet. The cache is only written when the
-    /// sprite owns its whole texture -- an atlas region would need cropping, and a
-    /// wrongly cropped icon is worse than a slow one.
+    /// A rendered icon is saved beside the plugin as a PNG, named for its **template
+    /// id**, so the second launch reads a file instead of posing a camera at a rooster.
+    /// The id rather than the symbol name, because the name is what this build calls the
+    /// symbol and the id is what the picture is actually of -- see <see cref="FromDisk"/>.
     /// </summary>
     internal static class ItemArt
     {
         /// <summary>
         /// Which real item each reel symbol is.
         ///
-        /// Read out of `SPT_Data/database/templates/items.json` rather than typed from
-        /// memory, which matters more than it sounds: the id that comes to mind for
-        /// "BEAR dogtag" is the USEC one, and the Labs keycard has two plausible ids of
-        /// which only one is the violet.
+        /// Chosen to be **worth looking at**, and to climb: a can of cola, a first aid
+        /// kit, a bottle of moonshine, a games console, a gold watch, a golden rooster,
+        /// a graphics card, a bitcoin, a red keycard. The first set was medkits, ammo
+        /// boxes and dog tags, which is what a Tarkov player already scrolls past.
+        ///
+        /// Every id is read out of `SPT_Data/database/templates/items.json` rather than
+        /// typed from memory, which matters more than it sounds: the id that comes to
+        /// mind for "BEAR dogtag" is the USEC one, and the Labs keycard has several
+        /// plausible ids of which exactly one is the red.
         /// </summary>
         private static readonly Dictionary<string, string> Templates =
             new Dictionary<string, string>
             {
-                ["Medkit"] = "5755356824597772cb798962",   // AI-2 medkit
-                ["AmmoBox"] = "6570254fcfc010a0f5006a22",  // 7.62x51mm M61 ammo pack (20)
-                ["Grenade"] = "5710c24ad2720bc3458b45a3",  // F-1 hand grenade
-                ["Helmet"] = "5ac8d6885acfc400180ae7b0",   // Ops-Core FAST MT (Urban Tan)
-                ["DogTag"] = "59f32bb586f774757e1e8442",   // Dogtag BEAR
-                ["Roubles"] = "5449016a4bdc2d6f028b456f",  // Roubles
-                ["GpCoin"] = "5d235b4d86f7742e017bc88a",   // GP coin
-                ["Bitcoin"] = "59faff1d86f7746c51718c9c",  // Physical Bitcoin
-                ["Keycard"] = "5c1e495a86f7743109743dfb",  // TerraGroup Labs keycard (Violet)
+                ["Cola"] = "57514643245977207f2c2d09",      // Can of TarCola soda
+                ["Salewa"] = "544fb45d4bdc2dee738b4568",    // Salewa first aid kit
+                ["Moonshine"] = "5d1b376e86f774252519444e", // Fierce Hatchling moonshine
+                ["Tetriz"] = "5c12620d86f7743f8b198b72",    // Tetriz portable game console
+                ["Watch"] = "59faf7ca86f7740dbe19f6c2",     // Roler Submariner gold watch
+                ["Rooster"] = "5bc9bc53d4351e00367fbcee",   // Golden rooster figurine
+                ["Gpu"] = "57347ca924597744596b4e71",       // Graphics card
+                ["Bitcoin"] = "59faff1d86f7746c51718c9c",   // Physical Bitcoin
+                ["Keycard"] = "5c1d0efb86f7744baf2e7b7b",   // TerraGroup Labs keycard (Red)
             };
 
         /// <summary>
@@ -134,12 +139,13 @@ namespace SlotMachine.Client
 
             foreach (var symbol in symbols)
             {
-                if (symbol == null || Ready.ContainsKey(symbol))
+                if (symbol == null || Ready.ContainsKey(symbol)
+                    || !Templates.TryGetValue(symbol, out var template))
                 {
                     continue;
                 }
 
-                var cached = FromDisk(symbol);
+                var cached = FromDisk(template);
 
                 if (cached != null)
                 {
@@ -220,7 +226,7 @@ namespace SlotMachine.Client
 
                 Asked.Add(symbol);
 
-                var cached = FromDisk(symbol);
+                var cached = FromDisk(template);
 
                 if (cached != null)
                 {
@@ -257,7 +263,7 @@ namespace SlotMachine.Client
 
                 Ready[symbol] = task.Result;
                 rendered++;
-                Save(symbol, task.Result);
+                Save(template, task.Result);
                 onArrived?.Invoke();
             }
 
@@ -324,15 +330,24 @@ namespace SlotMachine.Client
             }
         }
 
-        private static Sprite FromDisk(string symbol)
+        /// <summary>
+        /// A cached icon, **keyed by template id rather than by symbol name**.
+        ///
+        /// The name is what the symbol is called in this build; the id is what the
+        /// picture is of. Keying on the name is wrong the moment a symbol keeps its name
+        /// and changes its item, which is exactly what happened when `Keycard` moved
+        /// from the violet Labs card to the red one: the cache would have gone on
+        /// serving a violet card under a symbol that had become red.
+        /// </summary>
+        private static Sprite FromDisk(string template)
         {
             try
             {
-                return Textures.FromFile(Path.Combine(CacheFolder, symbol.ToLowerInvariant() + ".png"));
+                return Textures.FromFile(Path.Combine(CacheFolder, template + ".png"));
             }
             catch (Exception ex)
             {
-                SlotClientPlugin.Log.LogWarning($"[Slots] could not read the cached {symbol}: {ex.Message}");
+                SlotClientPlugin.Log.LogWarning($"[Slots] could not read the cached {template}: {ex.Message}");
                 return null;
             }
         }
@@ -357,7 +372,7 @@ namespace SlotMachine.Client
         ///    Full-surface is the point: reading a sub-rectangle is where the two
         ///    coordinate conventions disagree, and reading all of it cannot.
         /// </summary>
-        private static void Save(string symbol, Sprite sprite)
+        private static void Save(string template, Sprite sprite)
         {
             try
             {
@@ -385,13 +400,13 @@ namespace SlotMachine.Client
                 }
 
                 Directory.CreateDirectory(CacheFolder);
-                File.WriteAllBytes(Path.Combine(CacheFolder, symbol.ToLowerInvariant() + ".png"), png);
+                File.WriteAllBytes(Path.Combine(CacheFolder, template + ".png"), png);
             }
             catch (Exception ex)
             {
                 // Not worth a warning every launch: the icon still works, it is only the
                 // saving of it that did not.
-                SlotClientPlugin.Log.LogInfo($"[Slots] {symbol} was drawn but not cached: {ex.Message}");
+                SlotClientPlugin.Log.LogInfo($"[Slots] {template} was drawn but not cached: {ex.Message}");
             }
         }
 

@@ -12,21 +12,21 @@ namespace SlotMachine.Game;
 public enum Symbol
 {
     /// <summary>Low. The filler that makes near misses happen.</summary>
-    Medkit,
+    Cola,
 
-    AmmoBox,
+    Salewa,
 
-    Grenade,
+    Moonshine,
 
     /// <summary>Mid.</summary>
-    Helmet,
+    Tetriz,
 
-    DogTag,
+    Watch,
 
-    Roubles,
+    Rooster,
 
     /// <summary>High.</summary>
-    GpCoin,
+    Gpu,
 
     Bitcoin,
 
@@ -67,7 +67,7 @@ public static class Reels
 
     private static readonly Symbol[][] Strips =
     [
-        //       medkit ammo  gren  helm  tag  RUB  gp  BTC key
+        //       cola salewa moon tetriz watch roost gpu BTC key
         Strip(5, 5, 4, 4, 4, 3, 2, 2, 1),
         Strip(5, 5, 4, 4, 4, 3, 2, 2, 1),
         Strip(5, 5, 5, 4, 4, 3, 2, 1, 1),
@@ -115,18 +115,18 @@ public static class Reels
     /// repeats.
     /// </summary>
     private static Symbol[] Strip(
-        int medkit, int ammo, int grenade, int helmet,
-        int dogTag, int roubles, int gp, int bitcoin, int keycard)
+        int cola, int salewa, int moonshine, int tetriz,
+        int watch, int rooster, int gpu, int bitcoin, int keycard)
     {
         var counts = new (Symbol Symbol, int Count)[]
         {
-            (Symbol.Medkit, medkit),
-            (Symbol.AmmoBox, ammo),
-            (Symbol.Grenade, grenade),
-            (Symbol.Helmet, helmet),
-            (Symbol.DogTag, dogTag),
-            (Symbol.Roubles, roubles),
-            (Symbol.GpCoin, gp),
+            (Symbol.Cola, cola),
+            (Symbol.Salewa, salewa),
+            (Symbol.Moonshine, moonshine),
+            (Symbol.Tetriz, tetriz),
+            (Symbol.Watch, watch),
+            (Symbol.Rooster, rooster),
+            (Symbol.Gpu, gpu),
             (Symbol.Bitcoin, bitcoin),
             (Symbol.Keycard, keycard),
         };
@@ -154,7 +154,7 @@ public static class Reels
         }
 
         // A taken[] rather than checking the strip for an empty value: default(Symbol)
-        // is Medkit, a real symbol, so an unwritten stop and a medkit are the same
+        // is Cola, a real symbol, so an unwritten stop and a can of cola are the same
         // thing to look at. The first draft of this method used that as its marker.
         var strip = new Symbol[pool.Count];
         var taken = new bool[pool.Count];

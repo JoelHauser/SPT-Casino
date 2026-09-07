@@ -736,8 +736,8 @@ namespace SlotMachine.Client
                 foreach (var reel in reels)
                 {
                     grid.Add(reel is JArray rows
-                        ? [.. rows.Select(r => (string)r ?? "Medkit")]
-                        : new List<string> { "Medkit", "Medkit", "Medkit" });
+                        ? [.. rows.Select(r => (string)r ?? "Cola")]
+                        : new List<string> { "Cola", "Cola", "Cola" });
                 }
             }
 
@@ -1145,10 +1145,30 @@ namespace SlotMachine.Client
             input.textComponent = text;
             input.contentType = TMP_InputField.ContentType.IntegerNumber;
             input.characterLimit = 9;
-            input.selectionColor = new Color(Gold.r, Gold.g, Gold.b, 0.35f);
+            input.restoreOriginalTextOnEscape = false;
+
+            // Three things, because one of them alone was not enough to see where the
+            // click had landed. The caret at its default single pixel is invisible on a
+            // 1440p screen; selecting the whole number on focus paints a gold block that
+            // cannot be missed; and the border lighting up says the box has the keyboard
+            // even before anything is typed.
             input.caretColor = Gold;
             input.customCaretColor = true;
-            input.restoreOriginalTextOnEscape = false;
+            input.caretWidth = 3;
+            input.caretBlinkRate = 0.9f;
+            input.selectionColor = new Color(Gold.r, Gold.g, Gold.b, 0.45f);
+            input.onFocusSelectAll = true;
+
+            input.transition = Selectable.Transition.SpriteSwap;
+
+            var lit = Textures.RoundedBox(6, new Color(0.07f, 0.07f, 0.08f, 1f), Gold, 2);
+
+            input.spriteState = new SpriteState
+            {
+                highlightedSprite = lit,
+                pressedSprite = lit,
+                selectedSprite = lit,
+            };
 
             // On leaving the box or pressing return, whichever comes first. Both are
             // "I have finished typing a number", and a stake that only took effect on
@@ -1209,6 +1229,18 @@ namespace SlotMachine.Client
             }
 
             SetSpinEnabled(Ready && !ReelView.Spinning);
+
+            // Nothing is drawn on the reels or in the paytable until every symbol is
+            // the real thing. The blanks are a fallback, not something to look at.
+            ReelView.ShowSymbols(Ready);
+
+            foreach (var pair in PayFaces)
+            {
+                if (pair.Value != null)
+                {
+                    pair.Value.enabled = Ready;
+                }
+            }
 
             if (Ready && _status != null && _status.text.StartsWith("Fetching"))
             {
@@ -1306,15 +1338,15 @@ namespace SlotMachine.Client
         /// </summary>
         private static string NameOf(string symbol) => symbol switch
         {
-            "Medkit" => "AI-2 MEDKIT",
-            "AmmoBox" => "7.62 AMMO",
-            "Grenade" => "GRENADE",
-            "Helmet" => "HELMET",
-            "DogTag" => "BEAR TAG",
-            "Roubles" => "ROUBLES",
-            "GpCoin" => "GP COIN",
+            "Cola" => "TARCOLA",
+            "Salewa" => "SALEWA",
+            "Moonshine" => "MOONSHINE",
+            "Tetriz" => "TETRIZ",
+            "Watch" => "GOLD WATCH",
+            "Rooster" => "GOLD ROOSTER",
+            "Gpu" => "GRAPHICS CARD",
             "Bitcoin" => "BITCOIN",
-            "Keycard" => "LABS KEYCARD",
+            "Keycard" => "RED KEYCARD",
             _ => symbol?.ToUpperInvariant() ?? string.Empty,
         };
 

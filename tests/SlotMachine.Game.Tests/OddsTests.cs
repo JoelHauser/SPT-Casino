@@ -110,12 +110,12 @@ public class OddsTests
         {
             var strip = Reels.Of(reel);
 
-            var medkits = strip.Count(s => s == Symbol.Medkit);
+            var cheapest = strip.Count(s => s == Symbol.Cola);
             var keycard = strip.Count(s => s == Symbol.Keycard);
 
             Assert.True(
-                medkits > keycard,
-                $"reel {reel + 1} has {medkits} medkits and {keycard} keycards, which is the wrong way round.");
+                cheapest > keycard,
+                $"reel {reel + 1} has {cheapest} cola and {keycard} keycards, which is the wrong way round.");
         }
     }
 

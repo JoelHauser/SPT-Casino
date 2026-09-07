@@ -35,8 +35,8 @@ public static class Paytable
     ///
     /// The first draft was picked and hoped for. It paid **681%** -- the low symbols
     /// looked modest at payline scale, but a ways win multiplies by how many times the
-    /// symbol landed on each reel, and medkits alone were giving back three times the
-    /// stake. That is what a computed return is for.
+    /// symbol landed on each reel, and the cheapest symbol alone was giving back
+    /// three times the stake. That is what a computed return is for.
     ///
     /// Low symbols pay very little, which surprises people reading a paytable and is
     /// exactly right for 243 ways: they land constantly, so a five of a kind on the
@@ -46,39 +46,39 @@ public static class Paytable
     {
         3 => symbol switch
         {
-            Symbol.Medkit => 1,
-            Symbol.AmmoBox => 1,
-            Symbol.Grenade => 1,
-            Symbol.Helmet => 1,
-            Symbol.DogTag => 1,
-            Symbol.Roubles => 2,
-            Symbol.GpCoin => 5,
+            Symbol.Cola => 1,
+            Symbol.Salewa => 1,
+            Symbol.Moonshine => 1,
+            Symbol.Tetriz => 1,
+            Symbol.Watch => 1,
+            Symbol.Rooster => 2,
+            Symbol.Gpu => 5,
             Symbol.Bitcoin => 10,
             Symbol.Keycard => 25,
             _ => 0,
         },
         4 => symbol switch
         {
-            Symbol.Medkit => 1,
-            Symbol.AmmoBox => 1,
-            Symbol.Grenade => 2,
-            Symbol.Helmet => 2,
-            Symbol.DogTag => 2,
-            Symbol.Roubles => 4,
-            Symbol.GpCoin => 20,
+            Symbol.Cola => 1,
+            Symbol.Salewa => 1,
+            Symbol.Moonshine => 2,
+            Symbol.Tetriz => 2,
+            Symbol.Watch => 2,
+            Symbol.Rooster => 4,
+            Symbol.Gpu => 20,
             Symbol.Bitcoin => 50,
             Symbol.Keycard => 150,
             _ => 0,
         },
         5 => symbol switch
         {
-            Symbol.Medkit => 1,
-            Symbol.AmmoBox => 2,
-            Symbol.Grenade => 2,
-            Symbol.Helmet => 5,
-            Symbol.DogTag => 5,
-            Symbol.Roubles => 12,
-            Symbol.GpCoin => 80,
+            Symbol.Cola => 1,
+            Symbol.Salewa => 2,
+            Symbol.Moonshine => 2,
+            Symbol.Tetriz => 5,
+            Symbol.Watch => 5,
+            Symbol.Rooster => 12,
+            Symbol.Gpu => 80,
             Symbol.Bitcoin => 250,
             Symbol.Keycard => 1000,
             _ => 0,

@@ -31,7 +31,7 @@ public class MachineTests
     public void TwoOfAKindPaysNothing()
     {
         Assert.Equal(0, Paytable.Of(Symbol.Keycard, 2));
-        Assert.Equal(0, Paytable.Of(Symbol.Medkit, 2));
+        Assert.Equal(0, Paytable.Of(Symbol.Cola, 2));
         Assert.Equal(3, Paytable.MinRun);
     }
 
@@ -44,20 +44,20 @@ public class MachineTests
     public void RepeatsOnOneReelMultiplyTheWin()
     {
         var machine = new Machine();
-        var stops = Enumerable.Range(0, Reels.Count).Select(r => StopWith(r, Symbol.Medkit)).ToArray();
+        var stops = Enumerable.Range(0, Reels.Count).Select(r => StopWith(r, Symbol.Cola)).ToArray();
 
         var pull = machine.StopAt(stops, 1_000);
-        var win = Assert.Single(pull.Wins.Where(w => w.Symbol == Symbol.Medkit));
+        var win = Assert.Single(pull.Wins.Where(w => w.Symbol == Symbol.Cola));
 
         var expectedWays = 1;
 
         for (var reel = 0; reel < win.Reels; reel++)
         {
-            expectedWays *= Reels.Window(reel, stops[reel]).Count(s => s == Symbol.Medkit);
+            expectedWays *= Reels.Window(reel, stops[reel]).Count(s => s == Symbol.Cola);
         }
 
         Assert.Equal(expectedWays, win.Ways);
-        Assert.Equal(1_000L * Paytable.Of(Symbol.Medkit, win.Reels) * win.Ways, win.Paid);
+        Assert.Equal(1_000L * Paytable.Of(Symbol.Cola, win.Reels) * win.Ways, win.Paid);
     }
 
     /// <summary>What is paid is the sum of what each symbol paid, and nothing else.</summary>

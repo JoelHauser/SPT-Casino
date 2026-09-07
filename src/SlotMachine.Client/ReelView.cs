@@ -131,7 +131,7 @@ namespace SlotMachine.Client
         /// </param>
         internal static GameObject Build(Transform parent, IReadOnlyList<string> symbols)
         {
-            _symbols = symbols is { Count: > 0 } ? [.. symbols] : ["Medkit"];
+            _symbols = symbols is { Count: > 0 } ? [.. symbols] : ["Cola"];
 
             var root = NewBox("Reels", parent, Color.white);
             root.sizeDelta = new Vector2(Width + 28f, Height + 28f);
@@ -190,7 +190,7 @@ namespace SlotMachine.Client
         ///
         /// For a machine built before the server answered: the reels fall back to a
         /// single symbol so they are not empty, and this puts the real set in once it
-        /// arrives rather than leaving a column of medkits spinning forever.
+        /// arrives rather than leaving one symbol spinning forever.
         /// </summary>
         internal static void Restock(IReadOnlyList<string> symbols)
         {
@@ -411,6 +411,31 @@ namespace SlotMachine.Client
             }
 
             return strip;
+        }
+
+        /// <summary>
+        /// Shows or hides the symbols, leaving the windows themselves in place.
+        ///
+        /// Not the reel frame, and not the windows -- only what is drawn in them. A
+        /// machine with dark windows reads as one that has not been switched on yet,
+        /// which is exactly what it is. Hiding the whole reel block instead would leave
+        /// a hole in the cabinet, and showing the blank tiles -- which is what happened
+        /// before this -- looks like a row of empty grey boxes and reads as unfinished.
+        /// </summary>
+        internal static void ShowSymbols(bool on)
+        {
+            if (_cells == null)
+            {
+                return;
+            }
+
+            for (var reel = 0; reel < 5; reel++)
+            {
+                for (var i = 0; i < Cells; i++)
+                {
+                    _cells[reel][i].enabled = on;
+                }
+            }
         }
 
         /// <summary>

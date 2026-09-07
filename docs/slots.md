@@ -69,23 +69,23 @@ symbols, divide by the stake, and that is the RTP. No simulation, no enumeration
 `Reels.cs`. Five reels of **30 stops**, nine symbols, three rows visible.
 
 ```
-        Med Ammo Gren Helm Tag  RUB  GP  BTC Key
-reel 1   5    5    4    4   4   3    2    2   1
-reel 2   5    5    4    4   4   3    2    2   1
-reel 3   5    5    5    4   4   3    2    1   1
-reel 4   6    5    5    4   4   3    1    1   1
-reel 5   6    6    5    4   4   2    1    1   1
+        Cola Salewa Moon Tetriz Watch Roost Gpu BTC Key
+reel 1    5     5     4     4     4     3    2   2   1
+reel 2    5     5     4     4     4     3    2   2   1
+reel 3    5     5     5     4     4     3    2   1   1
+reel 4    6     5     5     4     4     3    1   1   1
+reel 5    6     6     5     4     4     2    1   1   1
 ```
 
 **Every symbol appears at least once on every reel**, and there is a test that says
-so. An earlier draft had LEDX on zero stops of every reel, which does not make the top
-prize rare -- it makes it *impossible*, and nothing about the machine looks wrong when
-you play it.
+so. An earlier draft had the top symbol on zero stops of every reel, which does not
+make the top prize rare -- it makes it *impossible*, and nothing about the machine
+looks wrong when you play it.
 
 `Strip()` throws if any count is below 1 or the total is not 30. Symbols are spread
 around the strip with a stride of 7 using a `bool[] taken` array. It used to use
-`default(Symbol)` as an "empty" marker, which is `Bandage` -- so the first symbol's
-positions were silently overwritten by every later one.
+`default(Symbol)` as an "empty" marker, which is the first symbol of the enum -- so
+that symbol's positions were silently overwritten by every later one.
 
 ## The paytable
 
@@ -93,20 +93,22 @@ positions were silently overwritten by every later one.
 
 | Symbol | Enum | 3 | 4 | 5 |
 | --- | --- | --- | --- | --- |
-| AI-2 medkit | `Medkit` | 1 | 1 | 1 |
-| 7.62x51 ammo box | `AmmoBox` | 1 | 1 | 2 |
-| Grenade | `Grenade` | 1 | 2 | 2 |
-| Helmet | `Helmet` | 1 | 2 | 5 |
-| BEAR dog tag | `DogTag` | 1 | 2 | 5 |
-| Rouble stack | `Roubles` | 2 | 4 | 12 |
-| GP coin | `GpCoin` | 5 | 20 | 80 |
-| Bitcoin | `Bitcoin` | 10 | 50 | 250 |
-| Violet Labs keycard | `Keycard` | 25 | 150 | 1000 |
+| Can of TarCola | `Cola` | 1 | 1 | 1 |
+| Salewa first aid kit | `Salewa` | 1 | 1 | 2 |
+| Fierce Hatchling moonshine | `Moonshine` | 1 | 2 | 2 |
+| Tetriz portable game console | `Tetriz` | 1 | 2 | 5 |
+| Roler Submariner gold watch | `Watch` | 1 | 2 | 5 |
+| Golden rooster figurine | `Rooster` | 2 | 4 | 12 |
+| Graphics card | `Gpu` | 5 | 20 | 80 |
+| Physical Bitcoin | `Bitcoin` | 10 | 50 | 250 |
+| TerraGroup Labs keycard (Red) | `Keycard` | 25 | 150 | 1000 |
 
-The set was placeholder loot names until 2026-09-06 (bandage, crackers, screwdriver
-and so on) and was renamed to match the artwork that arrived. **The strips and the
-multipliers did not move**, so neither did the 92.510%: it was a rename, and the test
-that guards the return proves it was only a rename.
+**The symbol set has been renamed twice and the maths has never moved.** First from
+placeholder loot names (bandage, crackers, screwdriver) to a set matching some drawn
+art, then to this one -- chosen to be worth looking at, and to climb, after the second
+set turned out to be medkits and ammo boxes, which is what a Tarkov player already
+scrolls past. The strips and the multipliers were untouched both times, so the 92.510%
+is untouched, and the test that guards the return is what proves it was only a rename.
 
 Solved numerically against the strips to land on 92.5%. The low symbols pay about what
 they cost because they hit constantly; the top of the table is where the machine is
@@ -307,7 +309,15 @@ renderer would be.
 
 ### The stake box
 
-Typed, with a minus and a plus either side and the currency beside it. A stepper alone
+Typed, with a minus and a plus either side and the currency beside it.
+
+**Three things make the focus visible**, and none of them was enough alone. The caret
+at its default single pixel is invisible on a 1440p screen, so it is three wide, gold,
+and blinking. `onFocusSelectAll` paints the whole number in a gold block the moment the
+box is clicked, which is the part that actually answers "where did my click go".
+And the border lights gold on focus through a `SpriteState`, which says the box has the
+keyboard before anything has been typed.
+ A stepper alone
 cannot express "I want to spin for 12,345", which is what prompted the server to stop
 requiring multiples of the step.
 
@@ -395,8 +405,15 @@ their own installation, which is the honest arrangement and the reason the mod d
 carry a folder of somebody else's pictures.
 
 A rendered icon is cached as a PNG in `symbols/ingame/` beside the plugin, so the
-second launch reads a file instead of posing a camera at a helmet. **`pack.ps1` knows
-not to sweep that folder** -- see "Installing while the server is up".
+second launch reads a file instead of posing a camera at a rooster. `pack.ps1` never
+touches that folder: it removes only files from its own manifest, and these are written
+at runtime.
+
+**The file is named for the template id, not the symbol name.** The name is what this
+build calls the symbol; the id is what the picture is of. Keying on the name breaks the
+moment a symbol keeps its name and changes its item -- which is exactly what `Keycard`
+did when it moved from the violet Labs card to the red one, and the cache would have
+gone on serving a violet card under a symbol that had become red.
 
 ### There is no second set of pictures, deliberately
 
@@ -407,8 +424,14 @@ icons arrived. A machine that changes its mind about what is on its reels is wor
 than one that takes a second to fill in.
 
 So they are gone, and the fallback is deliberately not an item: a plain dark tile that
-reads as "nothing here yet", which is what it means. The panel **will not spin** until
-every symbol is in hand, says so, and greys the button.
+reads as "nothing here yet". The panel **will not spin** until every symbol is in hand,
+says so, and greys the button.
+
+**And the blanks are not drawn either.** A row of grey boxes reads as unfinished, so
+`ReelView.ShowSymbols(false)` hides the symbols while leaving the reel frame and the
+windows in place -- a machine with dark windows reads as one that has not been switched
+on, which is what it is. The paytable's icons are hidden the same way. Hiding the whole
+reel block instead would leave a hole in the cabinet.
 
 Two things keep that from being a trap:
 
@@ -508,7 +531,8 @@ for Roulette; rerun it after changing `SlotService`.
 - Client: panel, reels, SPIN button, stake stepper, currency switch, a paytable read
   from the ping response, and win lines drawn over the reels. Fourth tile in the lobby.
 - Art: the game's own item icons, rendered on the player's machine and cached beside
-  the plugin. No stand-ins at all; blank tiles and a disabled SPIN until they land.
+  the plugin under their template ids. No stand-ins at all, and nothing drawn on the
+  reels until every icon has landed.
 - The stake is typed, and the server takes any whole amount between the two ends.
 - `pack.ps1` builds and installs it with the rest of the casino.
 
