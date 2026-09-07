@@ -171,7 +171,7 @@ the ceiling for everybody, and ignoring the switch entirely -- and both are caug
 ## The client
 
 `src/SlotMachine.Client/`, compiled into `Casino.Client` like every other table.
-Three files: `SlotPanel`, `ReelView`, `SlotApi`.
+Four files: `SlotPanel`, `ReelView`, `SlotApi`, `ItemArt`.
 
 **Everything lives inside one frame.** The first layout scattered pieces across a
 full-screen canvas at hand-picked coordinates, and it hid a crash: see below.
@@ -426,20 +426,23 @@ All three types are public and unobfuscated. **None of it was remembered** -- th
 shape was read out of `Assembly-CSharp.dll` with Mono.Cecil (`EFT.StashSizeBonus` is
 the clearest example of the `Singleton<ItemFactory>` pattern), and the template ids
 came out of `SPT_Data/database/templates/items.json`. That mattered: the id that comes
-to mind for "BEAR dogtag" is the USEC one, and the Labs keycard has two plausible ids
-of which only one is violet.
+to mind for "BEAR dogtag" is the USEC one, and the Labs keycard has several plausible
+ids of which exactly one is the red.
 
 | Symbol | Template | Item |
 | --- | --- | --- |
-| `Medkit` | `5755356824597772cb798962` | AI-2 medkit |
-| `AmmoBox` | `6570254fcfc010a0f5006a22` | 7.62x51mm M61 ammo pack (20) |
-| `Grenade` | `5710c24ad2720bc3458b45a3` | F-1 hand grenade |
-| `Helmet` | `5ac8d6885acfc400180ae7b0` | Ops-Core FAST MT (Urban Tan) |
-| `DogTag` | `59f32bb586f774757e1e8442` | Dogtag BEAR |
-| `Roubles` | `5449016a4bdc2d6f028b456f` | Roubles |
-| `GpCoin` | `5d235b4d86f7742e017bc88a` | GP coin |
+| `Cola` | `57514643245977207f2c2d09` | Can of TarCola soda |
+| `Salewa` | `544fb45d4bdc2dee738b4568` | Salewa first aid kit |
+| `Moonshine` | `5d1b376e86f774252519444e` | Bottle of Fierce Hatchling moonshine |
+| `Tetriz` | `5c12620d86f7743f8b198b72` | Tetriz portable game console |
+| `Watch` | `59faf7ca86f7740dbe19f6c2` | Roler Submariner gold wrist watch |
+| `Rooster` | `5bc9bc53d4351e00367fbcee` | Golden rooster figurine |
+| `Gpu` | `57347ca924597744596b4e71` | Graphics card |
 | `Bitcoin` | `59faff1d86f7746c51718c9c` | Physical Bitcoin |
-| `Keycard` | `5c1e495a86f7743109743dfb` | TerraGroup Labs keycard (Violet) |
+| `Keycard` | `5c1d0efb86f7744baf2e7b7b` | TerraGroup Labs keycard (Red) |
+
+Chosen to be **worth looking at**, and to climb. The set before this was medkits, ammo
+boxes and dog tags, which is what a Tarkov player already scrolls past.
 
 **Nothing here ships BSG's art.** The icons are made on the player's own machine out of
 their own installation, which is the honest arrangement and the reason the mod does not
@@ -570,11 +573,12 @@ its anchor is a test that is not running.**
 
 ## Current state
 
-**2026-09-06.** Server and client both complete and installed. Not yet played in game.
+**2026-09-07.** Complete, installed, and played over several sittings. Every screen in
+this file has been looked at on a real machine.
 
 - Engine: 17 tests. RTP 92.510%, computed and simulated.
-- Server: 15 money tests, mutation-checked 9/9. Routes `/slots/ping` and `/slots/pull`,
-  item event `SlotsSync`.
+- Server: 27 money tests, mutation-checked 11/11. Routes `/slots/ping` and
+  `/slots/pull`, item event `SlotsSync`.
 - Client: panel, reels, SPIN button, stake stepper, currency switch, a paytable read
   from the ping response, and win lines drawn over the reels. Fourth tile in the lobby.
 - Art: the game's own item icons, rendered on the player's machine and cached beside
@@ -585,28 +589,34 @@ its anchor is a test that is not running.**
 - The win banner scales with the multiple: WIN, BIG WIN, HUGE WIN, JACKPOT.
 - `pack.ps1` builds and installs it with the rest of the casino.
 
-### Seen on screen once
+### What playing it found
 
-2026-09-06, and it found the lever crash above. What is still unwatched:
+Every one of these was invisible until somebody looked at the screen, and most of
+them are written up in full above:
 
-- Whether the reels read as spinning at the game's framerate, or strobe. If they
-  strobe, `PeakCellsPerSecond` is the dial and `MaxCellsPerFrame` is the reason.
-- Whether the overshoot-and-settle reads as a thump or as a wobble. `Overshoot` and
-  `SettleSeconds` are one dial between them.
-- Whether the paytable is legible at 1080p. It is 372 units wide beside a 680-unit
-  cabinet, which fits, but the type is small.
-- Whether the lever's throw is reachable at 1080p and at ultrawide -- it is positioned
-  relative to the reel block, not the screen.
-- Whether the rouble counter behind the panel gives the result away. It should not:
-  `Resync` is deferred. Roulette needed two goes at this.
-- Whether the win lines read at a glance or as a tangle. `MaxLines` is the dial, and
-  `LineWidth` the other one.
-- Whether the frame is a sensible size on an ultrawide. It is 1240x700 against a
-  1920x1080 reference matched on height, so it scales with the height and leaves more
-  margin the wider the screen gets.
-- A LEDX five-of-a-kind has never been seen and will not be for a long time. The
-  payout-splitting path in `Bank.Credit` for very large wins is still unexercised
-  here, as it is in Roulette.
+- **The panel was crashing** and looked finished. `AddComponent<Image>` returns null on
+  an object that already has one; `Build` stopped at the lever and everything after it
+  was simply never created. The log said so on the first line.
+- **The reels ate their own landing symbols** -- `Recycle` moved cells, so an array
+  index stopped saying where a cell was. Found rewriting the motion, not on screen.
+- **The icon cache had never written a file**, and the only sign was a log line reading
+  "9 drawn by the game, 0 from the cache".
+- **The paytable's names overlapped its icons** by five units, because both positions
+  were hand-picked and disagreed.
+- **The win lines stacked on top of each other**, so eight ways looked like one.
+- **The stand-in art was good enough to be a problem**: the reels visibly changed their
+  minds a second after opening.
+
+What is still unwatched:
+
+- Whether the reels strobe at a low framerate. `PeakCellsPerSecond` is the dial and
+  `MaxCellsPerFrame` is the reason. They read as spinning at 120fps on a 3440x1440
+  screen.
+- **A five-reel keycard has never been seen and will not be for a long time.** The
+  payout-splitting path in `Bank.Credit` for very large wins is still unexercised here,
+  as it is in Roulette -- and the F12 switch that lifts the stake ceiling makes a win
+  big enough to need it much more reachable.
+- Whether `JACKPOT` at 64pt looks right, for the same reason: nobody has hit 100x.
 
 ### Open items
 
