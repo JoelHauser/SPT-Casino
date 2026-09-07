@@ -74,14 +74,25 @@ public sealed record WalletInfo(
     /// now, and a machine that refuses 7,500 roubles for no reason a player can see is
     /// a machine that looks broken. The step survives as what the button moves by.
     ///
-    /// Both ends still matter and both are still checked here rather than trusted from
-    /// the panel -- a request is a thing anybody can send by hand, and the ceiling is
-    /// what keeps a thousand-times payout to a sane number.
+    /// Checked here rather than trusted from the panel: a request is a thing anybody
+    /// can send by hand.
     /// </summary>
-    public static bool Allows(Wallet wallet, long stake)
+    /// <param name="ignoreMaximum">
+    /// Lifts the ceiling, and only the ceiling.
+    ///
+    /// The maximum exists to keep a thousand-times payout to a sane number -- at 50,000
+    /// a five-reel keycard already returns 50,000,000 -- but that is the house being
+    /// careful on the player's behalf, and a player who would rather it did not can say
+    /// so in the F12 menu. Blackjack's table maximum works exactly this way.
+    ///
+    /// **The minimum is not negotiable.** A stake of zero is a free spin at a machine
+    /// that pays multiples of the stake, which is either nothing or a divide by nothing
+    /// depending on where you look; a negative one is a machine that pays you to play.
+    /// </param>
+    public static bool Allows(Wallet wallet, long stake, bool ignoreMaximum = false)
     {
         var info = For(wallet);
 
-        return stake >= info.MinStake && stake <= info.MaxStake;
+        return stake >= info.MinStake && (ignoreMaximum || stake <= info.MaxStake);
     }
 }

@@ -100,13 +100,15 @@ public class SlotService(
         var info = WalletInfo.For(wallet);
         var refunded = await RefundStranded(sessionId, output);
 
-        if (!WalletInfo.Allows(wallet, request.Stake))
+        if (!WalletInfo.Allows(wallet, request.Stake, request.IgnoreMaximum))
         {
             return new SlotResponse
             {
                 Ok = false,
                 Note = refunded,
-                Error = $"A pull in {info.Label} costs {info.MinStake:N0} to {info.MaxStake:N0}.",
+                Error = request.IgnoreMaximum
+                    ? $"A pull in {info.Label} costs at least {info.MinStake:N0}."
+                    : $"A pull in {info.Label} costs {info.MinStake:N0} to {info.MaxStake:N0}.",
             };
         }
 

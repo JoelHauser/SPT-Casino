@@ -48,6 +48,12 @@ namespace SlotMachine.Client
         internal static BaseUnityPlugin Instance;
 
         internal static ManualLogSource Log;
+
+        /// <summary>
+        /// Whether the machine's maximum stake is off. Bound by
+        /// <see cref="Casino.Client.CasinoPlugin"/> and settable from the F12 menu.
+        /// </summary>
+        internal static ConfigEntry<bool> NoStakeCap;
     }
 }
 

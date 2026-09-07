@@ -152,9 +152,21 @@ when the panel only offered a button that walked them -- but the stake can be ty
 now, and a machine that refuses 7,500 roubles for no reason a player can see is a
 machine that looks broken.
 
-Both ends are still checked on the server rather than trusted from the panel. The
-ceiling is what keeps a thousand-times payout to a sane number: at 50,000 a five-reel
-keycard already returns 50,000,000.
+### The ceiling comes off, the floor does not
+
+`Allows(wallet, stake, ignoreMaximum)`. **"No maximum stake" in the F12 menu** lifts
+the ceiling and nothing else, exactly the way Blackjack's table maximum does -- the
+client sends `IgnoreMaximum` on every pull, true or false, so the request says plainly
+what was asked for, and the server is still the one that decides.
+
+The maximum exists to keep a thousand-times payout to a sane number: at 50,000 a
+five-reel keycard already returns 50,000,000. That is the house being careful on the
+player's behalf, so a player is allowed to say no.
+
+**The minimum is not negotiable and there are tests that say so.** A stake of zero is
+a free spin at a machine that pays multiples of the stake; a negative one is a machine
+that pays you to play. The mutation check carries two mutants for this now -- lifting
+the ceiling for everybody, and ignoring the switch entirely -- and both are caught.
 
 ## The client
 
@@ -306,6 +318,35 @@ free cross-check on the settlement, drawn on screen.
 uGUI has no line renderer. A segment is a thin `Image` with its pivot on the left,
 sized to the gap and rotated to face along it, which is the whole of what a line
 renderer would be.
+
+### The win banner
+
+Above the reels, and **it says how big the win was by how big it is.** The first
+version printed every win at the same 30pt gold, so ten times the stake and a thousand
+times it looked identical and the machine had no top end.
+
+| Multiple of the stake | | Size |
+| --- | --- | --- |
+| under 1x | just the number | 30 |
+| 1x | `WIN` | 36 |
+| 5x | `BIG WIN` | 44 |
+| 20x | `HUGE WIN` | 54 |
+| 100x | `JACKPOT` | 64 |
+
+Multiples rather than amounts, because the stake is three currencies and, with the cap
+off, can be anything at all: 100,000 is a rounding error on an uncapped spin and a
+fortune on a minimum one. What the player feels is the multiple.
+
+Anything that earns a word also gets a pop -- scale up past full size and settle back,
+the same shape as the reels' own overshoot. A number that simply appears is a number
+the eye has already finished reading.
+
+The banner is **600 units wide with auto-sizing**, which is not decoration: it is
+centred on the reels, the reels are not centred in the frame, and a jackpot on an
+uncapped spin can read `JACKPOT   +50,000,000,000`. Left to grow it would run over the
+paytable. The layout was checked arithmetically -- banner rect 189..267 vertically,
+reels top at 184, the ways line at 296, paytable right edge at -213 and the banner
+stopping at -191.
 
 ### The stake box
 
@@ -514,12 +555,18 @@ computed 92.510%. It is slow by the standards of the rest of the suite and it is
 it: it is the only thing that would catch the closed form and the settlement drifting
 apart.
 
-The money path is **mutation-checked**, and was re-run after the stake rule changed.
-Nine deliberate breakages -- escrow never
+The money path is **mutation-checked**, and was re-run after each change to the stake
+rules. Eleven deliberate breakages -- escrow never
 released, the stake paid back instead of the win, a failed debit ignored, an unknown
 currency quietly becoming roubles, a reply reporting a payout the wallet never got --
-and **9 of 9 were caught, 0 survived**. The script is in the scratchpad pattern used
-for Roulette; rerun it after changing `SlotService`.
+the ceiling lifted for everybody, the F12 switch ignored -- and **11 of 11 were
+caught, 0 survived**. The script is in the scratchpad pattern used for Roulette; rerun
+it after changing `SlotService`.
+
+One of those mutants silently stopped applying when `Allows` gained its third argument
+and its anchor no longer matched. The script prints `SKIP (anchor not found)` for that
+case, which is the only reason it was noticed -- **a mutation script that cannot find
+its anchor is a test that is not running.**
 
 ## Current state
 
@@ -533,7 +580,9 @@ for Roulette; rerun it after changing `SlotService`.
 - Art: the game's own item icons, rendered on the player's machine and cached beside
   the plugin under their template ids. No stand-ins at all, and nothing drawn on the
   reels until every icon has landed.
-- The stake is typed, and the server takes any whole amount between the two ends.
+- The stake is typed, and the server takes any whole amount between the two ends --
+  or above the top one, with "No maximum stake" ticked in F12.
+- The win banner scales with the multiple: WIN, BIG WIN, HUGE WIN, JACKPOT.
 - `pack.ps1` builds and installs it with the rest of the casino.
 
 ### Seen on screen once

@@ -141,6 +141,70 @@ public class MoneyInvariantTests
         Assert.Null(escrow.Get(Session));
     }
 
+    /// <summary>
+    /// With the ceiling turned off, a stake above the maximum is taken.
+    ///
+    /// The player asked for that in the F12 menu. The house keeps a maximum because a
+    /// thousand-times payout on a big stake is a silly number, not because the stake
+    /// itself is a problem.
+    /// </summary>
+    [Theory]
+    [InlineData(50_001)]
+    [InlineData(250_000)]
+    [InlineData(10_000_000)]
+    public async Task TheMaximumCanBeTurnedOff(long stake)
+    {
+        var (service, bank, _, escrow) = Machine();
+        bank.Seed(Wallet.Roubles, (int)(stake * 2));
+
+        var reply = await service.PullAsync(
+            new PullRequest
+            {
+                Wallet = nameof(Wallet.Roubles),
+                Stake = stake,
+                IgnoreMaximum = true,
+            },
+            Session,
+            Output());
+
+        Assert.True(reply.Ok);
+        Assert.Equal(stake, reply.Pull!.Staked);
+        Assert.Equal((Wallet.Roubles, (int)-stake), bank.Movements.First());
+        Assert.Null(escrow.Get(Session));
+    }
+
+    /// <summary>
+    /// Turning the ceiling off does not turn the floor off.
+    ///
+    /// A stake of zero is a free spin at a machine that pays multiples of the stake,
+    /// and a negative one is a machine that pays you to play. Neither is a thing the
+    /// F12 switch is offering.
+    /// </summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(-50_000)]
+    [InlineData(4_999)]
+    public async Task TurningTheMaximumOffLeavesTheMinimumAlone(long stake)
+    {
+        var (service, bank, _, escrow) = Machine();
+        bank.Seed(Wallet.Roubles, Rich);
+
+        var reply = await service.PullAsync(
+            new PullRequest
+            {
+                Wallet = nameof(Wallet.Roubles),
+                Stake = stake,
+                IgnoreMaximum = true,
+            },
+            Session,
+            Output());
+
+        Assert.False(reply.Ok);
+        Assert.Empty(bank.Movements);
+        Assert.Null(escrow.Get(Session));
+    }
+
     /// <summary>An unknown currency is refused by name rather than defaulting to one.</summary>
     [Fact]
     public async Task AnUnknownCurrencyIsRefused()

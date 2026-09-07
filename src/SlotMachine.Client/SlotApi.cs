@@ -31,8 +31,18 @@ namespace SlotMachine.Client
         /// every field silently takes its default -- which is how a 50,000 stake
         /// arrives as 0 while looking like it bound correctly.
         /// </summary>
-        internal static JObject Pull(string wallet, long stake) =>
-            Post("/slots/pull", "{\"Wallet\":\"" + wallet + "\",\"Stake\":" + Num(stake) + "}");
+        internal static JObject Pull(string wallet, long stake)
+        {
+            // The server enforces the maximum unless told the player has turned it off.
+            // Sent every time rather than only when true, so the request says plainly
+            // what was asked for. Blackjack's table maximum works the same way.
+            var uncapped = SlotClientPlugin.NoStakeCap?.Value == true;
+
+            return Post(
+                "/slots/pull",
+                "{\"Wallet\":\"" + wallet + "\",\"Stake\":" + Num(stake)
+                + ",\"IgnoreMaximum\":" + (uncapped ? "true" : "false") + "}");
+        }
 
         /// <summary>
         /// Invariant formatting, so a machine with a comma decimal separator does not

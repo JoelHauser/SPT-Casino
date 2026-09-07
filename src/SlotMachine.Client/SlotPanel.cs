@@ -38,7 +38,7 @@ namespace SlotMachine.Client
         private const string RootName = "SlotMachineCanvas";
 
         private const float FrameWidth = 1240f;
-        private const float FrameHeight = 700f;
+        private const float FrameHeight = 740f;
         private const float PayWidth = 380f;
         private const float PayRow = 42f;
 
@@ -80,6 +80,9 @@ namespace SlotMachine.Client
         private static readonly Color ButtonFace = new Color(0.17f, 0.17f, 0.19f, 1f);
         private static readonly Color SpinRed = new Color(0.62f, 0.14f, 0.14f, 1f);
         private static readonly Color SpinDead = new Color(0.28f, 0.16f, 0.16f, 1f);
+
+        /// <summary>The size the win banner sits at when the win is smaller than the stake.</summary>
+        private const float QuietSize = 30f;
 
         /// <summary>
         /// How thick a win line is. Thin, deliberately: it is drawn over photographs of
@@ -147,6 +150,7 @@ namespace SlotMachine.Client
         private static TMP_InputField _stakeInput;
         private static TextMeshProUGUI _walletLabel;
         private static TextMeshProUGUI _paidLabel;
+        private static Coroutine _pop;
         private static RectTransform _lines;
         private static readonly Dictionary<string, Image> PayFaces = new Dictionary<string, Image>();
         private static Image _spinFace;
@@ -158,6 +162,14 @@ namespace SlotMachine.Client
         private static readonly List<string> Symbols = new List<string>();
         private static readonly Dictionary<string, int[]> Pays = new Dictionary<string, int[]>();
         private static bool _syncOwed;
+
+        /// <summary>
+        /// What the spin in flight cost.
+        ///
+        /// Kept because the win is announced relative to it, and the player is free to
+        /// retype the stake while the reels are still turning.
+        /// </summary>
+        private static long _paidStake;
 
         internal static bool IsOpen => _root != null && _root.activeSelf && !_closing;
 
@@ -318,6 +330,7 @@ namespace SlotMachine.Client
 
             SetStatus("...");
             SetPaid(null);
+            _paidStake = _stake;
             ClearLines();
             ReelView.Highlight(null);
             SetSpinEnabled(false);
@@ -349,7 +362,7 @@ namespace SlotMachine.Client
                 var reels = (int?)best?["Reels"] ?? 0;
                 var ways = (int?)best?["Ways"] ?? 1;
 
-                SetPaid(paid);
+                SetPaid(paid, _paidStake);
 
                 var drawn = DrawWinLines(grid, wins);
                 var total = wins.Sum(w => (int?)w["Ways"] ?? 0);
@@ -807,7 +820,10 @@ namespace SlotMachine.Client
 
             // The reels, and the lines over them, in the space the paytable leaves.
             var reelsX = ContentLeft + PayWidth + PayGap + ((ReelView.Width + 28f) * 0.5f);
-            const float reelsY = 34f;
+
+            // Lower than the middle: the win banner above needs somewhere to grow into,
+            // and it grows upwards from the top of the reels.
+            const float reelsY = 14f;
 
             var reels = ReelView.Build(frame, Symbols);
             var reelsRect = (RectTransform)reels.transform;
@@ -821,11 +837,19 @@ namespace SlotMachine.Client
             _lines.anchoredPosition = Vector2.zero;
             _lines.GetComponent<Image>().raycastTarget = false;
 
-            _paidLabel = NewText("Paid", frame, string.Empty, 30f);
+            _paidLabel = NewText("Paid", frame, string.Empty, QuietSize);
             _paidLabel.rectTransform.anchoredPosition =
-                new Vector2(reelsX, reelsY + (ReelView.Height * 0.5f) + 46f);
+                new Vector2(reelsX, reelsY + (ReelView.Height * 0.5f) + 58f);
 
-            _paidLabel.rectTransform.sizeDelta = new Vector2(ReelView.Width, 38f);
+            // 600 wide, which stops it well short of the paytable
+            // -- the banner is centred on the reels, and the reels are not centred in
+            // the frame. Auto-sizing does the rest: with the cap off, a win can be
+            // "JACKPOT   +50,000,000,000", and a banner that overflows its box onto the
+            // paytable is worse than one that shrinks a little.
+            _paidLabel.rectTransform.sizeDelta = new Vector2(600f, 78f);
+            _paidLabel.enableAutoSizing = true;
+            _paidLabel.fontSizeMin = 22f;
+            _paidLabel.fontSizeMax = QuietSize;
             _paidLabel.color = Gold;
 
             BuildSpinButton(frame, reelsX, reelsY);
@@ -1144,7 +1168,7 @@ namespace SlotMachine.Client
             input.textViewport = viewport;
             input.textComponent = text;
             input.contentType = TMP_InputField.ContentType.IntegerNumber;
-            input.characterLimit = 9;
+            input.characterLimit = 12;
             input.restoreOriginalTextOnEscape = false;
 
             // Three things, because one of them alone was not enough to see where the
@@ -1199,12 +1223,15 @@ namespace SlotMachine.Client
                 return;
             }
 
-            var clamped = Math.Max(limits[0], Math.Min(limits[1], wanted));
+            var ceiling = Ceiling(limits);
+            var clamped = Math.Max(limits[0], Math.Min(ceiling, wanted));
 
             if (clamped != wanted)
             {
                 SetStatus(
-                    $"A spin in {_wallet.ToLowerInvariant()} costs {limits[0]:N0} to {limits[1]:N0}."
+                    (ceiling == long.MaxValue
+                        ? $"A spin in {_wallet.ToLowerInvariant()} costs at least {limits[0]:N0}."
+                        : $"A spin in {_wallet.ToLowerInvariant()} costs {limits[0]:N0} to {ceiling:N0}.")
                     + $"  Set to {clamped:N0}.");
             }
 
@@ -1248,6 +1275,16 @@ namespace SlotMachine.Client
             }
         }
 
+        /// <summary>
+        /// The machine's ceiling, or none if the player has turned it off in F12.
+        ///
+        /// The server is the one that decides -- it is sent the switch with every spin
+        /// and checks it -- but the panel has to agree, or the box would clamp a stake
+        /// the machine would happily have taken.
+        /// </summary>
+        private static long Ceiling(long[] limits) =>
+            SlotClientPlugin.NoStakeCap?.Value == true ? long.MaxValue : limits[1];
+
         private static void StepStake(int direction)
         {
             if (!Limits.TryGetValue(_wallet, out var l))
@@ -1255,7 +1292,7 @@ namespace SlotMachine.Client
                 return;
             }
 
-            _stake = Math.Max(l[0], Math.Min(l[1], _stake + (direction * l[2])));
+            _stake = Math.Max(l[0], Math.Min(Ceiling(l), _stake + (direction * l[2])));
             SetStake();
         }
 
@@ -1291,19 +1328,97 @@ namespace SlotMachine.Client
             }
         }
 
-        private static void SetPaid(long? paid)
+        /// <summary>
+        /// Announces the win, at a size and a colour that say how big it was.
+        ///
+        /// **A slot machine's whole job at this moment is to make the number felt.** The
+        /// first version printed every win at the same 30pt gold, so ten times the stake
+        /// and a thousand times it looked identical and the machine had no top end.
+        ///
+        /// The tiers are multiples of the stake, not absolute amounts, because the stake
+        /// is three currencies and can now be anything at all -- 100,000 is a rounding
+        /// error on an uncapped spin and a life-changing sum on a minimum one. What the
+        /// player feels is the multiple.
+        ///
+        /// The size is set on a label with a fixed rect, so a very long number at 64pt
+        /// would overflow rather than wrap: the rect is 920 wide, which fits
+        /// "JACKPOT  +999,999,999" with room to spare.
+        /// </summary>
+        private static void SetPaid(long? paid, long stake = 0)
         {
             if (_paidLabel == null)
             {
                 return;
             }
 
-            _paidLabel.text = paid switch
+            if (paid is null or 0)
             {
-                null => string.Empty,
-                0 => string.Empty,
-                _ => $"+{paid:N0}",
+                _paidLabel.text = string.Empty;
+                _paidLabel.fontSizeMax = QuietSize;
+                _paidLabel.rectTransform.localScale = Vector3.one;
+                return;
+            }
+
+            var won = paid.Value;
+
+            // Guard the division rather than trusting the stake: a spin is never free,
+            // but this is the one line where a zero would take the panel down.
+            var multiple = stake > 0 ? (double)won / stake : 1d;
+
+            var (word, size, colour) = multiple switch
+            {
+                >= 100d => ("JACKPOT", 64f, new Color(1.00f, 0.97f, 0.85f, 1f)),
+                >= 20d => ("HUGE WIN", 54f, new Color(1.00f, 0.62f, 0.24f, 1f)),
+                >= 5d => ("BIG WIN", 44f, new Color(1.00f, 0.84f, 0.34f, 1f)),
+                >= 1d => ("WIN", 36f, Gold),
+                _ => (string.Empty, QuietSize, new Color(0.78f, 0.72f, 0.55f, 1f)),
             };
+
+            _paidLabel.text = string.IsNullOrEmpty(word) ? $"+{won:N0}" : $"{word}   +{won:N0}";
+            _paidLabel.fontSizeMax = size;
+            _paidLabel.color = colour;
+
+            // Anything worth a word gets a pop as well. A number that simply appears is
+            // a number the eye has already finished reading.
+            if (!string.IsNullOrEmpty(word) && SlotClientPlugin.Instance != null)
+            {
+                if (_pop != null)
+                {
+                    SlotClientPlugin.Instance.StopCoroutine(_pop);
+                }
+
+                _pop = SlotClientPlugin.Instance.StartCoroutine(Pop());
+            }
+            else
+            {
+                _paidLabel.rectTransform.localScale = Vector3.one;
+            }
+        }
+
+        /// <summary>
+        /// Overshoots and settles, like the reels do. 0.28s, which is long enough to
+        /// register and short enough not to be in the way of the next spin.
+        /// </summary>
+        private static IEnumerator Pop()
+        {
+            const float seconds = 0.28f;
+            var rect = _paidLabel.rectTransform;
+
+            for (var t = 0f; t < seconds; t += Time.unscaledDeltaTime)
+            {
+                var u = t / seconds;
+
+                // Up past full size, then back to it.
+                var scale = u < 0.55f
+                    ? Mathf.Lerp(0.55f, 1.14f, Mathf.SmoothStep(0f, 1f, u / 0.55f))
+                    : Mathf.Lerp(1.14f, 1f, Mathf.SmoothStep(0f, 1f, (u - 0.55f) / 0.45f));
+
+                rect.localScale = new Vector3(scale, scale, 1f);
+                yield return null;
+            }
+
+            rect.localScale = Vector3.one;
+            _pop = null;
         }
 
         private static void SetStatus(string text)

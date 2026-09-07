@@ -24,6 +24,15 @@ public record PullRequest : IRequestData
 
     /// <summary>What the pull costs, in that currency.</summary>
     public long Stake { get; set; }
+
+    /// <summary>
+    /// Whether the player has turned the maximum stake off in the F12 menu.
+    ///
+    /// Sent on every pull rather than only when true, so the request says plainly what
+    /// was asked for. The minimum is not affected. Same arrangement as Blackjack's
+    /// table maximum, down to the name.
+    /// </summary>
+    public bool IgnoreMaximum { get; set; }
 }
 
 /// <summary>Does nothing to the game. See <see cref="SlotItemEventRouter"/>.</summary>

@@ -107,6 +107,15 @@ namespace Casino.Client
                         4_000_000,    // 200
                         5_000_000))); // 250
 
+            SlotMachine.Client.SlotClientPlugin.NoStakeCap = Config.Bind(
+                "Slots",
+                "No maximum stake",
+                false,
+                "Off by default. The slot machine caps a spin at 50,000 roubles (or 500 "
+                + "dollars or euros) because it pays up to a thousand times the stake, and "
+                + "a capped win is still 50,000,000. Turn this on to bet as much as you "
+                + "like. The minimum stake is unaffected.");
+
             Blackjack.Client.BlackjackClientPlugin.EnforceTableMaximum = Config.Bind(
                 "Blackjack",
                 "Enforce the table maximum",
