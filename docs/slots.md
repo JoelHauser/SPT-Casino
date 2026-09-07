@@ -269,6 +269,19 @@ inside it, and each way gets a polyline through the middle of the symbols it cla
 with a numbered badge on the left. Capped at `MaxLines = 12`, because a big win runs
 to dozens; the rest are counted in words -- "Showing 12 of 27 ways".
 
+**Every line of a win runs through the same cells**, so drawn where they fall they sit
+on top of each other and a win on eight ways looks like a win on one. They are spread
+evenly across a 64-unit band inside the symbol instead, the way a payline machine
+spaces its lines: parallel where they share a row, separating where they do not. One
+line runs dead centre; more fan out either side. `MaxLineGap` caps it, or two lines
+would take the whole band and run along the top and bottom edges of the symbols rather
+than through them.
+
+That needs the count *before* anything is drawn, so `DrawWinLines` plans every way
+first and draws second. Each way gets its own colour, and the numbered badges are
+dropped past `MaxBadges = 8`, where they stack into a pile -- a way has no name the way
+a payline does, so the numbering is a convenience rather than a fact about the game.
+
 The first version was lines alone, 4px and hard-edged, and it read as a scratch on the
 screen. Three things fixed it:
 

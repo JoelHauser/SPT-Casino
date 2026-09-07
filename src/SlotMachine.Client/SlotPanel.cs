@@ -89,6 +89,35 @@ namespace SlotMachine.Client
         private const float LineWidth = 3f;
 
         /// <summary>
+        /// The band inside a symbol that the lines are spread across.
+        ///
+        /// Every line of a win runs through the same cells, so without this they sit on
+        /// top of each other and a win on eight ways looks like a win on one. They are
+        /// laid out evenly across this band instead, the way a payline machine spaces
+        /// its lines -- parallel where they share a row, and separating where they do
+        /// not.
+        /// </summary>
+        private const float LineBand = 64f;
+
+        /// <summary>
+        /// The most two neighbouring lines are allowed to be apart.
+        ///
+        /// Without a cap, two lines would take the whole band and run along the top and
+        /// bottom edges of the symbols rather than through them. This keeps a small win
+        /// looking like it goes through the middle.
+        /// </summary>
+        private const float MaxLineGap = 17f;
+
+        /// <summary>
+        /// Above this many lines the numbered badges are dropped.
+        ///
+        /// They are 22 units tall and the lines can be six apart, so past a handful they
+        /// stack into an unreadable pile. The numbering is a convenience, not a fact
+        /// about the game -- a way has no name the way a payline does.
+        /// </summary>
+        private const int MaxBadges = 8;
+
+        /// <summary>
         /// One colour per drawn way. Chosen to stay apart on a dark cabinet -- the whole
         /// point of a line is telling it from the line beside it.
         /// </summary>
@@ -387,7 +416,9 @@ namespace SlotMachine.Client
                 return 0;
             }
 
-            var drawn = 0;
+            // Worked out in full before anything is drawn, because the spacing between
+            // the lines depends on how many there are going to be.
+            var plan = new List<int[]>();
 
             foreach (var token in wins)
             {
@@ -417,32 +448,44 @@ namespace SlotMachine.Client
                     rows.Add(here);
                 }
 
-                var colour = LineColours[drawn % LineColours.Length];
-
                 // The cells first, once for the whole win, so the frames sit under every
                 // line that runs through them. Drawing them per way would stack nine
                 // identical outlines on one symbol and turn the edge into a smear.
+                var frame = LineColours[plan.Count % LineColours.Length];
+
                 for (var reel = 0; reel < rows.Count; reel++)
                 {
                     foreach (var row in rows[reel])
                     {
-                        MarkCell(reel, row, colour);
+                        MarkCell(reel, row, frame);
                     }
                 }
 
                 foreach (var way in Ways(rows))
                 {
-                    if (drawn >= MaxLines)
+                    if (plan.Count >= MaxLines)
                     {
-                        return drawn;
+                        break;
                     }
 
-                    DrawWay(way, colour, drawn);
-                    drawn++;
+                    plan.Add(way);
                 }
             }
 
-            return drawn;
+            // Evenly spread about the middle of the symbol. One line runs dead centre;
+            // any more and they fan out either side of it.
+            var gap = plan.Count > 1
+                ? Mathf.Min(LineBand / (plan.Count - 1), MaxLineGap)
+                : 0f;
+
+            var first = -(plan.Count - 1) * 0.5f * gap;
+
+            for (var i = 0; i < plan.Count; i++)
+            {
+                DrawWay(plan[i], LineColours[i % LineColours.Length], i, first + (i * gap));
+            }
+
+            return plan.Count;
         }
 
         /// <summary>
@@ -528,14 +571,9 @@ namespace SlotMachine.Client
         ///    leave a notch on the outside of the turn, and a notch on every corner is
         ///    most of what made the first version look broken.
         /// </summary>
-        private static void DrawWay(int[] way, Color colour, int index)
+        private static void DrawWay(int[] way, Color colour, int index, float nudge)
         {
-            // Two ways through the same cells would sit exactly on top of each other, so
-            // each is nudged a little. Small, now that the frames say which symbols are
-            // involved and the line only has to show the shape.
-            var nudge = ((index % 5) - 2) * 4f;
-
-            var overhang = 12f;
+            const float overhang = 12f;
             var points = new List<Vector2>
             {
                 new Vector2(
@@ -570,17 +608,25 @@ namespace SlotMachine.Client
                 Joint(points[i], colour);
             }
 
-            // A numbered tag on the left, the way a payline machine numbers its lines.
+            if (index < MaxBadges)
+            {
+                Badge(index, points[0], colour);
+            }
+        }
+
+        /// <summary>A numbered tag on the left, the way a payline machine numbers its lines.</summary>
+        private static void Badge(int index, Vector2 at, Color colour)
+        {
             var badge = NewBox("Badge" + index, _lines, Color.white);
-            badge.sizeDelta = new Vector2(24f, 24f);
-            badge.anchoredPosition = points[0] + new Vector2(-14f, 0f);
+            badge.sizeDelta = new Vector2(22f, 22f);
+            badge.anchoredPosition = at + new Vector2(-13f, 0f);
 
             var face = badge.GetComponent<Image>();
-            face.sprite = Textures.RoundedBox(11, colour, new Color(0f, 0f, 0f, 0.65f), 2);
+            face.sprite = Textures.RoundedBox(10, colour, new Color(0f, 0f, 0f, 0.65f), 2);
             face.type = Image.Type.Sliced;
             face.raycastTarget = false;
 
-            var number = NewText("BadgeText", badge, (index + 1).ToString(), 14f);
+            var number = NewText("BadgeText", badge, (index + 1).ToString(), 13f);
             number.rectTransform.anchorMin = Vector2.zero;
             number.rectTransform.anchorMax = Vector2.one;
             number.rectTransform.offsetMin = Vector2.zero;
