@@ -23,7 +23,7 @@ public class Startup(SlotLog log) : IOnLoad
 
         log.Banner($"v{TableInfo.Version} loaded -- built for SPT {TableInfo.SptVersion}");
         log.Banner($"mod folder: {log.ModFolder}");
-        log.Banner("routes: POST /slots/ping, /pull");
+        log.Banner("routes: POST /slots/ping, /pull, /stats");
         log.Banner($"item event: {SlotActions.Sync}, so the stash keeps up without a reload");
         log.Banner(
             $"{Reels.Count} reels, {Reels.Rows} rows, {(int)Math.Pow(Reels.Rows, Reels.Count)} ways -- "

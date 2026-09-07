@@ -53,6 +53,17 @@ public class SlotCallbacks(
     }
 
     /// <summary>
+    /// The lifetime record. Unlike Ping and Pull this comes back as the stats object
+    /// itself rather than wrapped in a response, because nothing about it can fail
+    /// in a way the player needs telling about.
+    /// </summary>
+    public ValueTask<string> Stats(StatsRequest info, MongoId sessionId)
+    {
+        log.Detail($"stats [{sessionId}]");
+        return new ValueTask<string>(httpResponseUtil.NoBody(service.Stats(sessionId)));
+    }
+
+    /// <summary>
     /// The response the bank writes its change records into.
     ///
     /// **From `EventOutputHolder`, never from `new`.** A hand-built one initialises

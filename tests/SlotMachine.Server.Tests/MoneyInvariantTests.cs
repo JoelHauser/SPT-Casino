@@ -311,7 +311,8 @@ public class MoneyInvariantTests
         var profiles = new FakeProfiles();
         var escrow = new FakeEscrow();
 
-        var service = new SlotService(bank, profiles, escrow, new FakeRandom(20260906), new QuietLog());
+        var service = new SlotService(
+            bank, profiles, escrow, new FakeRandom(20260906), new FakeStats(), new QuietLog());
 
         return (service, bank, profiles, escrow);
     }

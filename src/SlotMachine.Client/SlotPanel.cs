@@ -81,6 +81,11 @@ namespace SlotMachine.Client
         private static readonly Color SpinRed = new Color(0.62f, 0.14f, 0.14f, 1f);
         private static readonly Color SpinDead = new Color(0.28f, 0.16f, 0.16f, 1f);
 
+        // Same values Blackjack's stats sheet uses, so a currency in the red reads
+        // the same way at every table.
+        private static readonly Color Good = new Color(0.55f, 0.82f, 0.45f, 1f);
+        private static readonly Color Bad = new Color(0.92f, 0.42f, 0.36f, 1f);
+
         /// <summary>The size the win banner sits at when the win is smaller than the stake.</summary>
         private const float QuietSize = 30f;
 
@@ -170,6 +175,18 @@ namespace SlotMachine.Client
         private static readonly Dictionary<string, Image> PayFaces = new Dictionary<string, Image>();
         private static Image _spinFace;
         private static TextMeshProUGUI _spinLabel;
+
+        /// <summary>
+        /// Everything the machine draws to actually play: paytable, reels, spin
+        /// button, stake row. One wrapper so STATS can hide all of it in one call the
+        /// way Blackjack's felt column hides behind its own stats sheet.
+        /// </summary>
+        private static RectTransform _machine;
+
+        private static GameObject _statsPanel;
+        private static RectTransform _statsTiles;
+        private static RectTransform _statsRows;
+        private static TextMeshProUGUI _statsEmpty;
 
         private static string _wallet = "Roubles";
         private static long _stake;
@@ -285,6 +302,9 @@ namespace SlotMachine.Client
             // nobody is looking at.
             StopRainbow();
 
+            // The sheet must not still be lying over the reels next time this opens.
+            HideStats();
+
             _closing = true;
 
             FadeTo(0f, () =>
@@ -295,7 +315,16 @@ namespace SlotMachine.Client
         }
 
         /// <summary>Escape, from the casino's own handler.</summary>
-        internal static void OnEscape() => Close();
+        internal static void OnEscape()
+        {
+            if (_statsPanel != null && _statsPanel.activeSelf)
+            {
+                ToggleStats();
+                return;
+            }
+
+            Close();
+        }
 
         // ------------------------------------------------------------------ playing
 
@@ -841,7 +870,15 @@ namespace SlotMachine.Client
             ways.rectTransform.sizeDelta = new Vector2(FrameWidth - 40f, 24f);
             ways.color = Dim;
 
-            BuildPaytable(frame, top);
+            // Everything below that actually plays the machine hangs off this one
+            // wrapper, centred on the frame exactly like the frame's own children
+            // would be, so STATS can hide the lot with one SetActive rather than
+            // hunting down each piece.
+            _machine = NewBox("Machine", frame, Color.clear);
+            _machine.sizeDelta = new Vector2(FrameWidth, FrameHeight);
+            _machine.GetComponent<Image>().raycastTarget = false;
+
+            BuildPaytable(_machine, top);
 
             // The reels, and the lines over them, in the space the paytable leaves.
             var reelsX = ContentLeft + PayWidth + PayGap + ((ReelView.Width + 28f) * 0.5f);
@@ -850,7 +887,7 @@ namespace SlotMachine.Client
             // and it grows upwards from the top of the reels.
             const float reelsY = 14f;
 
-            var reels = ReelView.Build(frame, Symbols);
+            var reels = ReelView.Build(_machine, Symbols);
             var reelsRect = (RectTransform)reels.transform;
             reelsRect.anchoredPosition = new Vector2(reelsX, reelsY);
 
@@ -862,7 +899,7 @@ namespace SlotMachine.Client
             _lines.anchoredPosition = Vector2.zero;
             _lines.GetComponent<Image>().raycastTarget = false;
 
-            _paidLabel = NewText("Paid", frame, string.Empty, QuietSize);
+            _paidLabel = NewText("Paid", _machine, string.Empty, QuietSize);
             _paidLabel.rectTransform.anchoredPosition =
                 new Vector2(reelsX, reelsY + (ReelView.Height * 0.5f) + 58f);
 
@@ -877,13 +914,17 @@ namespace SlotMachine.Client
             _paidLabel.fontSizeMax = QuietSize;
             _paidLabel.color = Gold;
 
-            BuildSpinButton(frame, reelsX, reelsY);
+            BuildSpinButton(_machine, reelsX, reelsY);
 
-            BuildStakeRow(frame, reelsX);
+            BuildStakeRow(_machine, reelsX);
 
+            // Outside _machine, like the status line: what it says stays visible
+            // right up to the moment STATS covers the reels, not a moment before.
             _status = NewText("Status", frame, string.Empty, 19f);
             _status.rectTransform.anchoredPosition = new Vector2(0f, -(top - 94f));
             _status.rectTransform.sizeDelta = new Vector2(FrameWidth - 40f, 26f);
+
+            BuildStats(frame);
 
             BuildControls(frame, top);
         }
@@ -1078,6 +1119,7 @@ namespace SlotMachine.Client
             strip.childControlWidth = false;
             strip.childControlHeight = false;
 
+            SmallButton(row, "STATS", ToggleStats, 200f);
             SmallButton(row, "CLOSE", Close, 200f);
         }
 
@@ -1099,6 +1141,263 @@ namespace SlotMachine.Client
             text.color = Ink;
 
             box.gameObject.AddComponent<Button>().onClick.AddListener(() => action());
+        }
+
+        // ------------------------------------------------------------------- stats
+
+        /// <summary>
+        /// The lifetime figures, laid over the reels the same way Blackjack lays its
+        /// own sheet over the felt: something to read numbers off, in the space the
+        /// machine itself occupies while nobody is spinning it.
+        /// </summary>
+        private static void BuildStats(RectTransform frame)
+        {
+            var sheet = NewBox("StatsSheet", frame, new Color(0.06f, 0.07f, 0.07f, 0.94f));
+            sheet.sizeDelta = new Vector2(FrameWidth - 140f, 520f);
+            sheet.anchoredPosition = new Vector2(0f, 10f);
+
+            var sheetImage = sheet.GetComponent<Image>();
+            sheetImage.sprite = Textures.RoundedBox(14, new Color(0.06f, 0.07f, 0.07f, 0.94f), Edge, 2);
+            sheetImage.type = Image.Type.Sliced;
+
+            _statsPanel = sheet.gameObject;
+
+            var column = sheet.gameObject.AddComponent<VerticalLayoutGroup>();
+            column.childAlignment = TextAnchor.UpperCenter;
+            column.spacing = 14f;
+            column.padding = new RectOffset(24, 24, 20, 20);
+            column.childForceExpandWidth = false;
+            column.childForceExpandHeight = false;
+            column.childControlWidth = false;
+            column.childControlHeight = false;
+
+            var heading = NewText("StatsTitle", sheet, "STATS", 22f);
+            heading.rectTransform.sizeDelta = new Vector2(700f, 26f);
+            heading.color = Gold;
+
+            _statsTiles = NewRow("Tiles", sheet, 10f);
+            _statsTiles.sizeDelta = new Vector2(700f, 82f);
+
+            var rule = NewBox("Rule", sheet, new Color(1f, 1f, 1f, 0.10f));
+            rule.sizeDelta = new Vector2(700f, 2f);
+
+            _statsRows = NewBox("Rows", sheet, Color.clear);
+            _statsRows.sizeDelta = new Vector2(700f, 110f);
+            _statsRows.GetComponent<Image>().raycastTarget = false;
+
+            var rows = _statsRows.gameObject.AddComponent<VerticalLayoutGroup>();
+            rows.childAlignment = TextAnchor.UpperCenter;
+            rows.spacing = 4f;
+            rows.childForceExpandWidth = false;
+            rows.childForceExpandHeight = false;
+            rows.childControlWidth = false;
+            rows.childControlHeight = false;
+
+            _statsEmpty = NewText("StatsEmpty", sheet, string.Empty, 19f);
+            _statsEmpty.rectTransform.sizeDelta = new Vector2(700f, 26f);
+
+            _statsPanel.SetActive(false);
+        }
+
+        /// <summary>
+        /// Shows the figures and hides the machine, or puts it back. No pull is
+        /// touched either way -- the record lives on the server, and this only
+        /// decides what is drawn. Refused mid-spin the same way a second pull is:
+        /// the reels are already answering a question, and switching the sheet in
+        /// over them would not stop that.
+        /// </summary>
+        private static void ToggleStats()
+        {
+            if (_statsPanel == null || _machine == null || ReelView.Spinning)
+            {
+                return;
+            }
+
+            var showing = !_statsPanel.activeSelf;
+
+            _statsPanel.SetActive(showing);
+            _machine.gameObject.SetActive(!showing);
+
+            if (showing)
+            {
+                Populate(SlotApi.Stats());
+            }
+        }
+
+        private static void HideStats()
+        {
+            if (_statsPanel != null && _statsPanel.activeSelf)
+            {
+                _statsPanel.SetActive(false);
+
+                if (_machine != null)
+                {
+                    _machine.gameObject.SetActive(true);
+                }
+            }
+        }
+
+        private static void Populate(JObject stats)
+        {
+            Clear(_statsTiles);
+            Clear(_statsRows);
+            _statsEmpty.text = string.Empty;
+
+            if (stats == null)
+            {
+                _statsEmpty.text = "No answer from the server.";
+                _statsEmpty.color = Bad;
+                return;
+            }
+
+            int GetInt(string name) => stats[name]?.ToObject<int>() ?? 0;
+            double GetDouble(string name) => stats[name]?.ToObject<double>() ?? 0d;
+
+            var pulls = GetInt("PullsPlayed");
+            if (pulls == 0)
+            {
+                _statsEmpty.text = "No pulls yet.";
+                _statsEmpty.color = Dim;
+                return;
+            }
+
+            var wins = GetInt("Wins");
+            var losses = GetInt("Losses");
+            var rate = 100.0 * wins / pulls;
+
+            Tile(pulls.ToString("N0"), "pulls", Ink);
+            Tile($"{wins:N0}-{losses:N0}", "w-l", Ink);
+
+            // Not coloured good or bad, unlike Blackjack's win rate: a slot's hit
+            // frequency is a property of its paytable, not a thing a normal player
+            // is expected to clear half the time, so there is no honest threshold
+            // to judge it against.
+            Tile($"{rate:F0}%", "hit rate", Ink);
+
+            Tile($"{GetDouble("BestMultiple"):F0}x", "best pull", Gold);
+            Tile(GetInt("Jackpots").ToString("N0"), "jackpots", Gold);
+            Tile($"{GetInt("CurrentStreak"):N0} / {GetInt("BestStreak"):N0}", "streak / best", Ink);
+
+            var byCurrency = stats["ByCurrency"] as JObject;
+            if (byCurrency == null || !byCurrency.HasValues)
+            {
+                _statsEmpty.text = "Nothing staked yet.";
+                _statsEmpty.color = Dim;
+                return;
+            }
+
+            MoneyRow(string.Empty, "staked", "returned", "net", Dim);
+
+            foreach (var entry in byCurrency.Properties())
+            {
+                var staked = entry.Value["Wagered"]?.ToObject<long>() ?? 0;
+                var back = entry.Value["Returned"]?.ToObject<long>() ?? 0;
+                var net = entry.Value["Net"]?.ToObject<long>() ?? (back - staked);
+
+                MoneyRow(
+                    Short(entry.Name),
+                    staked.ToString("N0"),
+                    back.ToString("N0"),
+                    (net > 0 ? "+" : string.Empty) + net.ToString("N0"),
+                    net > 0 ? Good : (net < 0 ? Bad : Dim));
+            }
+        }
+
+        /// <summary>One figure with its name under it.</summary>
+        private static void Tile(string figure, string caption, Color colour)
+        {
+            var tile = NewBox("Tile", _statsTiles, new Color(1f, 1f, 1f, 0.04f));
+            tile.sizeDelta = new Vector2(110f, 78f);
+
+            var image = tile.GetComponent<Image>();
+            image.sprite = Textures.RoundedBox(
+                8, new Color(1f, 1f, 1f, 0.04f), new Color(1f, 1f, 1f, 0.07f), 2);
+            image.type = Image.Type.Sliced;
+
+            var inner = tile.gameObject.AddComponent<VerticalLayoutGroup>();
+            inner.childAlignment = TextAnchor.MiddleCenter;
+            inner.spacing = 2f;
+            inner.childForceExpandWidth = false;
+            inner.childForceExpandHeight = false;
+            inner.childControlWidth = false;
+            inner.childControlHeight = false;
+
+            var value = NewText("Value", tile, figure, 23f);
+            value.rectTransform.sizeDelta = new Vector2(104f, 30f);
+            value.color = colour;
+
+            var label = NewText("Label", tile, caption, 13f);
+            label.rectTransform.sizeDelta = new Vector2(104f, 18f);
+            label.color = Dim;
+        }
+
+        /// <summary>
+        /// One currency across four columns, matching the layout Blackjack's own
+        /// stats sheet uses. Fixed widths, because numbers that do not line up are
+        /// harder to read than numbers that are simply small.
+        /// </summary>
+        private static void MoneyRow(string wallet, string staked, string back, string net, Color netColour)
+        {
+            var row = NewRow("Row", _statsRows, 0f);
+            row.sizeDelta = new Vector2(700f, 24f);
+
+            var w = NewText("Wallet", row, wallet, 17f);
+            w.rectTransform.sizeDelta = new Vector2(110f, 22f);
+            w.alignment = TextAlignmentOptions.Left;
+            w.color = Dim;
+
+            var s = NewText("Staked", row, staked, 17f);
+            s.rectTransform.sizeDelta = new Vector2(200f, 22f);
+            s.alignment = TextAlignmentOptions.Right;
+            s.color = Ink;
+
+            var b = NewText("Returned", row, back, 17f);
+            b.rectTransform.sizeDelta = new Vector2(200f, 22f);
+            b.alignment = TextAlignmentOptions.Right;
+            b.color = Ink;
+
+            var n = NewText("Net", row, net, 17f);
+            n.rectTransform.sizeDelta = new Vector2(180f, 22f);
+            n.alignment = TextAlignmentOptions.Right;
+            n.color = netColour;
+        }
+
+        /// <summary>Currency names, abbreviated the same way Blackjack's stats sheet does.</summary>
+        private static string Short(string wallet) => wallet switch
+        {
+            "Roubles" => "RUB",
+            "Dollars" => "USD",
+            "Euros" => "EUR",
+            _ => wallet?.ToUpperInvariant() ?? string.Empty,
+        };
+
+        private static void Clear(RectTransform parent)
+        {
+            if (parent == null)
+            {
+                return;
+            }
+
+            for (var i = parent.childCount - 1; i >= 0; i--)
+            {
+                UnityEngine.Object.Destroy(parent.GetChild(i).gameObject);
+            }
+        }
+
+        private static RectTransform NewRow(string name, Transform parent, float spacing)
+        {
+            var row = NewBox(name, parent, Color.clear);
+            row.GetComponent<Image>().raycastTarget = false;
+
+            var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = spacing;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.childControlWidth = false;
+            layout.childControlHeight = false;
+
+            return row;
         }
 
         private static void Refresh() => SetStake();

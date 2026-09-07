@@ -24,6 +24,13 @@ namespace SlotMachine.Client
         internal static JObject Ping() => Post("/slots/ping", "{}");
 
         /// <summary>
+        /// The lifetime record. Comes back as the stats object itself rather than
+        /// wrapped in a response, like Blackjack's -- nothing about it can fail in a
+        /// way the player needs telling about.
+        /// </summary>
+        internal static JObject Stats() => Post("/slots/stats", "{}");
+
+        /// <summary>
         /// Pulls the handle.
         ///
         /// PascalCase property names, deliberately, like every other body here. SPT

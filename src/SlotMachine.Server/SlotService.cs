@@ -24,6 +24,7 @@ public class SlotService(
     IProfileGateway profiles,
     IEscrowStore escrow,
     IRandomSource random,
+    IStatsStore stats,
     ISlotLog log)
 {
     private readonly Machine _machine = new(random.Create());
@@ -143,6 +144,10 @@ public class SlotService(
             bank.Credit(sessionId, wallet, (int)pull.Paid, output);
         }
 
+        var record = stats.Get(sessionId);
+        record.Record(stake, pull.Paid, wallet, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        stats.Save(sessionId, record);
+
         escrow.Release(sessionId);
 
         // 6. On disk, or it did not happen.
@@ -162,6 +167,8 @@ public class SlotService(
 
         return new SlotResponse { Note = refunded, Pull = View(pull) };
     }
+
+    public PlayerStats Stats(MongoId sessionId) => stats.Get(sessionId);
 
     /// <summary>
     /// Gives back a stake left behind by a pull that never finished.

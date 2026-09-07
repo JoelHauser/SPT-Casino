@@ -38,6 +38,9 @@ public record PullRequest : IRequestData
 /// <summary>Does nothing to the game. See <see cref="SlotItemEventRouter"/>.</summary>
 public record SlotSyncAction : BaseInteractionRequestData;
 
+/// <summary>Asks for the lifetime record. Nothing to send -- the session id is enough.</summary>
+public record StatsRequest : IRequestData;
+
 /// <summary>One symbol that paid, as the panel needs to show it.</summary>
 public record WinView
 {

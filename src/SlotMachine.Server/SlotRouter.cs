@@ -27,4 +27,9 @@ public class SlotRouter(JsonUtil jsonUtil, SlotCallbacks callbacks)
                 "/slots/pull",
                 async (url, info, sessionId, output, cancellationToken) =>
                     await callbacks.Pull(info, sessionId)),
+
+            new RouteAction<StatsRequest>(
+                "/slots/stats",
+                async (url, info, sessionId, output, cancellationToken) =>
+                    await callbacks.Stats(info, sessionId)),
         ]);

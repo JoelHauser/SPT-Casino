@@ -141,6 +141,32 @@ public sealed class FakeRandom(int seed) : IRandomSource
     public Random Create() => new(seed);
 }
 
+/// <summary>Stats without a file behind them. Same shape as Blackjack.Server.Tests' FakeStats.</summary>
+public sealed class FakeStats : IStatsStore
+{
+    private readonly Dictionary<string, PlayerStats> _stats = [];
+
+    public int Saves { get; private set; }
+
+    public PlayerStats Get(MongoId sessionId)
+    {
+        var key = sessionId.ToString();
+        if (!_stats.TryGetValue(key, out var stats))
+        {
+            stats = new PlayerStats();
+            _stats[key] = stats;
+        }
+
+        return stats;
+    }
+
+    public void Save(MongoId sessionId, PlayerStats stats)
+    {
+        _stats[sessionId.ToString()] = stats;
+        Saves++;
+    }
+}
+
 /// <summary>A log that says nothing, so a test run is readable.</summary>
 public sealed class QuietLog : ISlotLog
 {
