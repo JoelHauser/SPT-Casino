@@ -413,6 +413,23 @@ namespace SlotMachine.Client
             return strip;
         }
 
+        /// <summary>
+        /// Redraws every reel where it stands. Called when the game hands over an icon
+        /// the reels were showing a stand-in for.
+        /// </summary>
+        internal static void Repaint()
+        {
+            if (_cells == null)
+            {
+                return;
+            }
+
+            for (var reel = 0; reel < 5; reel++)
+            {
+                Render(reel);
+            }
+        }
+
         /// <summary>Lights the reels a win ran through, and dims the rest.</summary>
         internal static void Highlight(IReadOnlyList<int> reelsWon)
         {
@@ -460,7 +477,13 @@ namespace SlotMachine.Client
         internal static Sprite Artwork(string symbol) => FaceFor(symbol);
 
         /// <summary>
-        /// A symbol's artwork, cached.
+        /// A symbol's artwork, in order of preference: the icon the game drew, then the
+        /// picture shipped beside the plugin, then a plain box.
+        ///
+        /// The game's own icon wins whenever there is one -- it is the item as the
+        /// player sees it everywhere else in the menu, and no drawing of a helmet is
+        /// going to beat the helmet. It is asked for first rather than cached here,
+        /// because it arrives some frames after the panel is built. See ItemArt.
         ///
         /// A missing file falls back to a drawn box rather than an empty cell: a reel
         /// with holes in it looks broken, where a plain tile looks like a symbol nobody
@@ -468,6 +491,13 @@ namespace SlotMachine.Client
         /// </summary>
         private static Sprite FaceFor(string symbol)
         {
+            var real = ItemArt.For(symbol);
+
+            if (real != null)
+            {
+                return real;
+            }
+
             var key = symbol ?? string.Empty;
 
             if (Faces.TryGetValue(key, out var cached))

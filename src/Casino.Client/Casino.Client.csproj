@@ -69,6 +69,7 @@
     <Compile Include="..\SlotMachine.Client\SlotPanel.cs" Link="Games\SlotMachine\SlotPanel.cs" />
     <Compile Include="..\SlotMachine.Client\ReelView.cs"  Link="Games\SlotMachine\ReelView.cs" />
     <Compile Include="..\SlotMachine.Client\SlotApi.cs"   Link="Games\SlotMachine\SlotApi.cs" />
+    <Compile Include="..\SlotMachine.Client\ItemArt.cs"  Link="Games\SlotMachine\ItemArt.cs" />
   </ItemGroup>
 
   <ItemGroup>

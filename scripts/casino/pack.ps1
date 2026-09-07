@@ -208,65 +208,78 @@ foreach ($old in $tables) {
 # renamed symbol, a dropped assembly -- would sit in the install for ever and the mod
 # would still find it. Eight renamed slot symbols did exactly that.
 #
-# So stale files are removed, and ONLY stale ones: anything the stage does not also
-# contain. Emptying the folders outright is the obvious version and it is wrong twice
-# over. It deletes data\, where the house records what it owes a player whose hand was
-# interrupted; and it fails outright on the assemblies while the server has them open,
-# which is most of the time anybody runs this.
-$modDir = Join-Path $target 'SPT_Runtime\user\mods\Casino'
+# So the packer keeps a manifest of what IT installed, and removes only files that are
+# in the last manifest and not in this build. Nothing else is touched.
+#
+# The obvious version -- delete everything the stage does not contain -- is wrong, and
+# was caught deleting two things it had no business touching: data\, where the house
+# records what it owes a player whose hand was interrupted, and seen.txt, which is the
+# list of profiles that have read the welcome card. Both are written at runtime, by the
+# mod, and neither has ever been in a stage. A manifest cannot make that mistake,
+# because it only ever knows about files the packer itself put there.
+$manifestName = '.casino-installed.txt'
 
-function Get-Stale {
-    param([string]$Stage, [string]$Installed, [string[]]$Keep = @())
+function Get-Staged {
+    param([string]$Stage)
 
-    $found = @()
-    if (-not (Test-Path $Installed)) { return $found }
-
-    $wanted = @{}
+    $relative = @()
     foreach ($file in Get-ChildItem $Stage -Recurse -File) {
-        $wanted[$file.FullName.Substring($Stage.Length).TrimStart('\')] = $true
+        $relative += $file.FullName.Substring($Stage.Length).TrimStart('\')
     }
 
-    foreach ($file in Get-ChildItem $Installed -Recurse -File) {
-        $relative = $file.FullName.Substring($Installed.Length).TrimStart('\')
-
-        if ($wanted.ContainsKey($relative)) { continue }
-        if ($Keep | Where-Object { $relative -like "$_*" }) { continue }
-
-        $found += $relative
-    }
-
-    return $found
+    return $relative
 }
 
-function Remove-Stale {
-    param([string]$Stage, [string]$Installed, [string[]]$Keep = @())
+function Sync-Installed {
+    param([string]$Stage, [string]$Installed)
 
-    foreach ($relative in (Get-Stale -Stage $Stage -Installed $Installed -Keep $Keep)) {
-        Remove-Item (Join-Path $Installed $relative) -Force
-        Write-Host "  removed stale $relative" -ForegroundColor DarkYellow
+    $staged = Get-Staged -Stage $Stage
+    $manifest = Join-Path $Installed $manifestName
+
+    if (Test-Path $manifest) {
+        # Trimmed for a byte-order mark: Set-Content -Encoding utf8 writes one on
+        # 5.1, and a first entry that silently never matches is a stale file that
+        # silently never gets swept.
+        $previous = Get-Content $manifest |
+            ForEach-Object { $_.Trim([char]0xFEFF, ' ', "`t") } |
+            Where-Object { $_ }
+
+        foreach ($relative in $previous) {
+            if ($staged -contains $relative) { continue }
+
+            $old = Join-Path $Installed $relative
+            if (-not (Test-Path $old)) { continue }
+
+            Remove-Item $old -Force
+            Write-Host "  removed $relative, which this build no longer makes" -ForegroundColor DarkYellow
+        }
     }
+
+    return $staged
 }
 
-Remove-Stale `
-    -Stage (Join-Path $stage 'BepInEx\plugins\Casino') `
-    -Installed (Join-Path $target 'BepInEx\plugins\Casino')
+$pluginStage = Join-Path $stage 'BepInEx\plugins\Casino'
+$pluginDest = Join-Path $target 'BepInEx\plugins\Casino'
+$pluginFiles = Sync-Installed -Stage $pluginStage -Installed $pluginDest
 
 Copy-Item (Join-Path $stage 'BepInEx') -Destination $target -Recurse -Force
-Write-Host "Installed the plugin to $target\BepInEx\plugins\Casino" -ForegroundColor Green
+Set-Content -Path (Join-Path $pluginDest $manifestName) -Value $pluginFiles -Encoding utf8
+Write-Host "Installed the plugin to $pluginDest" -ForegroundColor Green
 
 # The server half is skipped while the server is running.
 #
 # It holds its assemblies open, so writing over them fails -- and most edits here are
 # to the client, which does not need the server stopped at all. Demanding a shutdown
-# for a panel tweak is how a build script teaches somebody to skip it.
+# for a panel tweak is how a build script teaches somebody to skip running it.
 #
 # A warning rather than an error, and the whole server half is skipped rather than
 # partly written: half an installed mod folder is a worse place to leave somebody than
-# an untouched one. If server code did change, the line below is the one that says so.
+# an untouched one.
 $modStage = Join-Path $stage 'SPT_Runtime\user\mods\Casino'
+$modDest = Join-Path $target 'SPT_Runtime\user\mods\Casino'
 $locked = @()
 
-foreach ($dll in Get-ChildItem $modDir -Filter *.dll -ErrorAction SilentlyContinue) {
+foreach ($dll in Get-ChildItem $modDest -Filter *.dll -ErrorAction SilentlyContinue) {
     try {
         $handle = [System.IO.File]::Open($dll.FullName, 'Open', 'ReadWrite', 'None')
         $handle.Close()
@@ -283,10 +296,11 @@ if ($locked.Count -gt 0) {
     Write-Host "If you changed server code, stop the server and run this again." -ForegroundColor Yellow
 }
 else {
-    Remove-Stale -Stage $modStage -Installed $modDir -Keep @('data')
+    $modFiles = Sync-Installed -Stage $modStage -Installed $modDest
 
     Copy-Item (Join-Path $stage 'SPT_Runtime') -Destination $target -Recurse -Force
-    Write-Host "Installed the server half to $modDir" -ForegroundColor Green
+    Set-Content -Path (Join-Path $modDest $manifestName) -Value $modFiles -Encoding utf8
+    Write-Host "Installed the server half to $modDest" -ForegroundColor Green
 }
 
 Write-Host ''

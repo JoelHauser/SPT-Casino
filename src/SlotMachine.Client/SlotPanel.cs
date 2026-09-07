@@ -91,6 +91,7 @@ namespace SlotMachine.Client
         private static TextMeshProUGUI _stakeLabel;
         private static TextMeshProUGUI _paidLabel;
         private static RectTransform _lines;
+        private static readonly Dictionary<string, Image> PayFaces = new Dictionary<string, Image>();
         private static Image _spinFace;
         private static TextMeshProUGUI _spinLabel;
 
@@ -144,6 +145,11 @@ namespace SlotMachine.Client
 
                 ClearLines();
                 SetSpinEnabled(!ReelView.Spinning);
+
+                // The game draws the real item icons, some frames from now. Until they
+                // arrive the reels show the pictures that shipped with the mod.
+                ItemArt.Fetch(SlotClientPlugin.Instance, Symbols, UseRealArt);
+
                 Note(ping);
 
                 SetStatus(ping == null
@@ -726,6 +732,8 @@ namespace SlotMachine.Client
                 .OrderByDescending(s => Pays.TryGetValue(s, out var p) ? p[2] : 0)
                 .ToList();
 
+            PayFaces.Clear();
+
             var panel = NewBox("Paytable", frame, Color.white);
             panel.sizeDelta = new Vector2(PayWidth, (Math.Max(ordered.Count, 1) * PayRow) + 100f);
             panel.anchoredPosition = new Vector2(
@@ -769,6 +777,8 @@ namespace SlotMachine.Client
                 image.sprite = ReelView.Artwork(symbol);
                 image.preserveAspect = true;
                 image.raycastTarget = false;
+
+                PayFaces[symbol] = image;
 
                 var name = NewText("Name_" + symbol, panel, NameOf(symbol), 14f);
                 name.rectTransform.anchoredPosition = new Vector2(-60f, y);
@@ -838,6 +848,23 @@ namespace SlotMachine.Client
         }
 
         private static void Refresh() => SetStake();
+
+        /// <summary>
+        /// Puts the game's own icons on the reels and down the paytable, as each one
+        /// finishes being drawn.
+        /// </summary>
+        private static void UseRealArt()
+        {
+            ReelView.Repaint();
+
+            foreach (var pair in PayFaces)
+            {
+                if (pair.Value != null)
+                {
+                    pair.Value.sprite = ReelView.Artwork(pair.Key);
+                }
+            }
+        }
 
         private static void StepStake(int direction)
         {

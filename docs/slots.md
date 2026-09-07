@@ -291,18 +291,58 @@ wheel, twice.** Closing mid-spin settles the debt on the way out.
 
 ## The art
 
-Nine rendered items in `src/SlotMachine.Client/assets/symbols/`, **named for the
-lowercase symbol name** -- that filename is the entire binding between the enum and
-the picture, so renaming a symbol means renaming a file.
+**The reels show the game's own item icons.** `ItemArt.cs`, and it is worth reading
+before touching anything near it.
 
-They arrived as 1254px transparent PNGs and are processed down to 168px squares:
-cropped to the alpha bounding box first, so a grenade and a rouble stack end up the
-same visual weight instead of one floating in its own padding, then centred on
-transparency rather than stretched, because a squashed helmet reads as a bad
-screenshot.
+Tarkov does not ship item icons as pictures. It *renders* them: the item's 3D model,
+posed by a camera, into a texture. `ItemIconCreator` is that, and
+`ItemViewFactory.GetItemSpriteAsync` is the front door -- the same call the stash and
+the flea market make for every icon anybody has ever seen in the menu. So:
 
-`FaceFor` falls back to a drawn box on a missing file -- a reel with holes in it looks
-broken, where a plain tile looks like a symbol nobody has drawn yet.
+```csharp
+Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(true), template, null)
+ItemViewFactory.GetItemSpriteAsync(item, ScaleFactor)   // -> Task<Sprite>
+```
+
+All three types are public and unobfuscated. **None of it was remembered** -- the call
+shape was read out of `Assembly-CSharp.dll` with Mono.Cecil (`EFT.StashSizeBonus` is
+the clearest example of the `Singleton<ItemFactory>` pattern), and the template ids
+came out of `SPT_Data/database/templates/items.json`. That mattered: the id that comes
+to mind for "BEAR dogtag" is the USEC one, and the Labs keycard has two plausible ids
+of which only one is violet.
+
+| Symbol | Template | Item |
+| --- | --- | --- |
+| `Medkit` | `5755356824597772cb798962` | AI-2 medkit |
+| `AmmoBox` | `6570254fcfc010a0f5006a22` | 7.62x51mm M61 ammo pack (20) |
+| `Grenade` | `5710c24ad2720bc3458b45a3` | F-1 hand grenade |
+| `Helmet` | `5ac8d6885acfc400180ae7b0` | Ops-Core FAST MT (Urban Tan) |
+| `DogTag` | `59f32bb586f774757e1e8442` | Dogtag BEAR |
+| `Roubles` | `5449016a4bdc2d6f028b456f` | Roubles |
+| `GpCoin` | `5d235b4d86f7742e017bc88a` | GP coin |
+| `Bitcoin` | `59faff1d86f7746c51718c9c` | Physical Bitcoin |
+| `Keycard` | `5c1e495a86f7743109743dfb` | TerraGroup Labs keycard (Violet) |
+
+**Nothing here ships BSG's art.** The icons are made on the player's own machine out of
+their own installation, which is the honest arrangement and the reason the mod does not
+carry a folder of somebody else's pictures.
+
+A rendered icon is cached as a PNG in `symbols/ingame/` beside the plugin, so the
+second launch reads a file instead of posing a camera at a helmet. **`pack.ps1` knows
+not to sweep that folder** -- see "Installing while the server is up".
+
+### It is allowed to fail
+
+Rendering needs a live `ItemIconCreator`, which needs a session. Every step is inside a
+try, every failure is a log line, and the fallback chain is: the game's icon, then the
+picture shipped in `assets/symbols/`, then a drawn box. **A missing icon must never be
+able to take the machine down.**
+
+The shipped pictures are the nine generated stand-ins from before the real icons went
+in. They are kept deliberately: they are what the reels show on the very first frames,
+before the game has drawn anything, and they are better than a grey square. They are
+168px squares, cropped to the alpha bounding box so a grenade and a rouble stack carry
+the same visual weight, and centred rather than stretched.
 
 `assets/tile-slotmachine.png` in `Casino.Client` is the lobby tile.
 
@@ -323,15 +363,29 @@ and installs the plugin anyway. The server holds its DLLs open, most edits here 
 the client, and demanding a shutdown for a panel tweak is how a build script teaches
 somebody to stop running it.
 
-It also removes stale files -- but only files the stage does not contain, and never
-`data\`, where the house records what it owes an interrupted player. `Copy-Item`
-merges rather than replaces, so eight renamed symbol files sat in the plugin folder
-after the art landed until this was fixed.
+It also removes files it no longer produces. `Copy-Item` merges rather than replaces,
+so eight renamed symbol files sat in the plugin folder after the art landed until this
+was dealt with.
 
-An earlier version of this cleared the folders outright and then demanded a shutdown
-on a hash mismatch. Both were wrong: the first would have deleted the escrow, and the
-second fired constantly, because **two builds of unchanged sources do not come out
-byte-identical here** even with deterministic builds on.
+**How it decides what is stale is the part worth keeping.** The packer writes
+`.casino-installed.txt` -- a manifest of what it put there -- and on the next run
+removes only files that are in the last manifest and not in this build. Nothing else
+is ever touched.
+
+Three earlier attempts, all wrong, in the order they were wrong:
+
+1. **Empty the folders and copy.** Would have deleted `data\`, where the house records
+   what it owes an interrupted player.
+2. **Delete anything the stage does not contain.** Deleted `seen.txt`, the list of
+   profiles that have read the welcome card -- and would delete `symbols/ingame`, the
+   rendered item icons. Both are written at runtime by the mod and have never been in
+   a stage.
+3. **Compare hashes and refuse on a mismatch.** Fired every single time, because **two
+   builds of unchanged sources do not come out byte-identical here** even with
+   deterministic builds on.
+
+A manifest cannot make mistake 1 or 2, because it only knows about files the packer
+itself put there.
 
 ## Verifying
 
@@ -360,7 +414,8 @@ for Roulette; rerun it after changing `SlotService`.
   item event `SlotsSync`.
 - Client: panel, reels, SPIN button, stake stepper, currency switch, a paytable read
   from the ping response, and win lines drawn over the reels. Fourth tile in the lobby.
-- Art: nine rendered items, in. No placeholders left.
+- Art: the game's own item icons, rendered on the player's machine, with the nine
+  drawn stand-ins as the fallback and the first-frame art.
 - `pack.ps1` builds and installs it with the rest of the casino.
 
 ### Seen on screen once
@@ -388,5 +443,7 @@ for Roulette; rerun it after changing `SlotService`.
 ### Open items
 
 - No autoplay, and no plans for one.
+- The icons render at `ScaleFactor = 3`, roughly 190px for a one-cell item. If they
+  look soft on a 4K screen that is the number to raise.
 - The reels are silent. A ratchet on the spin and a thump on each stop would do more
   for the feel than anything left on this list.
