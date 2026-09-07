@@ -115,7 +115,8 @@ namespace SlotMachine.Client
         private static bool _closing;
 
         private static TextMeshProUGUI _status;
-        private static TextMeshProUGUI _stakeLabel;
+        private static TMP_InputField _stakeInput;
+        private static TextMeshProUGUI _walletLabel;
         private static TextMeshProUGUI _paidLabel;
         private static RectTransform _lines;
         private static readonly Dictionary<string, Image> PayFaces = new Dictionary<string, Image>();
@@ -130,6 +131,15 @@ namespace SlotMachine.Client
         private static bool _syncOwed;
 
         internal static bool IsOpen => _root != null && _root.activeSelf && !_closing;
+
+        /// <summary>
+        /// Whether the machine has all its symbols and can be played.
+        ///
+        /// It cannot spin without them. There is no stand-in art any more, so a spin
+        /// before the icons land would animate blank tiles to a result nobody could
+        /// read.
+        /// </summary>
+        private static bool Ready => ItemArt.HasAll(Symbols);
 
         internal static void Toggle()
         {
@@ -156,6 +166,11 @@ namespace SlotMachine.Client
                     ReadMachine(ping);
                 }
 
+                // Before Build, not after: the coroutine that renders icons cannot run
+                // until the next frame, so a cache hit read there would still mean one
+                // frame of blank reels and then a swap.
+                ItemArt.PrimeFromDisk(Symbols);
+
                 if (_root == null)
                 {
                     Build();
@@ -171,17 +186,19 @@ namespace SlotMachine.Client
                 FadeTo(1f, null);
 
                 ClearLines();
-                SetSpinEnabled(!ReelView.Spinning);
+                UseRealArt();
 
-                // The game draws the real item icons, some frames from now. Until they
-                // arrive the reels show the pictures that shipped with the mod.
+                // Anything not already cached, the game draws now. On a first run that
+                // is nine model renders and the reels stay blank until they land.
                 ItemArt.Fetch(SlotClientPlugin.Instance, Symbols, UseRealArt);
 
                 Note(ping);
 
                 SetStatus(ping == null
-                    ? "The server is not answering. The machine will not take a pull."
-                    : "Press SPIN.");
+                    ? "The server is not answering. The machine will not take a spin."
+                    : Ready
+                        ? "Press SPIN."
+                        : "Fetching the symbols from your install...");
 
                 Refresh();
             }
@@ -227,6 +244,12 @@ namespace SlotMachine.Client
         {
             if (ReelView.Spinning)
             {
+                return;
+            }
+
+            if (!Ready)
+            {
+                SetStatus("Still fetching the symbols from your install.");
                 return;
             }
 
@@ -288,7 +311,7 @@ namespace SlotMachine.Client
         {
             // Now, with the reels. Any earlier and the stash gives the answer away.
             Resync();
-            SetSpinEnabled(true);
+            SetSpinEnabled(Ready);
 
             if (paid > 0 && wins is { Count: > 0 })
             {
@@ -761,9 +784,7 @@ namespace SlotMachine.Client
 
             BuildSpinButton(frame, reelsX, reelsY);
 
-            _stakeLabel = NewText("Stake", frame, string.Empty, 24f);
-            _stakeLabel.rectTransform.anchoredPosition = new Vector2(reelsX, -190f);
-            _stakeLabel.rectTransform.sizeDelta = new Vector2(ReelView.Width + 220f, 32f);
+            BuildStakeRow(frame, reelsX);
 
             _status = NewText("Status", frame, string.Empty, 19f);
             _status.rectTransform.anchoredPosition = new Vector2(0f, -(top - 94f));
@@ -962,16 +983,14 @@ namespace SlotMachine.Client
             strip.childControlWidth = false;
             strip.childControlHeight = false;
 
-            SmallButton(row, "STAKE -", () => StepStake(-1));
-            SmallButton(row, "STAKE +", () => StepStake(1));
-            SmallButton(row, "CURRENCY", NextWallet);
-            SmallButton(row, "CLOSE", Close);
+            SmallButton(row, "CLOSE", Close, 200f);
         }
 
-        private static void SmallButton(RectTransform parent, string label, Action action)
+        private static void SmallButton(
+            RectTransform parent, string label, Action action, float width = 180f)
         {
             var box = NewBox("Button_" + label, parent, Color.white);
-            box.sizeDelta = new Vector2(180f, 46f);
+            box.sizeDelta = new Vector2(width, 46f);
 
             var image = box.GetComponent<Image>();
             image.sprite = Textures.RoundedBox(6, ButtonFace, Edge, 2);
@@ -990,6 +1009,144 @@ namespace SlotMachine.Client
         private static void Refresh() => SetStake();
 
         /// <summary>
+        /// The stake: a box you can type in, a minus and a plus either side of it, and
+        /// the currency beside that.
+        ///
+        /// **Typed, because a stepper alone cannot express "I want to bet 12,345".**
+        /// The buttons stay because they are faster for the common case, and they walk
+        /// the wallet's own step. The server stopped requiring a multiple of that step
+        /// when this box arrived -- see `WalletInfo.Allows`.
+        /// </summary>
+        private static void BuildStakeRow(RectTransform frame, float reelsX)
+        {
+            var row = NewBox("StakeRow", frame, Color.clear);
+            row.sizeDelta = new Vector2(ReelView.Width + 40f, 52f);
+            row.anchoredPosition = new Vector2(reelsX, -196f);
+            row.GetComponent<Image>().raycastTarget = false;
+
+            var strip = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            strip.spacing = 10f;
+            strip.childAlignment = TextAnchor.MiddleCenter;
+            strip.childForceExpandWidth = false;
+            strip.childForceExpandHeight = false;
+            strip.childControlWidth = false;
+            strip.childControlHeight = false;
+
+            var caption = NewText("StakeCaption", row, "STAKE", 20f);
+            caption.rectTransform.sizeDelta = new Vector2(76f, 46f);
+            caption.alignment = TextAlignmentOptions.Right;
+            caption.color = Dim;
+
+            SmallButton(row, "-", () => StepStake(-1), 52f);
+
+            _stakeInput = NewStakeField(row);
+
+            SmallButton(row, "+", () => StepStake(1), 52f);
+
+            var wallet = NewBox("Wallet", row, Color.white);
+            wallet.sizeDelta = new Vector2(170f, 46f);
+
+            var walletImage = wallet.GetComponent<Image>();
+            walletImage.sprite = Textures.RoundedBox(6, ButtonFace, Edge, 2);
+            walletImage.type = Image.Type.Sliced;
+
+            _walletLabel = NewText("WalletLabel", wallet, string.Empty, 18f);
+            _walletLabel.rectTransform.anchorMin = Vector2.zero;
+            _walletLabel.rectTransform.anchorMax = Vector2.one;
+            _walletLabel.rectTransform.offsetMin = Vector2.zero;
+            _walletLabel.rectTransform.offsetMax = Vector2.zero;
+            _walletLabel.color = Ink;
+
+            wallet.gameObject.AddComponent<Button>().onClick.AddListener(() => NextWallet());
+        }
+
+        /// <summary>
+        /// The box itself.
+        ///
+        /// Built by hand because there is no prefab to instantiate: a background image,
+        /// a viewport to clip against, a text object inside it, and the input field
+        /// pointed at both. Miss the viewport and the caret is placed relative to
+        /// nothing; miss `targetGraphic` and clicking it does not focus it.
+        /// </summary>
+        private static TMP_InputField NewStakeField(RectTransform parent)
+        {
+            var box = NewBox("StakeField", parent, Color.white);
+            box.sizeDelta = new Vector2(190f, 46f);
+
+            var background = box.GetComponent<Image>();
+            background.sprite = Textures.RoundedBox(6, new Color(0.07f, 0.07f, 0.08f, 1f), Edge, 2);
+            background.type = Image.Type.Sliced;
+
+            var viewport = NewBox("Viewport", box, Color.clear);
+            viewport.anchorMin = Vector2.zero;
+            viewport.anchorMax = Vector2.one;
+            viewport.offsetMin = new Vector2(10f, 4f);
+            viewport.offsetMax = new Vector2(-10f, -4f);
+            viewport.GetComponent<Image>().raycastTarget = false;
+
+            var text = NewText("Text", viewport, string.Empty, 22f);
+            text.rectTransform.anchorMin = Vector2.zero;
+            text.rectTransform.anchorMax = Vector2.one;
+            text.rectTransform.offsetMin = Vector2.zero;
+            text.rectTransform.offsetMax = Vector2.zero;
+            text.alignment = TextAlignmentOptions.Center;
+            text.richText = false;
+            text.color = Ink;
+
+            var input = box.gameObject.AddComponent<TMP_InputField>();
+            input.targetGraphic = background;
+            input.textViewport = viewport;
+            input.textComponent = text;
+            input.contentType = TMP_InputField.ContentType.IntegerNumber;
+            input.characterLimit = 9;
+            input.selectionColor = new Color(Gold.r, Gold.g, Gold.b, 0.35f);
+            input.caretColor = Gold;
+            input.customCaretColor = true;
+            input.restoreOriginalTextOnEscape = false;
+
+            // On leaving the box or pressing return, whichever comes first. Both are
+            // "I have finished typing a number", and a stake that only took effect on
+            // one of them would be a stake somebody spins without.
+            input.onEndEdit.AddListener(TypedStake);
+
+            return input;
+        }
+
+        /// <summary>
+        /// Takes what was typed, or explains why it could not.
+        ///
+        /// Clamped rather than refused: somebody who types 90,000 into a machine whose
+        /// ceiling is 50,000 meant "as much as it takes", and putting 50,000 in the box
+        /// tells them what that is. The box is always rewritten from the accepted value,
+        /// so what is on screen is what the next spin will cost.
+        /// </summary>
+        private static void TypedStake(string typed)
+        {
+            if (!Limits.TryGetValue(_wallet, out var limits))
+            {
+                return;
+            }
+
+            if (!long.TryParse(typed, out var wanted))
+            {
+                SetStake();
+                return;
+            }
+
+            var clamped = Math.Max(limits[0], Math.Min(limits[1], wanted));
+
+            if (clamped != wanted)
+            {
+                SetStatus(
+                    $"A spin in {_wallet.ToLowerInvariant()} costs {limits[0]:N0} to {limits[1]:N0}."
+                    + $"  Set to {clamped:N0}.");
+            }
+
+            _stake = clamped;
+            SetStake();
+        }
+
+        /// <summary>
         /// Puts the game's own icons on the reels and down the paytable, as each one
         /// finishes being drawn.
         /// </summary>
@@ -1003,6 +1160,13 @@ namespace SlotMachine.Client
                 {
                     pair.Value.sprite = ReelView.Artwork(pair.Key);
                 }
+            }
+
+            SetSpinEnabled(Ready && !ReelView.Spinning);
+
+            if (Ready && _status != null && _status.text.StartsWith("Fetching"))
+            {
+                SetStatus("Press SPIN.");
             }
         }
 
@@ -1035,9 +1199,17 @@ namespace SlotMachine.Client
 
         private static void SetStake()
         {
-            if (_stakeLabel != null)
+            if (_stakeInput != null)
             {
-                _stakeLabel.text = $"STAKE  {_stake:N0} {_wallet.ToUpperInvariant()}";
+                // SetTextWithoutNotify: assigning .text raises onEndEdit on some paths,
+                // and a setter that calls the handler that calls the setter is a loop
+                // waiting for an excuse.
+                _stakeInput.SetTextWithoutNotify(_stake.ToString());
+            }
+
+            if (_walletLabel != null)
+            {
+                _walletLabel.text = _wallet.ToUpperInvariant();
             }
         }
 

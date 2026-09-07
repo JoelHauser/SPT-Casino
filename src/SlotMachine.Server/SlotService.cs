@@ -106,8 +106,7 @@ public class SlotService(
             {
                 Ok = false,
                 Note = refunded,
-                Error = $"A pull in {info.Label} costs {info.MinStake:N0} to {info.MaxStake:N0}, "
-                    + $"in steps of {info.Step:N0}.",
+                Error = $"A pull in {info.Label} costs {info.MinStake:N0} to {info.MaxStake:N0}.",
             };
         }
 

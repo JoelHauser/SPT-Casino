@@ -90,15 +90,14 @@ public class MoneyInvariantTests
     /// <summary>
     /// Stakes outside what the wallet takes are refused before anything moves.
     ///
-    /// The panel offers a button that walks the steps, so none of these can be reached
-    /// by playing. A request is a thing anybody can send by hand.
+    /// Every one of these is off one end or the other. A request is a thing anybody can
+    /// send by hand, so the ends are checked here and not trusted from the panel.
     /// </summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-5_000)]
     [InlineData(1)]
     [InlineData(4_999)]
-    [InlineData(7_500)]
     [InlineData(50_001)]
     [InlineData(1_000_000)]
     public async Task AStakeTheWalletDoesNotTakeIsRefused(long stake)
@@ -110,6 +109,35 @@ public class MoneyInvariantTests
 
         Assert.False(reply.Ok);
         Assert.Empty(bank.Movements);
+        Assert.Null(escrow.Get(Session));
+    }
+
+    /// <summary>
+    /// A stake between the two ends is taken whether or not it is a round number.
+    ///
+    /// The machine used to insist on a multiple of the step, because the panel only
+    /// offered a button that walked them. The stake can be typed now. This is the test
+    /// that says the server agrees.
+    /// </summary>
+    [Theory]
+    [InlineData(5_000)]
+    [InlineData(5_001)]
+    [InlineData(7_500)]
+    [InlineData(12_345)]
+    [InlineData(49_999)]
+    [InlineData(50_000)]
+    public async Task AnyWholeStakeBetweenTheEndsIsTaken(long stake)
+    {
+        var (service, bank, _, escrow) = Machine();
+        bank.Seed(Wallet.Roubles, Rich);
+
+        var reply = await service.PullAsync(Request(stake), Session, Output());
+
+        Assert.True(reply.Ok);
+        Assert.Equal(stake, reply.Pull!.Staked);
+
+        // Taken exactly once, and nothing left owing.
+        Assert.Equal((Wallet.Roubles, (int)-stake), bank.Movements.First());
         Assert.Null(escrow.Get(Session));
     }
 

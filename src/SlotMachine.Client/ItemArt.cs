@@ -34,13 +34,18 @@ namespace SlotMachine.Client
     /// out of their own installation, which is both the honest arrangement and the
     /// reason the mod does not carry a folder of somebody else's pictures.
     ///
-    /// ## It is allowed to fail
+    /// ## It is allowed to fail, but not to hang
     ///
     /// Rendering needs a live `ItemIconCreator`, which needs a session. Open the panel
-    /// early enough, or on a build where a name has moved, and this quietly gives up and
-    /// the reels keep the drawn art they shipped with. **A missing icon must never be
-    /// able to take the machine down**, so every step is inside a try and every failure
-    /// is a log line and a fallback.
+    /// early enough, or on a build where a name has moved, and it cannot draw anything.
+    /// Every step is inside a try and every failure is a log line.
+    ///
+    /// Failing is not the same as never answering, though, and the panel will not let
+    /// anybody spin until the symbols are in. So a symbol the game refuses outright is
+    /// recorded as **given up on** rather than left pending, and after
+    /// `MaxAttempts` fruitless passes the whole set is given up on. The machine is then
+    /// playable with blank tiles and a warning in the log, which is poor -- but a good
+    /// deal better than a panel that never becomes usable.
     ///
     /// ## Cached to disk, once
     ///
@@ -85,6 +90,21 @@ namespace SlotMachine.Client
 
         private static readonly HashSet<string> Asked = new HashSet<string>();
 
+        /// <summary>
+        /// Symbols the game will not draw. Counted as settled, not as pending: the panel
+        /// waits on <see cref="HasAll"/>, and a symbol that is never coming would make
+        /// it wait for ever.
+        /// </summary>
+        private static readonly HashSet<string> Abandoned = new HashSet<string>();
+
+        /// <summary>
+        /// How many passes may end with the game unable to draw anything before the
+        /// machine gives up and lets itself be played with blanks.
+        /// </summary>
+        private const int MaxAttempts = 3;
+
+        private static int _attempts;
+
         private static bool _running;
 
         /// <summary>The game's icon for a symbol, or null if there is not one yet.</summary>
@@ -93,6 +113,65 @@ namespace SlotMachine.Client
 
         /// <summary>Where a rendered icon is kept between launches.</summary>
         private static string CacheFolder => Path.Combine(Host.AssetFolder, "symbols/ingame");
+
+        /// <summary>
+        /// Loads whatever is already on disk, **before the panel is built**.
+        ///
+        /// This is the whole reason the reels do not visibly change their minds. The
+        /// coroutine below cannot help with that: it runs a frame after `Build`, so even
+        /// a cache hit meant one frame of something else followed by a swap. Reading the
+        /// files synchronously here means that on every launch but the very first, the
+        /// first frame the reels ever draw is already the real icons.
+        ///
+        /// Cheap: nine small PNGs off a local disk, once per session.
+        /// </summary>
+        internal static void PrimeFromDisk(IReadOnlyList<string> symbols)
+        {
+            if (symbols == null)
+            {
+                return;
+            }
+
+            foreach (var symbol in symbols)
+            {
+                if (symbol == null || Ready.ContainsKey(symbol))
+                {
+                    continue;
+                }
+
+                var cached = FromDisk(symbol);
+
+                if (cached != null)
+                {
+                    Ready[symbol] = cached;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Whether every symbol has its real icon in hand.
+        ///
+        /// The panel holds the reels blank until this is true. There is nothing else to
+        /// show them: the drawn stand-ins were removed precisely so that nobody would
+        /// watch the machine change its symbols a second after opening it.
+        /// </summary>
+        internal static bool HasAll(IReadOnlyList<string> symbols)
+        {
+            if (symbols == null || symbols.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var symbol in symbols)
+            {
+                if (symbol != null && !Ready.ContainsKey(symbol) && !Abandoned.Contains(symbol))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
 
         /// <summary>
         /// Fetches every icon that is not in hand yet, and calls back as each arrives.
@@ -116,6 +195,7 @@ namespace SlotMachine.Client
         {
             var loaded = 0;
             var rendered = 0;
+            var unable = false;
 
             foreach (var symbol in symbols)
             {
@@ -124,10 +204,17 @@ namespace SlotMachine.Client
                     continue;
                 }
 
+                // Yield first, so the panel gets a frame up before nine model renders
+                // begin. A machine that appears and then hitches looks worse than one
+                // that appears and fills in.
+                yield return null;
+
                 if (!Templates.TryGetValue(symbol, out var template))
                 {
-                    // A symbol the server knows about and this build does not. It keeps
-                    // whatever art shipped with it, which is the right outcome.
+                    // A symbol the server knows about and this build does not. Nothing
+                    // to render it from, so it is settled as a blank rather than left
+                    // holding the machine up.
+                    Abandoned.Add(symbol);
                     continue;
                 }
 
@@ -147,9 +234,10 @@ namespace SlotMachine.Client
 
                 if (!TryRender(symbol, template, out task))
                 {
-                    // No session, no renderer. Let it be asked again next time the panel
-                    // opens rather than giving up for the run.
+                    // No session, no renderer -- usually "not yet". Ask again next time
+                    // the panel opens, but not for ever.
                     Asked.Remove(symbol);
+                    unable = true;
                     break;
                 }
 
@@ -161,8 +249,9 @@ namespace SlotMachine.Client
                 if (task.IsFaulted || task.Result == null)
                 {
                     SlotClientPlugin.Log.LogWarning(
-                        $"[Slots] the game could not draw {symbol} ({template}); keeping the shipped art.");
+                        $"[Slots] the game would not draw {symbol} ({template}); it will show blank.");
 
+                    Abandoned.Add(symbol);
                     continue;
                 }
 
@@ -178,7 +267,26 @@ namespace SlotMachine.Client
                     $"[Slots] item icons: {rendered} drawn by the game, {loaded} from the cache.");
             }
 
+            if (unable && ++_attempts >= MaxAttempts)
+            {
+                // Three opens and the game has still never been in a state to draw
+                // anything. Rather than a machine that can never be played, take the
+                // blanks and say so where somebody will find it.
+                foreach (var symbol in symbols)
+                {
+                    if (symbol != null && !Ready.ContainsKey(symbol))
+                    {
+                        Abandoned.Add(symbol);
+                    }
+                }
+
+                SlotClientPlugin.Log.LogWarning(
+                    $"[Slots] the game has not been able to draw item icons in {MaxAttempts} tries. "
+                    + "The reels will show blanks. Reopening after a profile is loaded usually fixes it.");
+            }
+
             _running = false;
+            onArrived?.Invoke();
         }
 
         /// <summary>
@@ -232,11 +340,22 @@ namespace SlotMachine.Client
         /// <summary>
         /// Keeps a rendered icon for next time.
         ///
-        /// Only when the sprite owns its whole texture. A sprite that is a region of an
-        /// atlas would have to be cropped, and the two coordinate conventions in play --
-        /// the sprite's, and the one <c>ReadPixels</c> uses -- disagree about which way
-        /// up the image is. A wrong crop is worse than no cache, so that case is simply
-        /// left uncached and re-rendered next launch.
+        /// **The icons are regions of an atlas, not textures of their own.** The first
+        /// version of this refused to cache anything whose `textureRect` was not the
+        /// whole texture, on the reasoning that cropping it was risky -- and every one
+        /// of the nine failed that test, so the cache never held a single file and every
+        /// launch re-rendered all nine. A guard that never passes is not a safe guard,
+        /// it is a disabled feature.
+        ///
+        /// So it crops, two ways round:
+        ///
+        /// 1. `GetPixels` over the sprite's rect, if the texture will allow it. No
+        ///    orientation to get wrong -- `GetPixels` and `EncodeToPNG` agree about
+        ///    which way up a texture is.
+        /// 2. Otherwise a `Blit` that applies the crop as a UV scale and offset, into a
+        ///    render texture the size of the sprite, then a full-surface `ReadPixels`.
+        ///    Full-surface is the point: reading a sub-rectangle is where the two
+        ///    coordinate conventions disagree, and reading all of it cannot.
         /// </summary>
         private static void Save(string symbol, Sprite sprite)
         {
@@ -244,42 +363,90 @@ namespace SlotMachine.Client
             {
                 var source = sprite.texture;
 
-                if (source == null
-                    || (int)sprite.textureRect.width != source.width
-                    || (int)sprite.textureRect.height != source.height)
+                if (source == null)
+                {
+                    return;
+                }
+
+                var rect = sprite.textureRect;
+                var width = Mathf.RoundToInt(rect.width);
+                var height = Mathf.RoundToInt(rect.height);
+
+                if (width < 1 || height < 1)
+                {
+                    return;
+                }
+
+                var png = Crop(source, rect, width, height);
+
+                if (png == null)
                 {
                     return;
                 }
 
                 Directory.CreateDirectory(CacheFolder);
-
-                // Through a RenderTexture, because the icon's own texture is not
-                // readable and EncodeToPNG needs one that is.
-                var buffer = RenderTexture.GetTemporary(
-                    source.width, source.height, 0, RenderTextureFormat.ARGB32);
-
-                var previous = RenderTexture.active;
-
-                Graphics.Blit(source, buffer);
-                RenderTexture.active = buffer;
-
-                var readable = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
-                readable.ReadPixels(new Rect(0f, 0f, source.width, source.height), 0, 0);
-                readable.Apply();
-
-                RenderTexture.active = previous;
-                RenderTexture.ReleaseTemporary(buffer);
-
-                File.WriteAllBytes(
-                    Path.Combine(CacheFolder, symbol.ToLowerInvariant() + ".png"), readable.EncodeToPNG());
-
-                UnityEngine.Object.Destroy(readable);
+                File.WriteAllBytes(Path.Combine(CacheFolder, symbol.ToLowerInvariant() + ".png"), png);
             }
             catch (Exception ex)
             {
                 // Not worth a warning every launch: the icon still works, it is only the
                 // saving of it that did not.
                 SlotClientPlugin.Log.LogInfo($"[Slots] {symbol} was drawn but not cached: {ex.Message}");
+            }
+        }
+
+        private static byte[] Crop(Texture2D source, Rect rect, int width, int height)
+        {
+            Texture2D cut = null;
+
+            try
+            {
+                try
+                {
+                    // The straightforward way, when the texture allows it. The icon
+                    // renderer writes its own icons to disk, so quite often it does.
+                    var pixels = source.GetPixels(
+                        Mathf.RoundToInt(rect.x), Mathf.RoundToInt(rect.y), width, height);
+
+                    cut = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                    cut.SetPixels(pixels);
+                    cut.Apply();
+
+                    return cut.EncodeToPNG();
+                }
+                catch (UnityException)
+                {
+                    // Not readable. Through the GPU instead.
+                }
+
+                var buffer = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
+                var previous = RenderTexture.active;
+
+                // The crop as a UV transform, so the render texture holds exactly the
+                // sprite and the read below can take all of it.
+                Graphics.Blit(
+                    source,
+                    buffer,
+                    new Vector2(rect.width / source.width, rect.height / source.height),
+                    new Vector2(rect.x / source.width, rect.y / source.height));
+
+                RenderTexture.active = buffer;
+
+                cut = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                cut.ReadPixels(new Rect(0f, 0f, width, height), 0, 0);
+                cut.Apply();
+
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(buffer);
+
+                return cut.EncodeToPNG();
+            }
+            finally
+            {
+                if (cut != null)
+                {
+                    UnityEngine.Object.Destroy(cut);
+                }
             }
         }
     }

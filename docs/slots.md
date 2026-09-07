@@ -144,6 +144,16 @@ so a typo would spend a currency the player never chose.
 | Dollars | 50 | 500 | 50 |
 | Euros | 50 | 500 | 50 |
 
+**Step is what the +/- buttons move by, and nothing else.** `Allows` takes any whole
+amount between the two ends. It used to insist on a multiple of the step as well, back
+when the panel only offered a button that walked them -- but the stake can be typed
+now, and a machine that refuses 7,500 roubles for no reason a player can see is a
+machine that looks broken.
+
+Both ends are still checked on the server rather than trusted from the panel. The
+ceiling is what keeps a thousand-times payout to a sane number: at 50,000 a five-reel
+keycard already returns 50,000,000.
+
 ## The client
 
 `src/SlotMachine.Client/`, compiled into `Casino.Client` like every other table.
@@ -282,6 +292,23 @@ uGUI has no line renderer. A segment is a thin `Image` with its pivot on the lef
 sized to the gap and rotated to face along it, which is the whole of what a line
 renderer would be.
 
+### The stake box
+
+Typed, with a minus and a plus either side and the currency beside it. A stepper alone
+cannot express "I want to spin for 12,345", which is what prompted the server to stop
+requiring multiples of the step.
+
+Built by hand, because there is no prefab to instantiate: a background image, a
+viewport to clip against, a `TextMeshProUGUI` inside it, and a `TMP_InputField`
+pointed at both. Miss `textViewport` and the caret is placed relative to nothing; miss
+`targetGraphic` and clicking the box does not focus it.
+
+What is typed is **clamped, not refused**. Somebody who types 90,000 into a machine
+whose ceiling is 50,000 meant "as much as it takes", and putting 50,000 in the box
+tells them what that is. The box is always rewritten from the accepted value, through
+`SetTextWithoutNotify` -- assigning `.text` raises `onEndEdit` on some paths, and a
+setter that calls the handler that calls the setter is a loop waiting for an excuse.
+
 ### The paytable down the side, and measuring instead of nudging
 
 Nine rows, richest first: the artwork, the name, and what 3, 4 and 5 of them pay --
@@ -358,18 +385,43 @@ A rendered icon is cached as a PNG in `symbols/ingame/` beside the plugin, so th
 second launch reads a file instead of posing a camera at a helmet. **`pack.ps1` knows
 not to sweep that folder** -- see "Installing while the server is up".
 
-### It is allowed to fail
+### There is no second set of pictures, deliberately
 
-Rendering needs a live `ItemIconCreator`, which needs a session. Every step is inside a
-try, every failure is a log line, and the fallback chain is: the game's icon, then the
-picture shipped in `assets/symbols/`, then a drawn box. **A missing icon must never be
-able to take the machine down.**
+The mod used to ship nine drawn stand-ins as a fallback, and they worked -- which was
+the problem. They were good enough to look like the machine's symbols, so opening the
+panel showed nine items and then, a moment later, nine **different** items as the real
+icons arrived. A machine that changes its mind about what is on its reels is worse
+than one that takes a second to fill in.
 
-The shipped pictures are the nine generated stand-ins from before the real icons went
-in. They are kept deliberately: they are what the reels show on the very first frames,
-before the game has drawn anything, and they are better than a grey square. They are
-168px squares, cropped to the alpha bounding box so a grenade and a rouble stack carry
-the same visual weight, and centred rather than stretched.
+So they are gone, and the fallback is deliberately not an item: a plain dark tile that
+reads as "nothing here yet", which is what it means. The panel **will not spin** until
+every symbol is in hand, says so, and greys the button.
+
+Two things keep that from being a trap:
+
+* **`PrimeFromDisk` runs before `Build`, not after.** The fetch is a coroutine, so it
+  cannot run until the frame after the panel exists -- even a cache hit meant one frame
+  of blanks and then a swap. Reading the files synchronously first means that on every
+  launch but the very first, the first frame the reels draw is already the real icons.
+* **`MaxAttempts`.** A symbol the game refuses is recorded as given up on rather than
+  left pending, and after three fruitless passes the whole set is. The machine is then
+  playable with blank tiles and a warning in the log -- poor, but a great deal better
+  than a panel that can never be used.
+
+### Caching them, and a guard that never passed
+
+The first version refused to cache any sprite whose `textureRect` was not its whole
+texture, on the reasoning that cropping was risky. **All nine failed that test** -- the
+icons are regions of an atlas -- so the cache never held a file and every launch
+re-rendered all nine, silently. A guard that never passes is not a safe guard, it is a
+disabled feature, and the log line saying "9 drawn by the game, 0 from the cache" was
+the only sign.
+
+It crops now, two ways round: `GetPixels` over the sprite's rect where the texture
+allows it, and otherwise a `Blit` that applies the crop as a UV scale and offset into a
+render texture the size of the sprite, followed by a **full-surface** `ReadPixels`.
+Full-surface is the point -- reading a sub-rectangle is exactly where the two
+coordinate conventions disagree about which way is up, and reading all of it cannot.
 
 `assets/tile-slotmachine.png` in `Casino.Client` is the lobby tile.
 
@@ -426,7 +478,8 @@ computed 92.510%. It is slow by the standards of the rest of the suite and it is
 it: it is the only thing that would catch the closed form and the settlement drifting
 apart.
 
-The money path is **mutation-checked**. Nine deliberate breakages -- escrow never
+The money path is **mutation-checked**, and was re-run after the stake rule changed.
+Nine deliberate breakages -- escrow never
 released, the stake paid back instead of the win, a failed debit ignored, an unknown
 currency quietly becoming roubles, a reply reporting a payout the wallet never got --
 and **9 of 9 were caught, 0 survived**. The script is in the scratchpad pattern used
@@ -441,8 +494,9 @@ for Roulette; rerun it after changing `SlotService`.
   item event `SlotsSync`.
 - Client: panel, reels, SPIN button, stake stepper, currency switch, a paytable read
   from the ping response, and win lines drawn over the reels. Fourth tile in the lobby.
-- Art: the game's own item icons, rendered on the player's machine, with the nine
-  drawn stand-ins as the fallback and the first-frame art.
+- Art: the game's own item icons, rendered on the player's machine and cached beside
+  the plugin. No stand-ins at all; blank tiles and a disabled SPIN until they land.
+- The stake is typed, and the server takes any whole amount between the two ends.
 - `pack.ps1` builds and installs it with the rest of the casino.
 
 ### Seen on screen once
@@ -473,5 +527,8 @@ for Roulette; rerun it after changing `SlotService`.
 - No autoplay, and no plans for one.
 - The icons render at `ScaleFactor = 3`, roughly 190px for a one-cell item. If they
   look soft on a 4K screen that is the number to raise.
+- Whether the disk cache round-trips right way up. The `GetPixels` path cannot be
+  wrong; the `Blit` fallback is the one to look at if a second launch shows an icon
+  upside down.
 - The reels are silent. A ratchet on the spin and a thump on each stop would do more
   for the feel than anything left on this list.

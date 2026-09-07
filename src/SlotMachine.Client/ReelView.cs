@@ -477,17 +477,18 @@ namespace SlotMachine.Client
         internal static Sprite Artwork(string symbol) => FaceFor(symbol);
 
         /// <summary>
-        /// A symbol's artwork, in order of preference: the icon the game drew, then the
-        /// picture shipped beside the plugin, then a plain box.
+        /// A symbol's artwork: the icon the game drew, or a blank.
         ///
-        /// The game's own icon wins whenever there is one -- it is the item as the
-        /// player sees it everywhere else in the menu, and no drawing of a helmet is
-        /// going to beat the helmet. It is asked for first rather than cached here,
-        /// because it arrives some frames after the panel is built. See ItemArt.
+        /// **There is no second set of pictures any more.** The mod used to ship nine
+        /// drawn stand-ins as a fallback, and they worked -- which was the problem. They
+        /// were good enough to look like the machine's symbols, so opening the panel
+        /// showed nine items and then, a moment later, nine *different* items as the
+        /// real icons arrived. A machine that changes its mind about what is on the
+        /// reels is worse than one that takes a second to fill in.
         ///
-        /// A missing file falls back to a drawn box rather than an empty cell: a reel
-        /// with holes in it looks broken, where a plain tile looks like a symbol nobody
-        /// has drawn yet.
+        /// So the fallback is deliberately not an item. It is the back of a reel: a
+        /// plain dark tile that reads as "nothing here yet", which is exactly what it
+        /// means. The panel keeps the reels on it until every icon is in hand.
         /// </summary>
         private static Sprite FaceFor(string symbol)
         {
@@ -498,19 +499,13 @@ namespace SlotMachine.Client
                 return real;
             }
 
-            var key = symbol ?? string.Empty;
-
-            if (Faces.TryGetValue(key, out var cached))
+            if (!Faces.TryGetValue("", out var blank))
             {
-                return cached;
+                blank = Textures.RoundedBox(10, new Color(0.13f, 0.14f, 0.16f, 1f), Edge, 2);
+                Faces[""] = blank;
             }
 
-            var path = Path.Combine(Host.AssetFolder, "symbols", key.ToLowerInvariant() + ".png");
-            var sprite = Textures.FromFile(path)
-                ?? Textures.RoundedBox(8, new Color(0.20f, 0.21f, 0.23f, 1f), Edge, 2);
-
-            Faces[key] = sprite;
-            return sprite;
+            return blank;
         }
 
         private static RectTransform NewBox(string name, Transform parent, Color colour)

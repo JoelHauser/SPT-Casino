@@ -20,8 +20,9 @@ public enum Wallet
 /// <param name="MinStake">The smallest pull.</param>
 /// <param name="MaxStake">The largest pull.</param>
 /// <param name="Step">
-/// What the stake moves in. A slot has a stake button rather than a text box, so the
-/// steps are what that button walks through.
+/// What the stake button moves in, and **nothing more than that**. It is not a rule
+/// about what the machine takes: the panel lets the stake be typed, so any whole
+/// amount between the two ends is legal. See <see cref="Allows"/>.
 /// </param>
 public sealed record WalletInfo(
     Wallet Wallet,
@@ -65,17 +66,22 @@ public sealed record WalletInfo(
     public static IEnumerable<WalletInfo> All => Table.Values;
 
     /// <summary>
-    /// Whether a stake is one this wallet actually takes.
+    /// Whether a stake is one this wallet actually takes: **any whole amount between
+    /// the two ends**.
     ///
-    /// Checked on the server rather than trusted from the panel: the panel offers a
-    /// button that walks the steps, and a request is a thing anybody can send by hand.
+    /// It used to insist on a multiple of <see cref="Step"/> as well, because the panel
+    /// only offered a button that walked the steps. The panel lets the stake be typed
+    /// now, and a machine that refuses 7,500 roubles for no reason a player can see is
+    /// a machine that looks broken. The step survives as what the button moves by.
+    ///
+    /// Both ends still matter and both are still checked here rather than trusted from
+    /// the panel -- a request is a thing anybody can send by hand, and the ceiling is
+    /// what keeps a thousand-times payout to a sane number.
     /// </summary>
     public static bool Allows(Wallet wallet, long stake)
     {
         var info = For(wallet);
 
-        return stake >= info.MinStake
-            && stake <= info.MaxStake
-            && stake % info.Step == 0;
+        return stake >= info.MinStake && stake <= info.MaxStake;
     }
 }
