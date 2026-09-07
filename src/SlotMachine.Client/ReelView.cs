@@ -229,8 +229,16 @@ namespace SlotMachine.Client
         /// <summary>
         /// Spins, and lands on the grid the server already settled.
         /// </summary>
+        /// <param name="speed">
+        /// Divides the duration rather than speeding up the motion itself, so a faster
+        /// run travels fewer cells at the same peak rate instead of the same cells
+        /// faster. <see cref="PeakCellsPerSecond"/> is a ceiling chosen to keep the belt
+        /// a blur instead of a strobe -- multiplying the rate by six would blow straight
+        /// through it and multiplying the duration down does not touch it at all.
+        /// </param>
         internal static IEnumerator Spin(
-            MonoBehaviour host, IReadOnlyList<IReadOnlyList<string>> grid, Action onStopped)
+            MonoBehaviour host, IReadOnlyList<IReadOnlyList<string>> grid, Action onStopped,
+            float speed = 1f)
         {
             if (_cells == null || grid == null)
             {
@@ -254,7 +262,7 @@ namespace SlotMachine.Client
             {
                 running++;
                 host.StartCoroutine(
-                    SpinOne(reel, MinDuration + (reel * Stagger), grid[reel], () => running--));
+                    SpinOne(reel, (MinDuration + (reel * Stagger)) / speed, grid[reel], () => running--));
             }
 
             while (running > 0)

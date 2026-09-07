@@ -619,6 +619,10 @@ this file has been looked at on a real machine.
 - The stake is typed, and the server takes any whole amount between the two ends --
   or above the top one, with "No maximum stake" ticked in F12.
 - The win banner scales with the multiple: WIN, BIG WIN, HUGE WIN, JACKPOT.
+- **AUTO**, under SPIN. Arms a run that keeps pulling on its own -- a beat after each
+  settle, so a result is on screen for a moment -- until STOP is clicked, the panel is
+  closed, or a pull comes back with an error. Green both ways; the label and the shade
+  are what say which.
 - `pack.ps1` builds and installs it with the rest of the casino.
 
 ### What playing it found
@@ -649,10 +653,12 @@ What is still unwatched:
   as it is in Roulette -- and the F12 switch that lifts the stake ceiling makes a win
   big enough to need it much more reachable.
 - Whether `JACKPOT` at 64pt looks right, for the same reason: nobody has hit 100x.
+- **AUTO has not been played in game.** It compiles and the button's position was
+  measured against the same layout the paytable's was, underneath SPIN with room to
+  the stake row below it, but nobody has clicked it on a real machine yet.
 
 ### Open items
 
-- No autoplay, and no plans for one.
 - The icons render at `ScaleFactor = 3`, roughly 190px for a one-cell item. If they
   look soft on a 4K screen that is the number to raise.
 - Whether the disk cache round-trips right way up. The `GetPixels` path cannot be

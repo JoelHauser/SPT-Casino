@@ -50,6 +50,21 @@ namespace SlotMachine.Client
         private const float SpinSize = 164f;
 
         /// <summary>
+        /// AUTO sits under SPIN, in the same column. A rectangle rather than a disc --
+        /// see <see cref="BuildAutoButton"/> -- so it never reads as a second way to
+        /// take the same action.
+        /// </summary>
+        private const float AutoWidth = SpinSize;
+
+        private const float AutoHeight = 50f;
+        private const float AutoGap = 18f;
+
+        /// <summary>Below AUTO, same column, same width -- see BuildSpeedButton.</summary>
+        private const float SpeedHeight = 24f;
+
+        private const float SpeedGap = 6f;
+
+        /// <summary>
         /// The paytable, the reels and the spin button, side by side, centred in the
         /// frame.
         ///
@@ -80,6 +95,10 @@ namespace SlotMachine.Client
         private static readonly Color ButtonFace = new Color(0.17f, 0.17f, 0.19f, 1f);
         private static readonly Color SpinRed = new Color(0.62f, 0.14f, 0.14f, 1f);
         private static readonly Color SpinDead = new Color(0.28f, 0.16f, 0.16f, 1f);
+
+        // Green both while armed and while idle, deliberately -- see SetAutoRunning.
+        private static readonly Color AutoGreen = new Color(0.18f, 0.56f, 0.22f, 1f);
+        private static readonly Color AutoGreenOn = new Color(0.32f, 0.82f, 0.36f, 1f);
 
         // Same values Blackjack's stats sheet uses, so a currency in the red reads
         // the same way at every table.
@@ -175,6 +194,31 @@ namespace SlotMachine.Client
         private static readonly Dictionary<string, Image> PayFaces = new Dictionary<string, Image>();
         private static Image _spinFace;
         private static TextMeshProUGUI _spinLabel;
+        private static Image _autoFace;
+        private static TextMeshProUGUI _autoLabel;
+
+        /// <summary>
+        /// Armed by AUTO. The only thing that ever schedules another pull while this is
+        /// true is <see cref="Settled"/>, once the reels it is currently animating stop
+        /// -- so disarming it is just setting it back to false and letting the next
+        /// settle see that instead of scheduling one.
+        /// </summary>
+        private static bool _autoSpinning;
+
+        private static Coroutine _autoWait;
+
+        /// <summary>1x, 2x, 4x, 6x -- what SPEED cycles through, in order.</summary>
+        private static readonly float[] SpeedSteps = [1f, 2f, 4f, 6f];
+
+        private static int _speedStep;
+        private static TextMeshProUGUI _speedLabel;
+
+        /// <summary>
+        /// What every spin runs at, manual or AUTO. <see cref="Pull"/> reads this
+        /// unconditionally rather than only while a run is armed -- SPEED is its own
+        /// control, not a setting that belongs to AUTO just because it lives under it.
+        /// </summary>
+        private static float SpinSpeed => SpeedSteps[_speedStep];
 
         /// <summary>
         /// Everything the machine draws to actually play: paytable, reels, spin
@@ -302,6 +346,10 @@ namespace SlotMachine.Client
             // nobody is looking at.
             StopRainbow();
 
+            // A run in progress must not keep pulling once the panel is shut and nobody
+            // is there to click STOP.
+            StopAuto();
+
             // The sheet must not still be lying over the reels next time this opens.
             HideStats();
 
@@ -353,6 +401,7 @@ namespace SlotMachine.Client
             if (reply == null)
             {
                 SetStatus("No answer from the server.");
+                StopAuto();
                 return;
             }
 
@@ -363,6 +412,7 @@ namespace SlotMachine.Client
             if (!string.IsNullOrEmpty(error))
             {
                 SetStatus(error);
+                StopAuto();
                 return;
             }
 
@@ -371,6 +421,7 @@ namespace SlotMachine.Client
             if (pull == null)
             {
                 SetStatus("The machine answered with nothing.");
+                StopAuto();
                 return;
             }
 
@@ -398,7 +449,7 @@ namespace SlotMachine.Client
                 return;
             }
 
-            host.StartCoroutine(ReelView.Spin(host, grid, () => Settled(grid, paid, wins)));
+            host.StartCoroutine(ReelView.Spin(host, grid, () => Settled(grid, paid, wins), SpinSpeed));
         }
 
         /// <summary>What happens when the reels stop.</summary>
@@ -435,6 +486,14 @@ namespace SlotMachine.Client
             }
 
             Refresh();
+
+            // The only place another pull ever gets scheduled from. A run that was
+            // disarmed mid-spin, or that just failed inside Pull, leaves this false and
+            // the run simply ends here rather than needing to be cancelled.
+            if (_autoSpinning)
+            {
+                ScheduleAuto();
+            }
         }
 
         /// <summary>
@@ -915,6 +974,8 @@ namespace SlotMachine.Client
             _paidLabel.color = Gold;
 
             BuildSpinButton(_machine, reelsX, reelsY);
+            BuildAutoButton(_machine, reelsX, reelsY);
+            BuildSpeedButton(_machine, reelsX, reelsY);
 
             BuildStakeRow(_machine, reelsX);
 
@@ -974,6 +1035,175 @@ namespace SlotMachine.Client
             {
                 _spinLabel.text = on ? "SPIN" : "...";
                 _spinLabel.color = on ? Ink : Dim;
+            }
+        }
+
+        /// <summary>
+        /// Under SPIN, in the same column. A rectangle rather than a disc, on purpose --
+        /// SPIN is the button that spends money and AUTO only ever presses SPIN on the
+        /// player's behalf, so the two should not read as the same kind of control at a
+        /// glance.
+        /// </summary>
+        private static void BuildAutoButton(RectTransform frame, float reelsX, float reelsY)
+        {
+            var button = NewBox("Auto", frame, Color.white);
+            button.sizeDelta = new Vector2(AutoWidth, AutoHeight);
+            button.anchoredPosition = new Vector2(
+                reelsX + ((ReelView.Width + 28f) * 0.5f) + SpinGap + (SpinSize * 0.5f),
+                reelsY - (SpinSize * 0.5f) - AutoGap - (AutoHeight * 0.5f));
+
+            _autoFace = button.GetComponent<Image>();
+
+            _autoLabel = NewText("AutoLabel", button, "AUTO", 24f);
+            _autoLabel.rectTransform.anchorMin = Vector2.zero;
+            _autoLabel.rectTransform.anchorMax = Vector2.one;
+            _autoLabel.rectTransform.offsetMin = Vector2.zero;
+            _autoLabel.rectTransform.offsetMax = Vector2.zero;
+            _autoLabel.color = Ink;
+
+            SetAutoRunning(false);
+
+            button.gameObject.AddComponent<Button>().onClick.AddListener(() => ToggleAuto());
+        }
+
+        /// <summary>
+        /// Green either way. Only the label and the shade say whether a run is armed --
+        /// see <see cref="AutoGreen"/> and <see cref="AutoGreenOn"/> -- because AUTO
+        /// never becomes a different colour of "cannot be pressed" the way SPIN does:
+        /// it is always the thing to click to change what is happening.
+        /// </summary>
+        private static void SetAutoRunning(bool on)
+        {
+            if (_autoFace != null)
+            {
+                _autoFace.sprite = Textures.RoundedBox(8, on ? AutoGreenOn : AutoGreen, Edge, 3);
+                _autoFace.type = Image.Type.Sliced;
+            }
+
+            if (_autoLabel != null)
+            {
+                _autoLabel.text = on ? "STOP" : "AUTO";
+            }
+        }
+
+        /// <summary>
+        /// Arms or disarms a run. Arming spins immediately if the reels are free, the
+        /// same as a manual click would -- otherwise a reel already in flight finishes
+        /// on its own and <see cref="Settled"/> picks the run up from there.
+        /// Disarming never touches a spin in flight; see <see cref="StopAuto"/>.
+        /// </summary>
+        private static void ToggleAuto()
+        {
+            if (_autoSpinning)
+            {
+                StopAuto();
+                return;
+            }
+
+            if (!Ready)
+            {
+                SetStatus("Still fetching the symbols from your install.");
+                return;
+            }
+
+            _autoSpinning = true;
+            SetAutoRunning(true);
+
+            if (!ReelView.Spinning)
+            {
+                Pull();
+            }
+        }
+
+        /// <summary>
+        /// Disarms a run and cancels whatever it is waiting on. Safe to call whether or
+        /// not a run is actually active: <see cref="Close"/> and every failure inside
+        /// <see cref="Pull"/> call it unconditionally rather than checking first.
+        /// </summary>
+        private static void StopAuto()
+        {
+            _autoSpinning = false;
+
+            if (_autoWait != null && SlotClientPlugin.Instance != null)
+            {
+                SlotClientPlugin.Instance.StopCoroutine(_autoWait);
+            }
+
+            _autoWait = null;
+
+            SetAutoRunning(false);
+        }
+
+        /// <summary>
+        /// Under AUTO, same width. One button rather than three, cycling 1X, 2X, 4X,
+        /// 6X on every click and wrapping back to 1X rather than needing a separate
+        /// button to get back to normal.
+        /// </summary>
+        private static void BuildSpeedButton(RectTransform frame, float reelsX, float reelsY)
+        {
+            var button = NewBox("Speed", frame, Color.white);
+            button.sizeDelta = new Vector2(AutoWidth, SpeedHeight);
+            button.anchoredPosition = new Vector2(
+                reelsX + ((ReelView.Width + 28f) * 0.5f) + SpinGap + (SpinSize * 0.5f),
+                reelsY - (SpinSize * 0.5f) - AutoGap - AutoHeight - SpeedGap - (SpeedHeight * 0.5f));
+
+            var image = button.GetComponent<Image>();
+            image.sprite = Textures.RoundedBox(6, ButtonFace, Edge, 2);
+            image.type = Image.Type.Sliced;
+
+            _speedLabel = NewText("SpeedLabel", button, string.Empty, 17f);
+            _speedLabel.rectTransform.anchorMin = Vector2.zero;
+            _speedLabel.rectTransform.anchorMax = Vector2.one;
+            _speedLabel.rectTransform.offsetMin = Vector2.zero;
+            _speedLabel.rectTransform.offsetMax = Vector2.zero;
+            _speedLabel.color = Ink;
+
+            RenderSpeed();
+
+            button.gameObject.AddComponent<Button>().onClick.AddListener(CycleSpeed);
+        }
+
+        private static void CycleSpeed()
+        {
+            _speedStep = (_speedStep + 1) % SpeedSteps.Length;
+            RenderSpeed();
+        }
+
+        private static void RenderSpeed()
+        {
+            if (_speedLabel != null)
+            {
+                _speedLabel.text = $"{SpinSpeed:0}X";
+            }
+        }
+
+        /// <summary>
+        /// How long a result sits on screen before AUTO pulls again, at 1x. Scaled down
+        /// by <see cref="SpinSpeed"/> like the reels themselves, so SPEED shortens the
+        /// whole cycle and not just the part the reels are responsible for.
+        /// </summary>
+        private const float AutoPauseSeconds = 1.25f;
+
+        private static void ScheduleAuto()
+        {
+            if (SlotClientPlugin.Instance == null)
+            {
+                Pull();
+                return;
+            }
+
+            _autoWait = SlotClientPlugin.Instance.StartCoroutine(AutoWait(AutoPauseSeconds / SpinSpeed));
+        }
+
+        private static IEnumerator AutoWait(float seconds)
+        {
+            yield return new WaitForSecondsRealtime(seconds);
+
+            _autoWait = null;
+
+            if (_autoSpinning)
+            {
+                Pull();
             }
         }
 

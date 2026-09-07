@@ -19,7 +19,7 @@ namespace Casino.Server;
 /// first thing worth knowing when somebody reports a problem -- except SPT already
 /// writes it there itself:
 ///
-///     Mod: SPT Casino version: 1.0.1 (GUID: com.mybutthasarash.sptcasino | ...) loaded
+///     Mod: SPT Casino version: 1.1.0 (GUID: com.mybutthasarash.sptcasino | ...) loaded
 ///
 /// So the file keeps the fact and the console gets the flourish. Debug level was the
 /// other candidate for keeping a plain copy in the file, and it is not one: the log
