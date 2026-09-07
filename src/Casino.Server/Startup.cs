@@ -25,9 +25,7 @@ public class Startup : IOnLoad
     {
         var metadata = new ModMetadata();
 
-        Banner.Rainbow(
-            $"[Casino] v{metadata.Version} ready -- blackjack, hold'em, a single-zero wheel "
-            + "and a slot machine, playing for real money out of your stash.");
+        Banner.Rainbow($"[Casino] v{metadata.Version}");
 
         return Task.CompletedTask;
     }
