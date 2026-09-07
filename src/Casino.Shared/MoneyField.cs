@@ -66,6 +66,19 @@ namespace Casino.Shared
             // where the click landed, which is the clearest "you are typing here" the
             // field has.
             input.onFocusSelectAll = true;
+
+            // AddComponent&lt;TMP_InputField&gt; already ran this field's OnEnable once,
+            // synchronously, before the caller had a chance to assign textComponent or
+            // textViewport -- both still null at that point. TMP only ever builds its
+            // caret from OnEnable, gated on textComponent being non-null, so that first
+            // pass silently built no caret at all, and nothing later retries it. Closing
+            // the panel and reopening it fires a real OnEnable, by which point both are
+            // set, and that is the only reason it starts working the second time. Both
+            // callers of this method set textComponent and textViewport before reaching
+            // here, so toggling enabled now reruns OnEnable with everything in place --
+            // the same fix, just before anyone has a first time to see it missing.
+            input.enabled = false;
+            input.enabled = true;
         }
 
         /// <summary>
