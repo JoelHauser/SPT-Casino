@@ -1,9 +1,3 @@
-> ### This replaces my Blackjack and Poker mods
->
-> Both are tables inside this one now. **Uninstall them before installing this** — see [Installing](#installing). Leaving them in place gives you three tabs on the bar instead of one, and three copies of the same key handler arguing over the escape key.
->
-> They will not be updated separately from here on. Everything that was in them is here, unchanged, along with the rest of the room.
-
 A casino in your menu. One tab, a lobby, and tables that play for the roubles in your stash.
 
 There is no unlock, no hideout requirement and no quest. Install it, and a **CASINO** tab appears on the bar along the bottom of the menu — on a profile five minutes old or one with a thousand raids behind it.
@@ -104,25 +98,7 @@ The machine pays up to a thousand times the stake by default. **F12 → Slots �
 
 ## Installing
 
-Extract into your SPT folder — the one that holds `SPT_Runtime` — and start the server.
-
-**Delete my old Blackjack and Poker mods first.** They are tables inside this one now, and it installs as one folder on each side: `BepInEx/plugins/Casino` and `SPT_Runtime/user/mods/Casino`.
-
-Remove whichever of these you have:
-
-```
-BepInEx/plugins/Blackjack
-BepInEx/plugins/Poker
-BepInEx/plugins/Roulette
-
-SPT_Runtime/user/mods/Blackjack
-SPT_Runtime/user/mods/Poker
-SPT_Runtime/user/mods/Roulette
-```
-
-Leaving the old plugins gives you three tabs on the bar instead of one, and three copies of the same key handler arguing over the escape key. Leaving the old server mods gives you every route registered twice.
-
-**If you were mid-hand when you last played**, move those `user/mods` folders somewhere else rather than deleting them, launch once, and then delete them. Each keeps a small record of anything the house still owes you, and the casino imports it on first run.
+Extract into your SPT folder — the one that holds `SPT_Runtime` — and start the server. It installs as one folder on each side: `BepInEx/plugins/Casino` and `SPT_Runtime/user/mods/Casino`.
 
 The first time an account walks in, a card explains what the money does. Read it once and it never comes back.
 
