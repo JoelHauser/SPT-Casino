@@ -74,6 +74,40 @@ namespace Casino.Shared
             return go;
         }
 
+        /// <summary>
+        /// Builds one card inside a fixed-size slot and returns the card, not the slot.
+        ///
+        /// A layout group measures a child's rect and ignores its localScale, so a card
+        /// drawn smaller than <see cref="Width"/>/<see cref="Height"/> and placed
+        /// directly in a row reserves the full card's footprint regardless of how small
+        /// it is actually drawn at -- the slot fixes that by carrying the drawn size
+        /// while the card inside keeps its own scale.
+        ///
+        /// It has a second job, which is the reason both tables call this instead of
+        /// <see cref="Build"/> directly: the slot is the row's layout child and the card
+        /// is a free grandchild centred inside it, so <see cref="DealAnimator"/> can move
+        /// the card's own position and scale without the row's layout group fighting the
+        /// animation back into place on its next rebuild.
+        /// </summary>
+        internal static GameObject BuildSlotted(Transform parent, string code, TMP_FontAsset font, float scale = 1f)
+        {
+            var slot = new GameObject("Slot", typeof(RectTransform));
+            slot.transform.SetParent(parent, false);
+
+            var slotRect = (RectTransform)slot.transform;
+            slotRect.sizeDelta = new Vector2(Width * scale, Height * scale);
+
+            var card = Build(slotRect, code, font);
+
+            var rect = (RectTransform)card.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.localScale = new Vector3(scale, scale, 1f);
+
+            return card;
+        }
+
         private static string PathFor(string code)
         {
             if (_cardDirectory == null)

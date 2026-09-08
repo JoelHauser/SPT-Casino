@@ -546,9 +546,24 @@ namespace Poker.Client
 
             var all = seats.OfType<JObject>().ToList();
 
+            // Left to right on screen -- not seat index, which the engine fixes with
+            // the player at 0 regardless of where the button sits, and not the order
+            // seats happen to appear in the JSON. This is the order a real dealer's
+            // hands would read as moving in.
+            var dealOrder = all
+                .Select(seat =>
+                {
+                    var i = (int?)seat["Index"] ?? 0;
+                    var isPlayer = (bool?)seat["IsPlayer"] == true;
+                    return new { Index = i, X = SeatPosition(i, all.Count, isPlayer).x };
+                })
+                .OrderBy(s => s.X)
+                .Select((s, rank) => new { s.Index, Rank = rank })
+                .ToDictionary(s => s.Index, s => s.Rank);
+
             foreach (var seat in all)
             {
-                BuildSeat(seat, button, all.Count);
+                BuildSeat(seat, button, all.Count, dealOrder);
             }
         }
 
@@ -560,7 +575,7 @@ namespace Poker.Client
         /// Where a seat is drawn is presentation and never reaches the engine: the
         /// deal order is fixed by seat index, not by position on screen.
         /// </summary>
-        private static void BuildSeat(JObject seat, int button, int total)
+        private static void BuildSeat(JObject seat, int button, int total, Dictionary<int, int> dealOrder)
         {
             var index = (int?)seat["Index"] ?? 0;
             var name = (string)seat["Name"] ?? ("Seat " + index);
@@ -594,7 +609,8 @@ namespace Poker.Client
             column.childControlWidth = false;
             column.childControlHeight = false;
 
-            BuildSeatCards(holder, cards, isPlayer, folded);
+            var seatRank = dealOrder.TryGetValue(index, out var rank) ? rank : 0;
+            BuildSeatCards(holder, cards, isPlayer, folded, index, seatRank, total);
             BuildSeatPlaque(holder, name, stack, committed, folded, allIn, isTurn, isPlayer, index == button);
 
             // Only at a showdown, and only for a seat that reached one -- the server
@@ -635,21 +651,33 @@ namespace Poker.Client
         /// </summary>
         private static GameObject CardSlot(RectTransform row, string code, float scale)
         {
-            var slot = NewBox("Slot", row, Color.clear);
-            slot.sizeDelta = new Vector2(CardView.Width * scale, CardView.Height * scale);
-
-            var card = CardView.Build(slot, code, _font);
-
-            var rect = (RectTransform)card.transform;
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = Vector2.zero;
-            rect.localScale = new Vector3(scale, scale, 1f);
-
-            return card;
+            return CardView.BuildSlotted(row, code, _font, scale);
         }
 
-        private static void BuildSeatCards(RectTransform holder, string[] cards, bool isPlayer, bool folded)
+        /// <summary>
+        /// A card's place in the deal, keyed by where it sits rather than what it is,
+        /// so a card that has already been shown does not fly in again on the next of
+        /// the many redraws a single hand goes through. Only a slot whose content has
+        /// actually changed since the last render -- a fresh deal, or a hidden card
+        /// resolving to a face at showdown -- gets the animation.
+        /// </summary>
+        private static readonly Dictionary<string, string> _dealtState = new Dictionary<string, string>();
+
+        private static void AnimateIfNew(string key, string code, GameObject card, int dealIndex)
+        {
+            var state = code ?? "back";
+
+            if (_dealtState.TryGetValue(key, out var prev) && prev == state)
+            {
+                return;
+            }
+
+            _dealtState[key] = state;
+            DealAnimator.Deal(card, dealIndex * DealAnimator.CardStagger);
+        }
+
+        private static void BuildSeatCards(
+            RectTransform holder, string[] cards, bool isPlayer, bool folded, int seatIndex, int seatRank, int seatCount)
         {
             var scale = isPlayer ? 0.66f : 0.44f;
 
@@ -672,6 +700,12 @@ namespace Poker.Client
                 // including the drawn fallback it uses when the art is missing. The slot
                 // is what the row is measured on; see CardSlot.
                 var card = CardSlot(cardRow, code, scale);
+
+                // A real dealer goes around the table once giving everybody their
+                // first card, then goes round again for the second -- not both cards
+                // to one seat before moving to the next. seatCount spaces the two
+                // passes apart so the second never overtakes the first.
+                AnimateIfNew("seat:" + seatIndex + ":" + i, code, card, (i * seatCount) + seatRank);
 
                 // A folded seat keeps its cards, dimmed, so the shape of the table
                 // stays readable instead of seats vanishing mid-hand.
@@ -978,6 +1012,11 @@ namespace Poker.Client
             {
                 var dealt = codes != null && i < codes.Length;
                 var card = CardSlot(_board, dealt ? codes[i] : null, BoardCardScale);
+
+                if (dealt)
+                {
+                    AnimateIfNew("board:" + i, codes[i], card, i);
+                }
 
                 // An undealt slot is left as a ghost rather than a card back. A back
                 // means a card exists and is hidden, which on the board never happens.

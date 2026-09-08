@@ -621,6 +621,21 @@ the server half, deliberately, because so much of it has still only run once.
   actually is".
 - **The main-menu button is gone**, along with the F12 setting that briefly hid it. The
   plugin no longer patches `MenuScreen` at all. See the entry-point note above.
+- **Cards now deal in rather than appearing whole**, dealer and hand alike, using
+  `Casino.Shared.DealAnimator` -- the same animator Poker's hole cards now use, added
+  there first because Poker needed the left-to-right seat ordering. Every card is
+  built through the new `CardView.BuildSlotted`, which wraps it in a plain,
+  non-layout slot so the animation can move the card's own position without the
+  row's `HorizontalLayoutGroup` fighting it back into place -- necessary here
+  specifically because `RenderRound` calls `FitHands`, which force-rebuilds
+  `_handsRow`'s layout on every redraw and would otherwise snap an in-flight card
+  straight back. A per-slot state cache (keyed on `dealer:<i>` / `hand:<i>:<i>`, not
+  on the GameObject) stops a card re-animating on redraws where its content has not
+  actually changed -- a Hit only animates the one new card, not the whole hand.
+  **Built against the engine's shape and compiled cleanly as part of `Blackjack.Client`
+  on 8 Sep 2026, but not yet seen on a screen** -- there was no install to run the
+  game against. Worth an eyes-on pass before calling it done; see the identical note
+  in `docs/poker.md`.
 - **Escape closes the table and nothing else**, and the table has been played from the
   hideout and the flea market rather than only the main menu. See "Escape, and why
   watching the key was never enough".

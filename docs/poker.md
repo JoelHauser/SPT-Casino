@@ -1547,6 +1547,19 @@ reads this first and would have started building one.
 - Green at **214 tests** -- 189 over the engine, 25 over the money -- mutation-checked
   throughout. Every engine test builds its own `HoldemRules`, so the stakes can be
   retuned without touching the suite.
+- **Cards now deal in rather than appearing whole.** `Casino.Shared.DealAnimator`
+  slides and fades each newly-shown card into the resting spot its slot already gave
+  it, and hole cards go out left to right across the seats -- a real dealer's order,
+  not the engine's fixed seat index -- one card to every seat, then a second pass for
+  the second, the way a table actually deals. Community cards use the same animator
+  as they land. A per-slot state cache (keyed on seat/board position, not on the
+  GameObject) is what stops a card re-animating on every one of the redraws a single
+  hand goes through -- only a slot whose content actually changed since the last
+  render plays. **Built against the engine and checked with an isolated console
+  repro of the deal-order LINQ, but not yet run in the actual client** -- this box has
+  no SPT install, so `Poker.Client` never compiled past the `SPTPath` gate. Worth an
+  eyes-on pass in game before calling it done; see the identical note in
+  `docs/blackjack.md`.
 - **The variant is no-limit Texas Hold'em against bots**, decided after two
   reversals. See the top of this file, and read it before reopening the question.
 - **THE MONEY HAS RUN, ON A REAL PROFILE, AND IT WAS RIGHT.** 3 Sep 2026 on the home

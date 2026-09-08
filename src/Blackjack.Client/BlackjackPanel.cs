@@ -67,6 +67,15 @@ namespace Blackjack.Client
         private static RectTransform _cloth;
         private static GameObject _statsPanel;
         private static GameObject _statsButton;
+
+        /// <summary>
+        /// A card's place in the deal, keyed by where it sits rather than what it is,
+        /// so a card already shown does not fly in again on every one of the many
+        /// redraws a single round goes through -- only a slot whose content has
+        /// actually changed since the last render, which is a fresh deal, a hit, or
+        /// the hole card resolving from a back to a face.
+        /// </summary>
+        private static readonly Dictionary<string, string> _dealtState = new Dictionary<string, string>();
         private static RectTransform _statsTiles;
         private static RectTransform _statsRows;
         private static TextMeshProUGUI _statsEmpty;
@@ -480,18 +489,24 @@ namespace Blackjack.Client
                 _statsButton.SetActive(betting);
             }
 
+            // Where each new card is in the deal, so cards are dealt in rather than
+            // popping in all at once. Shared across the dealer's row and every hand
+            // below so a redraw reads as one deal in build order -- dealer first,
+            // then the hands -- rather than several unrelated animations at once.
+            var dealSequence = 0;
+
             var dealer = round?["Dealer"] as JObject;
             var dealerCards = dealer?["Cards"]?.ToObject<List<string>>() ?? new List<string>();
-            foreach (var card in dealerCards)
+            for (var i = 0; i < dealerCards.Count; i++)
             {
-                CardView.Build(_dealerCards, card, _font);
+                AnimateIfNew(_dealerCards, dealerCards[i], "dealer:" + i, ref dealSequence);
             }
 
             if (phase == "PlayerTurn" && dealerCards.Count > 0)
             {
                 // The hole card is not in the response during play. Drawing a back in
                 // its place is honest: the client does not have it to show.
-                CardView.Build(_dealerCards, null, _font);
+                AnimateIfNew(_dealerCards, null, "dealer:" + dealerCards.Count, ref dealSequence);
             }
 
             var dealerValue = dealer?["Value"]?.ToObject<int>() ?? 0;
@@ -511,7 +526,7 @@ namespace Blackjack.Client
                 var active = round["ActiveHandIndex"]?.ToObject<int>() ?? -1;
                 for (var i = 0; i < hands.Count; i++)
                 {
-                    BuildHand(_handsRow, (JObject)hands[i], i == active && phase == "PlayerTurn");
+                    BuildHand(_handsRow, (JObject)hands[i], i == active && phase == "PlayerTurn", i, ref dealSequence);
                 }
             }
 
@@ -553,7 +568,7 @@ namespace Blackjack.Client
             }
         }
 
-        private static void BuildHand(RectTransform parent, JObject hand, bool isActive)
+        private static void BuildHand(RectTransform parent, JObject hand, bool isActive, int handIndex, ref int dealSequence)
         {
             var column = NewBox(
                 "Hand",
@@ -595,9 +610,9 @@ namespace Blackjack.Client
             var cardsRow = NewRow("Cards", column, cardGap);
             SetSize(cardsRow, rowWidth, CardView.Height);
 
-            foreach (var card in cards)
+            for (var i = 0; i < cards.Count; i++)
             {
-                CardView.Build(cardsRow, card, _font);
+                AnimateIfNew(cardsRow, cards[i], "hand:" + handIndex + ":" + i, ref dealSequence);
             }
 
             var value = hand["Value"]?.ToObject<int>() ?? 0;
@@ -1587,6 +1602,28 @@ namespace Blackjack.Client
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
+        }
+
+        /// <summary>
+        /// Builds one card in a slotted, animation-safe wrapper (see
+        /// <see cref="CardView.BuildSlotted"/>) and plays the deal animation on it if
+        /// its slot's content is new since the last render. <paramref name="dealSequence"/>
+        /// is threaded through the whole round so every card built this render -- the
+        /// dealer's, then each hand's -- gets a later stagger than the one before it.
+        /// </summary>
+        private static GameObject AnimateIfNew(RectTransform parent, string code, string key, ref int dealSequence)
+        {
+            var card = CardView.BuildSlotted(parent, code, _font);
+            var order = dealSequence++;
+            var state = code ?? "back";
+
+            if (!_dealtState.TryGetValue(key, out var prev) || prev != state)
+            {
+                _dealtState[key] = state;
+                DealAnimator.Deal(card, order * DealAnimator.CardStagger);
+            }
+
+            return card;
         }
 
         private static void Clear(RectTransform parent)
