@@ -495,24 +495,48 @@ namespace Blackjack.Client
             // then the hands -- rather than several unrelated animations at once.
             var dealSequence = 0;
 
+            // The latest moment anything actually animating this render will finish.
+            // Outcome text is held back until then -- see AnimateIfNew -- so the
+            // player never reads a result before the card that decided it has
+            // visibly turned over.
+            var latestFinish = 0f;
+
             var dealer = round?["Dealer"] as JObject;
             var dealerCards = dealer?["Cards"]?.ToObject<List<string>>() ?? new List<string>();
             for (var i = 0; i < dealerCards.Count; i++)
             {
-                AnimateIfNew(_dealerCards, dealerCards[i], "dealer:" + i, ref dealSequence);
+                AnimateIfNew(_dealerCards, dealerCards[i], "dealer:" + i, ref dealSequence, ref latestFinish);
             }
 
             if (phase == "PlayerTurn" && dealerCards.Count > 0)
             {
                 // The hole card is not in the response during play. Drawing a back in
                 // its place is honest: the client does not have it to show.
-                AnimateIfNew(_dealerCards, null, "dealer:" + dealerCards.Count, ref dealSequence);
+                AnimateIfNew(_dealerCards, null, "dealer:" + dealerCards.Count, ref dealSequence, ref latestFinish);
             }
 
             var dealerValue = dealer?["Value"]?.ToObject<int>() ?? 0;
-            _dealerValue.text = dealerCards.Count == 0
-                ? ""
-                : (phase == "PlayerTurn" ? $"{dealerValue} + ?" : dealerValue.ToString());
+
+            if (dealerCards.Count == 0)
+            {
+                _dealerValue.text = "";
+            }
+            else if (phase == "PlayerTurn")
+            {
+                _dealerValue.text = $"{dealerValue} + ?";
+            }
+            else
+            {
+                // Held back to land with the hole card's flip rather than the instant
+                // Settled arrives -- the total alone is enough to spoil who won.
+                DealAnimator.After(latestFinish, () =>
+                {
+                    if (_dealerValue != null)
+                    {
+                        _dealerValue.text = dealerValue.ToString();
+                    }
+                });
+            }
 
             var hands = round?["PlayerHands"] as JArray;
             var anyHands = hands != null && hands.Count > 0;
@@ -526,7 +550,9 @@ namespace Blackjack.Client
                 var active = round["ActiveHandIndex"]?.ToObject<int>() ?? -1;
                 for (var i = 0; i < hands.Count; i++)
                 {
-                    BuildHand(_handsRow, (JObject)hands[i], i == active && phase == "PlayerTurn", i, ref dealSequence);
+                    BuildHand(
+                        _handsRow, (JObject)hands[i], i == active && phase == "PlayerTurn", i,
+                        ref dealSequence, ref latestFinish);
                 }
             }
 
@@ -568,7 +594,8 @@ namespace Blackjack.Client
             }
         }
 
-        private static void BuildHand(RectTransform parent, JObject hand, bool isActive, int handIndex, ref int dealSequence)
+        private static void BuildHand(
+            RectTransform parent, JObject hand, bool isActive, int handIndex, ref int dealSequence, ref float latestFinish)
         {
             var column = NewBox(
                 "Hand",
@@ -612,7 +639,7 @@ namespace Blackjack.Client
 
             for (var i = 0; i < cards.Count; i++)
             {
-                AnimateIfNew(cardsRow, cards[i], "hand:" + handIndex + ":" + i, ref dealSequence);
+                AnimateIfNew(cardsRow, cards[i], "hand:" + handIndex + ":" + i, ref dealSequence, ref latestFinish);
             }
 
             var value = hand["Value"]?.ToObject<int>() ?? 0;
@@ -631,10 +658,23 @@ namespace Blackjack.Client
             {
                 var won = outcome == "Win" || outcome == "Blackjack";
                 var pushed = outcome == "Push";
-                SetSize(
-                    Label(column, outcome.ToUpperInvariant(), 24f, pushed ? Faint : (won ? Good : Bad), TextAlignmentOptions.Center).rectTransform,
-                    labelWidth,
-                    30f);
+                var label = Label(column, outcome.ToUpperInvariant(), 24f, pushed ? Faint : (won ? Good : Bad), TextAlignmentOptions.Center);
+                SetSize(label.rectTransform, labelWidth, 30f);
+
+                // Invisible rather than inactive: an inactive label drops out of the
+                // column's own layout entirely, so the hand would visibly grow taller
+                // the instant this appears. Alpha keeps its space reserved from the
+                // start and holds it back until every card in this redraw -- the hole
+                // card, above all -- has actually finished turning over. Reading WIN or
+                // LOSE before that is reading it before the table has shown its hand.
+                label.alpha = 0f;
+                DealAnimator.After(latestFinish, () =>
+                {
+                    if (label != null)
+                    {
+                        label.alpha = 1f;
+                    }
+                });
             }
         }
 
@@ -1610,11 +1650,18 @@ namespace Blackjack.Client
         /// its slot's content is new since the last render. <paramref name="dealSequence"/>
         /// is threaded through the whole round so every card built this render -- the
         /// dealer's, then each hand's -- gets a later stagger than the one before it.
+        /// <paramref name="latestFinish"/> comes along for the same reason and tracks
+        /// the opposite end: the latest moment anything actually animating this render
+        /// will finish, in seconds from now, so a caller can hold outcome text back
+        /// until every card in the redraw -- most importantly the hole card, if it is
+        /// the one resolving -- has visibly settled.
         /// </summary>
-        private static GameObject AnimateIfNew(RectTransform parent, string code, string key, ref int dealSequence)
+        private static GameObject AnimateIfNew(
+            RectTransform parent, string code, string key, ref int dealSequence, ref float latestFinish)
         {
             var card = CardView.BuildSlotted(parent, code, _font);
             var order = dealSequence++;
+            var delay = order * DealAnimator.CardStagger;
             var state = code ?? "back";
 
             if (_dealtState.TryGetValue(key, out var prev))
@@ -1631,7 +1678,8 @@ namespace Blackjack.Client
                 {
                     _dealtState[key] = state;
                     var back = CardView.AddBackTo(card, _font);
-                    DealAnimator.Flip(card, back, order * DealAnimator.CardStagger);
+                    DealAnimator.Flip(card, back, delay);
+                    latestFinish = Mathf.Max(latestFinish, DealAnimator.FinishTime(delay));
                     return card;
                 }
             }
@@ -1642,7 +1690,8 @@ namespace Blackjack.Client
             // would actually sit, so the dealer's own cards get a short slide into
             // place beside each other and the player's cards get the long one
             // down the table -- both for free, from one honest origin.
-            DealAnimator.Deal(card, order * DealAnimator.CardStagger, _dealerCards);
+            DealAnimator.Deal(card, delay, _dealerCards);
+            latestFinish = Mathf.Max(latestFinish, DealAnimator.FinishTime(delay));
 
             return card;
         }

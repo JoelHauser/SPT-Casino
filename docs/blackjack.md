@@ -647,6 +647,17 @@ the server half, deliberately, because so much of it has still only run once.
   edge-on, destroys it, and grows the real card out from nothing, in place, because a
   card already on the table is not arriving from anywhere. Only width scales during a
   flip, never height, which is what reads as the card rotating rather than shrinking.
+  **WIN / LOSE / PUSH, and the dealer's revealed total, no longer arrive with the
+  Settled response itself** -- they used to be set synchronously in `RenderRound`,
+  which told the player the result before they could see the hole card that decided
+  it, since the flip animating it in takes real time. `DealAnimator.After` (a small
+  generic "run this once N seconds from now" helper, reusing the coroutine host every
+  other delay in this file already goes through) holds the outcome label and the
+  dealer's final total back until `AnimateIfNew`'s `latestFinish` -- the latest moment
+  anything actually animating this redraw will finish -- has passed. The outcome
+  label is hidden by **alpha**, not `SetActive(false)`: an inactive object drops out
+  of its column's layout entirely, so the hand would visibly grow taller the instant
+  the label appeared. Alpha keeps the space reserved from the first frame.
   **Built against the engine's shape, and compiled clean as part of `Casino.Client`
   against a real SPT 4.1.3 install (0.16.9.5 build 40743) on 8 Sep 2026 -- but still
   not yet seen on a screen**, since that box could only run the server, not the game.

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -216,6 +217,47 @@ namespace Casino.Shared
             }
 
             face.localScale = restScale;
+        }
+
+        /// <summary>
+        /// When a card started with <paramref name="delay"/> will actually have
+        /// finished moving -- <see cref="Deal"/> and <see cref="Flip"/> take the same
+        /// total time, so one formula covers both. For a caller that needs to hold
+        /// something back until every card in a redraw is done: an outcome the player
+        /// should not read before they can see the card that decided it.
+        /// </summary>
+        internal static float FinishTime(float delay) => delay + Duration;
+
+        /// <summary>
+        /// Runs <paramref name="action"/> once, <paramref name="delay"/> seconds from
+        /// now -- see <see cref="FinishTime"/>. Runs it immediately if there is no
+        /// plugin instance to run a coroutine on, the same fallback every other delay
+        /// in this class uses: something that cannot be timed is still shown, just not
+        /// late.
+        /// </summary>
+        internal static void After(float delay, Action action)
+        {
+            var host = Host.Plugin;
+
+            if (host == null)
+            {
+                action?.Invoke();
+                return;
+            }
+
+            host.StartCoroutine(Wait(delay, action));
+        }
+
+        private static IEnumerator Wait(float delay, Action action)
+        {
+            var waited = 0f;
+            while (waited < delay)
+            {
+                waited += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            action?.Invoke();
         }
 
         private static float EaseOut(float t) => 1f - ((1f - t) * (1f - t));
