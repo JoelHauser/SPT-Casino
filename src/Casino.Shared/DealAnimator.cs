@@ -18,7 +18,7 @@ namespace Casino.Shared
     internal static class DealAnimator
     {
         /// <summary>What a caller multiplies a card's place in the deal by.</summary>
-        internal const float CardStagger = 0.1f;
+        internal const float CardStagger = 0.3f;
 
         private const float Duration = 0.5f;
         private const float StartScale = 0.6f;
