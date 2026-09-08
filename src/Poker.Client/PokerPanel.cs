@@ -93,6 +93,15 @@ namespace Poker.Client
 
         private static RectTransform _board;
         private static RectTransform _potHolder;
+
+        /// <summary>
+        /// Where a dealt card starts its slide -- just above the felt, roughly where a
+        /// dealer would be standing. Every card in a deal starts here, not at its own
+        /// landing spot, so the deal reads as coming from one place across the table
+        /// rather than each card fading in where it lands. See DealAnimator.
+        /// </summary>
+        private static RectTransform _dealerPoint;
+
         private static RectTransform _seatLayer;
         private static RectTransform _actionRow;
         private static TextMeshProUGUI _status;
@@ -673,7 +682,7 @@ namespace Poker.Client
             }
 
             _dealtState[key] = state;
-            DealAnimator.Deal(card, dealIndex * DealAnimator.CardStagger);
+            DealAnimator.Deal(card, dealIndex * DealAnimator.CardStagger, _dealerPoint);
         }
 
         private static void BuildSeatCards(
@@ -1139,6 +1148,13 @@ namespace Poker.Client
             row.childForceExpandHeight = false;
             row.childControlWidth = false;
             row.childControlHeight = false;
+
+            // Just above the felt's own top edge, centred -- see the field doc.
+            _dealerPoint = NewBox("DealerPoint", felt, Color.clear);
+            _dealerPoint.anchorMin = _dealerPoint.anchorMax = new Vector2(0.5f, 0.5f);
+            _dealerPoint.pivot = new Vector2(0.5f, 0.5f);
+            _dealerPoint.sizeDelta = Vector2.zero;
+            _dealerPoint.anchoredPosition = new Vector2(0f, ClothCentreY + ClothY + 40f);
 
             _potHolder = NewBox("Pot", felt, Color.clear);
             _potHolder.anchorMin = _potHolder.anchorMax = new Vector2(0.5f, 0.5f);

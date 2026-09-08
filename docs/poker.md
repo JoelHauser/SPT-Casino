@@ -1548,18 +1548,23 @@ reads this first and would have started building one.
   throughout. Every engine test builds its own `HoldemRules`, so the stakes can be
   retuned without touching the suite.
 - **Cards now deal in rather than appearing whole.** `Casino.Shared.DealAnimator`
-  slides and fades each newly-shown card into the resting spot its slot already gave
-  it, and hole cards go out left to right across the seats -- a real dealer's order,
-  not the engine's fixed seat index -- one card to every seat, then a second pass for
-  the second, the way a table actually deals. Community cards use the same animator
-  as they land. A per-slot state cache (keyed on seat/board position, not on the
-  GameObject) is what stops a card re-animating on every one of the redraws a single
-  hand goes through -- only a slot whose content actually changed since the last
-  render plays. **Built against the engine and checked with an isolated console
-  repro of the deal-order LINQ, but not yet run in the actual client** -- this box has
-  no SPT install, so `Poker.Client` never compiled past the `SPTPath` gate. Worth an
-  eyes-on pass in game before calling it done; see the identical note in
-  `docs/blackjack.md`.
+  slides each newly-shown card in from a fixed "dealer point" just above the felt,
+  fading and scaling up as it travels, and hole cards go out left to right across the
+  seats -- a real dealer's order, not the engine's fixed seat index -- one card to
+  every seat, then a second pass for the second, the way a table actually deals.
+  Community cards slide in from the same point as they land. The slide moves the
+  card's world position rather than its anchored position, on purpose: the card sits
+  inside a slot a layout group owns, and reading `anchoredPosition` back a frame after
+  building it -- which the first version of this did -- is not safe to assume is final
+  yet, since Unity does not lay out a fresh hierarchy until its own end-of-frame pass;
+  world position sidesteps that entirely. A per-slot state cache (keyed on seat/board
+  position, not on the GameObject) is what stops a card re-animating on every one of
+  the redraws a single hand goes through -- only a slot whose content actually changed
+  since the last render plays. **Built against the engine and checked with an isolated
+  console repro of the deal-order LINQ, and this build actually compiled clean against
+  a real SPT 4.1.3 install (0.16.9.5 build 40743) on 8 Sep 2026, but still not yet
+  watched running in the actual game** -- that box could only run the server. Worth an
+  eyes-on pass before calling it done; see the identical note in `docs/blackjack.md`.
 - **The variant is no-limit Texas Hold'em against bots**, decided after two
   reversals. See the top of this file, and read it before reopening the question.
 - **THE MONEY HAS RUN, ON A REAL PROFILE, AND IT WAS RIGHT.** 3 Sep 2026 on the home

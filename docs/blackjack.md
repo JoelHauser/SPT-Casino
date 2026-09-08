@@ -624,18 +624,29 @@ the server half, deliberately, because so much of it has still only run once.
 - **Cards now deal in rather than appearing whole**, dealer and hand alike, using
   `Casino.Shared.DealAnimator` -- the same animator Poker's hole cards now use, added
   there first because Poker needed the left-to-right seat ordering. Every card is
-  built through the new `CardView.BuildSlotted`, which wraps it in a plain,
-  non-layout slot so the animation can move the card's own position without the
-  row's `HorizontalLayoutGroup` fighting it back into place -- necessary here
-  specifically because `RenderRound` calls `FitHands`, which force-rebuilds
-  `_handsRow`'s layout on every redraw and would otherwise snap an in-flight card
-  straight back. A per-slot state cache (keyed on `dealer:<i>` / `hand:<i>:<i>`, not
-  on the GameObject) stops a card re-animating on redraws where its content has not
-  actually changed -- a Hit only animates the one new card, not the whole hand.
-  **Built against the engine's shape and compiled cleanly as part of `Blackjack.Client`
-  on 8 Sep 2026, but not yet seen on a screen** -- there was no install to run the
-  game against. Worth an eyes-on pass before calling it done; see the identical note
-  in `docs/poker.md`.
+  built through `CardView.BuildSlotted`, which wraps it in a plain, non-layout slot
+  so the animation can move the card's own position without the row's
+  `HorizontalLayoutGroup` fighting it back into place -- necessary here specifically
+  because `RenderRound` calls `FitHands`, which force-rebuilds `_handsRow`'s layout on
+  every redraw and would otherwise snap an in-flight card straight back. A per-slot
+  state cache (keyed on `dealer:<i>` / `hand:<i>:<i>`, not on the GameObject) stops a
+  card re-animating on redraws where its content has not actually changed -- a Hit
+  only animates the one new card, not the whole hand.
+  **Every card slides in from the dealer's own row `_dealerCards`, not a fixed drop
+  from above** -- the dealer's own two cards get a short hop as they settle either
+  side of that row's centre, and the player's cards get the long slide down the felt.
+  That reuses an existing RectTransform as the "where the shoe is" marker rather than
+  adding a new one, since Blackjack's layout is nested nowhere near as regularly as
+  Poker's felt-relative seat math. The slide moves the card's **world** position, not
+  `anchoredPosition`, and reads it back one frame after building rather than
+  immediately -- Unity does not lay out a fresh hierarchy until its own end-of-frame
+  pass, so reading `rect.position` the same frame a card and its slot are built is not
+  safe to trust.
+  **Built against the engine's shape, and compiled clean as part of `Casino.Client`
+  against a real SPT 4.1.3 install (0.16.9.5 build 40743) on 8 Sep 2026 -- but still
+  not yet seen on a screen**, since that box could only run the server, not the game.
+  Worth an eyes-on pass before calling it done; see the identical note in
+  `docs/poker.md`.
 - **Escape closes the table and nothing else**, and the table has been played from the
   hideout and the flea market rather than only the main menu. See "Escape, and why
   watching the key was never enough".

@@ -1620,7 +1620,12 @@ namespace Blackjack.Client
             if (!_dealtState.TryGetValue(key, out var prev) || prev != state)
             {
                 _dealtState[key] = state;
-                DealAnimator.Deal(card, order * DealAnimator.CardStagger);
+
+                // The dealer's own row, not a separate marker: it is where a shoe
+                // would actually sit, so the dealer's own cards get a short slide into
+                // place beside each other and the player's cards get the long one
+                // down the table -- both for free, from one honest origin.
+                DealAnimator.Deal(card, order * DealAnimator.CardStagger, _dealerCards);
             }
 
             return card;
