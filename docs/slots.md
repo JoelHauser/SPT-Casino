@@ -616,20 +616,27 @@ this file has been looked at on a real machine.
 - Art: the game's own item icons, rendered on the player's machine and cached beside
   the plugin under their template ids. No stand-ins at all, and nothing drawn on the
   reels until every icon has landed.
-  **Rendering is switched off as of 8 Sep 2026, and the reels currently show blanks.**
-  `ItemArt.TryRender` looked up `Singleton<ItemFactory>` and `Singleton<ItemIconCreator>`
-  by name, and neither name resolves in `Assembly-CSharp.dll` on EFT 0.16.9.5 build
-  40743 -- not merely less accessible, the way two unrelated breaks in the same session
-  turned out to be, but genuinely absent, which reflection confirmed by finding a class
-  in that assembly with an empty, obfuscated name where `ItemFactory` used to be. That
-  is the obfuscator reshuffling between builds, the same class of problem this repo hit
-  once before with `MenuScreen.Awake`, and it blocked `Casino.Client` from compiling at
-  all -- Slots is bundled into the same plugin as the other three tables. `TryRender`
-  now always takes its own documented "cannot draw anything" fallback rather than
-  referencing the missing names, which was already a real designed-for outcome for
-  exactly this situation. Blank tiles are a regression from what this section describes
-  above, not a rewrite of it: the moment someone can read the current names back out of
-  a running game, that code should be the fix, not a rewrite of `TryRender`.
+  **Rendering was switched off between 8 Sep 2026 10:42 and 8 Sep 2026 (later the same
+  day), then restored by token instead of by name.** `ItemArt.TryRender` looked up
+  `Singleton<ItemFactory>` and `Singleton<ItemIconCreator>` by name; on EFT 0.16.9.5
+  build 40743 `ItemIconCreator` resolves under an unreadable Unicode name and
+  `ItemFactory` has no name at all -- its `Name` in the assembly's own metadata is the
+  empty string, which blocked `Casino.Client` from compiling (Slots shares a plugin with
+  the other three tables) and briefly took `TryRender` down to its documented
+  "cannot draw anything" fallback for everyone. It turned out `ItemIconCreator` never
+  needed naming at all: `ItemViewFactory.GetItemSpriteAsync`, the actual call site this
+  file uses, is still a normal public method and resolves it internally. Only
+  `ItemFactory.CreateItem` had to be reached another way -- `Module.ResolveMethod` against
+  its exact metadata token (`0x06009726`, found once by decompiling `Assembly-CSharp.dll`
+  with `ilspycmd` and matching the `CreateItem(string, string, diff)` overload shaped
+  like the old call site), then `Singleton<>.MakeGenericType` against whatever `Type`
+  that method's `DeclaringType` turns out to be -- a token addresses metadata directly
+  and does not care what the type is named. See `ItemArt.TryResolveFactory`. Verified by
+  building `Casino.Client` clean against the real `C:\HUH` install and re-running both
+  Slots test suites (52 passing); **not yet confirmed against a live session** -- the
+  panel itself has not been reopened in-game since. The token is exactly as fragile as
+  the name it replaces: a future build can move it the same way this one moved the name,
+  and the fix then is the same decompile-and-repin, not a rewrite of `TryRender`.
 - The stake is typed, and the server takes any whole amount between the two ends --
   or above the top one, with "No maximum stake" ticked in F12.
 - The win banner scales with the multiple: WIN, BIG WIN, HUGE WIN, JACKPOT.

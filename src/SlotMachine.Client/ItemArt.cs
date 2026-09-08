@@ -2,10 +2,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using Casino.Shared;
 using Comfort.Common;
 using EFT;
+using EFT.InventoryLogic;
 using EFT.UI.DragAndDrop;
 using UnityEngine;
 
@@ -21,14 +23,16 @@ namespace SlotMachine.Client
     /// `ItemViewFactory.GetItemSpriteAsync` is the front door to it -- the same call the
     /// stash and the flea market make for every icon you have ever seen in the menu.
     ///
-    /// So the path is: a template id, an `Item` from `Singleton&lt;ItemFactory&gt;`, and
-    /// that item handed to the renderer. Three calls, all public, all read off the
-    /// assembly rather than remembered:
+    /// So the path is: a template id, an `Item` from the game's own item factory, and
+    /// that item handed to the renderer.
     ///
     /// ```
-    /// Singleton&lt;ItemFactory&gt;.Instance.CreateItem(MongoID.Generate(true), template, null)
-    /// ItemViewFactory.GetItemSpriteAsync(item, ScaleFactor)   ->   Task&lt;Sprite&gt;
+    /// factory.CreateItem(MongoID.Generate(true), template, null)   -- see TryResolveFactory
+    /// ItemViewFactory.GetItemSpriteAsync(item, ScaleFactor)        -> Task&lt;Sprite&gt;
     /// ```
+    ///
+    /// `ItemViewFactory` is still a normal, nameable type -- only the factory it asks for
+    /// an `Item` had to stop being one. See <see cref="TryResolveFactory"/> for why.
     ///
     /// **Nothing here ships BSG's art.** The icons are made on the player's own machine
     /// out of their own installation, which is both the honest arrangement and the
@@ -296,26 +300,126 @@ namespace SlotMachine.Client
         }
 
         /// <summary>
+        /// The metadata token of the item factory's own
+        /// <c>CreateItem(string itemId, string templateId, ItemComponentsProperties diff)</c>
+        /// method, on EFT 0.16.9.5 build 40743.
+        ///
+        /// The class that method lives on was called `ItemFactory` until this build. It
+        /// is not renamed here -- its `Name` in the assembly's own metadata is the empty
+        /// string, which is not a name C# will let anyone write, `nameof` included. A
+        /// token sidesteps that: <see cref="Module.ResolveMethod(int)"/> hands back a
+        /// working <see cref="MethodInfo"/> from the address alone, and its
+        /// <see cref="MemberInfo.DeclaringType"/> is a real, usable <see cref="Type"/>
+        /// regardless of what it is called.
+        ///
+        /// Found by decompiling `Assembly-CSharp.dll` (ilspycmd) and matching the one
+        /// `CreateItem` overload shaped like the call this file always made -- an
+        /// instance method taking an id, a template id and an optional diff, returning
+        /// an `Item` -- against the handful the assembly has. Pinned as a constant
+        /// rather than re-discovered every launch, which is exactly why it is this
+        /// fragile: the next build can move it precisely the way this one moved the
+        /// name. There is no way to make a token outlive the build it was read from --
+        /// when this breaks again, decompile again and replace the constant.
+        /// </summary>
+        private const int FactoryCreateItemToken = 0x06009726;
+
+        private static MethodInfo _createItem;
+
+        private static PropertyInfo _factoryInstantiated;
+
+        private static PropertyInfo _factoryInstance;
+
+        private static bool _factoryResolveFailed;
+
+        /// <summary>
+        /// Resolves <see cref="_createItem"/> and its matching
+        /// <c>Singleton&lt;&gt;.Instantiated</c> / <c>.Instance</c> accessors from
+        /// <see cref="FactoryCreateItemToken"/>, once.
+        ///
+        /// A token that fails to resolve on this build will fail again on the next
+        /// attempt for the same reason, so a failure is cached rather than retried --
+        /// one warning for the session instead of one per symbol per panel open.
+        /// </summary>
+        private static bool TryResolveFactory()
+        {
+            if (_createItem != null)
+            {
+                return true;
+            }
+
+            if (_factoryResolveFailed)
+            {
+                return false;
+            }
+
+            try
+            {
+                _createItem = (MethodInfo)typeof(MongoID).Module.ResolveMethod(FactoryCreateItemToken);
+
+                var singletonOfFactory = typeof(Singleton<>).MakeGenericType(_createItem.DeclaringType);
+
+                _factoryInstantiated = singletonOfFactory.GetProperty(
+                    "Instantiated", BindingFlags.Public | BindingFlags.Static);
+                _factoryInstance = singletonOfFactory.GetProperty(
+                    "Instance", BindingFlags.Public | BindingFlags.Static);
+
+                if (_factoryInstantiated == null || _factoryInstance == null)
+                {
+                    throw new MissingMemberException(
+                        "Singleton<> no longer exposes Instantiated/Instance by those names.");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _factoryResolveFailed = true;
+                _createItem = null;
+
+                SlotClientPlugin.Log.LogWarning(
+                    $"[Slots] item icon rendering is off: the factory token no longer resolves "
+                    + $"({ex.Message}). The reels will show blanks until it is re-pinned.");
+
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Asks the game to draw one item.
         ///
         /// Returns false rather than throwing when the game is not in a state to do it,
         /// because "not yet" and "never" want different answers from the caller.
-        ///
-        /// **Disabled as of EFT 0.16.9.5 build 40743.** `ItemFactory` and
-        /// `ItemIconCreator` -- named directly above -- no longer resolve under those
-        /// names in that build's `Assembly-CSharp.dll` at all, which is the "a name has
-        /// moved" case this method's own doc already anticipated, just further than
-        /// expected: not a changed signature but a class renamed out from under it by
-        /// the obfuscator. Rather than guess at a replacement blind, this always takes
-        /// the existing "cannot draw anything" path below, which was already a real,
-        /// designed-for outcome -- blank tiles and a warning, not a build that cannot
-        /// ship. Re-enable once the current names are read out of a running game rather
-        /// than assumed.
         /// </summary>
         private static bool TryRender(string symbol, string template, out Task<Sprite> task)
         {
             task = null;
-            return false;
+
+            try
+            {
+                if (!TryResolveFactory() || !(bool)_factoryInstantiated.GetValue(null))
+                {
+                    return false;
+                }
+
+                var factory = _factoryInstance.GetValue(null);
+                string itemId = MongoID.Generate(true);
+                var item = (Item)_createItem.Invoke(factory, new object[] { itemId, template, null });
+
+                if (item == null)
+                {
+                    SlotClientPlugin.Log.LogWarning($"[Slots] no item template {template} for {symbol}.");
+                    return false;
+                }
+
+                task = ItemViewFactory.GetItemSpriteAsync(item, ScaleFactor);
+                return task != null;
+            }
+            catch (Exception ex)
+            {
+                var reason = (ex as TargetInvocationException)?.InnerException?.Message ?? ex.Message;
+                SlotClientPlugin.Log.LogWarning($"[Slots] could not ask the game for {symbol}: {reason}");
+                return false;
+            }
         }
 
         /// <summary>

@@ -8,11 +8,14 @@ lobby; the lobby has four tables.
 | **Blackjack** | Twenty-one against the dealer. |
 | **Poker** | No-limit hold'em against bots, seated under names drawn from the game's own PMC nickname list. |
 | **Roulette** | A single-zero European wheel that actually spins, and a full betting cloth to play it from. |
-| **Slots** | Five reels and 243 ways, spinning the item icons out of your own install. Takes roubles, dollars or euros. |
+| **Slots** | Five reels and 243 ways, spinning the item icons out of your own install. AUTO and SPEED keep it moving without a click every time. Takes roubles, dollars or euros. |
 
-**It plays for real money out of your stash.** A stake leaves the moment you commit it
-and winnings are paid straight back in. There is no chip balance and nothing to cash
-out. If your stash is too full to take a payout, it arrives in the post instead.
+**It plays for real money out of your stash -- never your gear.** A stake leaves the
+moment you commit it and winnings are paid straight back in, and it only ever comes
+from what is actually put away: pockets, the secure container, backpack and rig are
+untouched, so a bet can never eat into what you're about to carry into a raid. There
+is no chip balance and nothing to cash out. If your stash is too full to take a
+payout, it arrives in the post instead.
 
 The house edge is real too, and it is computed rather than guessed at. Roulette keeps
 2.70% of everything staked on it; the slot machine returns 92.51% and keeps the rest.
@@ -44,6 +47,15 @@ and only the casino -- the screen behind it stays where it was.
 
 The first time an account walks in, a card explains what the money does. Read it once.
 
+Cards deal the way a dealer would throw them -- sliding in from one spot on the table
+rather than popping into place -- and a hole card turns over in place instead of being
+dealt again when it's revealed. The result doesn't post until every card involved has
+actually finished turning over.
+
+Blackjack and Slots each keep a running record behind their own STATS button: rounds
+or pulls, wins and losses, best streak, and staked and returned per currency. Poker
+and Roulette don't have one yet.
+
 ### Settings
 
 F12 opens BepInEx's configuration manager. The casino keeps a handful of switches
@@ -56,6 +68,13 @@ there:
 | Poker | **Buy-in** | What sitting down costs. Five seats, always. |
 | Blackjack | **Enforce the table maximum** | Refuse a wager over the limit instead of trimming it. |
 | Slots | **No maximum stake** | Bet as much as you like. The minimum still applies. |
+
+## Known issues
+
+**Sound is wired in but silent for now.** Every action -- dealing, chips landing, the
+wheel and reels spinning, the win banner -- already fires its own cue; no audio files
+ship with the mod yet, so nothing plays. Drop one into the plugin's `sounds` folder,
+named for the cue, and it plays immediately -- no rebuild required.
 
 ## Building
 

@@ -180,6 +180,56 @@ fails with CS1566.
 **`.slnx` files are XML, so a `--` inside a comment is a parse error.** This has broken
 the build twice; both times the comment was written in this repo's own house style.
 
+## The SPT install on this box is not `H:\SPT4.1.X`
+
+Every `.csproj`'s default `SPTPath` is `H:\SPT4.1.X`, and Blackjack's alone falls back
+to `C:\HUH` if that path doesn't exist. On this machine that fallback is not a
+coincidence to skip past: there is no `H:` drive at all, only `C:` and a `K:` that is a
+disconnected work share (`\\bls-adfs\Common`, unrelated to any of this), and the real
+install lives at `C:\HUH`. Pass it explicitly for anything that touches a `.Client`
+project or `pack.ps1`:
+
+```
+dotnet build src/Casino.Client/Casino.Client.csproj -c Release -p:SPTPath=C:\HUH
+scripts/casino/pack.ps1 -SPTPath C:\HUH
+```
+
+`Casino.Client.csproj` itself doesn't carry the `C:\HUH` fallback the way Blackjack's
+does, so the plain `dotnet build SPT-Casino.slnx` this file and the README both show
+elsewhere will fail to find the install on this box specifically unless `-p:SPTPath`
+is added.
+
+## When the obfuscator empties a name instead of just moving it
+
+`MenuScreen.Awake` was the first time this repo hit BSG's obfuscator reshuffling a
+class between game builds. `ItemFactory`, on EFT 0.16.9.5 build 40743, was the second
+and the worse one: its `Name` in the assembly's own metadata is not a garbled Unicode
+glyph the way `ItemIconCreator`'s is, it is the empty string. There is no identifier
+C# will let anyone write for that -- `nameof` and Harmony's `AccessTools.TypeByName`
+both still need a real string to search for, and an empty one is not one.
+
+A metadata token survives that, because it addresses the member directly instead of
+searching for its name:
+
+1. `dotnet tool install -g ilspycmd`, then point it at the installed
+   `EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll`. `ilspycmd --dump-table
+   MethodDef <dll>` lists every method with its RID/token -- fast, metadata only, no
+   full decompile needed just to find candidates.
+2. Find the one shaped like the call site that broke -- same parameter count, same
+   rough parameter and return types -- and confirm it with `ilspycmd -m 0x0600XXXX
+   <dll>`, which decompiles a single member by token and shows its real body even
+   when its declaring type has no name to show one under.
+3. At runtime, `Module.ResolveMethod(token)` hands back a working `MethodInfo` off
+   that address alone, and `methodInfo.DeclaringType` is a real, usable `Type` --
+   `Type.MakeGenericType` accepts it exactly like any named type, which is how
+   `Singleton<>.Instance` gets reached for a class with nothing to write inside the
+   angle brackets.
+
+See `ItemArt.TryResolveFactory` in `src/SlotMachine.Client/ItemArt.cs` for the whole
+pattern working end to end, token `0x06009726` pinned for build 40743. It is exactly
+as build-specific as the name it replaces -- the next patch can move it too, and the
+fix is the same three steps again, not a rewrite of whatever calls it.
+
 ## The things that are true of every table
 
 **SPT 4.x server mods are C#, not TypeScript.** The `mod.ts` / `package.json` /
