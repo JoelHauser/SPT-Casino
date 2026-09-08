@@ -300,6 +300,14 @@ two reds. The test was wrong, not the data, and it now pins that property instea
   mid-spin gives it back on next contact. 13 money tests, written before the
   settlement, and mutation-checked against eight deliberate faults -- all eight
   caught. **Not yet played against a real profile.**
+- **Sound cues added, 8 Sep 2026: no audio files behind them yet.** `WheelView.Run`
+  plays `RouletteSpinStart` right as the spin coroutine actually begins and
+  `RouletteBallLand` on the frame the ball settles into its pocket -- not the
+  callback that follows, which drives a server-timed re-render instead. `Place`
+  plays `ChipPlace` once the engine has actually accepted the bet; `Lift` (taking a
+  chip back off the felt) has no cue yet. See "The sound boilerplate" in the root
+  `CLAUDE.md` and `src/Casino.Client/assets/sounds/README.txt` for the file names
+  this is waiting on.
 
 ### Opening the table costs 197ms, and used to cost 1489
 

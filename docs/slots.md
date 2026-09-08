@@ -633,6 +633,14 @@ this file has been looked at on a real machine.
 - The stake is typed, and the server takes any whole amount between the two ends --
   or above the top one, with "No maximum stake" ticked in F12.
 - The win banner scales with the multiple: WIN, BIG WIN, HUGE WIN, JACKPOT.
+  **Each tier now has a matching sound cue** -- `SlotWin`/`SlotBigWin`/`SlotHugeWin`/
+  `SlotJackpot` -- played from `SlotPanel.SetPaid` alongside the banner's own pop, off
+  the identical multiple boundaries so the two can never disagree about which tier a
+  spin landed in. `ReelView.Spin` plays `SlotReelSpin` once when all five reels start
+  together and `SlotReelStop` once per reel as it individually settles. No audio files
+  exist yet -- see "The sound boilerplate" in the root `CLAUDE.md` and
+  `src/Casino.Client/assets/sounds/README.txt` for the exact file names this is
+  waiting on.
 - **AUTO**, under SPIN. Arms a run that keeps pulling on its own -- a beat after each
   settle, so a result is on screen for a moment -- until STOP is clicked, the panel is
   closed, or a pull comes back with an error. Green both ways; the label and the shade

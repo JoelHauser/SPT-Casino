@@ -1582,6 +1582,13 @@ reads this first and would have started building one.
   still not yet watched running in the actual game** -- that box could only run the
   server. Worth an eyes-on pass before calling it done; see the identical note in
   `docs/blackjack.md`.
+- **Sound cues added, 8 Sep 2026, no audio files behind them yet.** `DealAnimator`
+  itself plays `CardDeal`/`CardFlip` -- shared with Blackjack, so nothing poker-
+  specific to wire there. `Act` plays `ChipBet` once the engine has accepted a
+  Bet/Call/Raise/All-in, never on Fold or Check and never on a refused move. A
+  bot betting plays no sound yet -- that needs diffing server state the way dealt
+  cards already are, which chips do not do. See "The sound boilerplate" in the
+  root `CLAUDE.md` and `src/Casino.Client/assets/sounds/README.txt`.
 - **The variant is no-limit Texas Hold'em against bots**, decided after two
   reversals. See the top of this file, and read it before reopening the question.
 - **THE MONEY HAS RUN, ON A REAL PROFILE, AND IT WAS RIGHT.** 3 Sep 2026 on the home

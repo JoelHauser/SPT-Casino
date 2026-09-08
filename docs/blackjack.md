@@ -663,6 +663,12 @@ the server half, deliberately, because so much of it has still only run once.
   not yet seen on a screen**, since that box could only run the server, not the game.
   Worth an eyes-on pass before calling it done; see the identical note in
   `docs/poker.md`.
+- **Sound cues added, 8 Sep 2026, no audio files behind them yet.** `DealAnimator`
+  plays `CardDeal`/`CardFlip` -- shared with Poker. `Deal()` (placing the bet and
+  starting the round) plays `ChipBet` once the server confirms the stake was
+  actually taken. Double and Split both take more money mid-hand and are not
+  hooked yet. See "The sound boilerplate" in the root `CLAUDE.md` and
+  `src/Casino.Client/assets/sounds/README.txt`.
 - **Escape closes the table and nothing else**, and the table has been played from the
   hideout and the flea market rather than only the main menu. See "Escape, and why
   watching the key was never enough".
