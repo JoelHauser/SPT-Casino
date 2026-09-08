@@ -1,3 +1,7 @@
+> ### Your stash is the bankroll
+>
+> No chips, no separate wallet, nothing to cash out. What you bet is what's already in your stash, and what you win lands back in it before the panel even closes. Lose, and it's gone the same as anything you didn't make it out of a raid with.
+
 A casino in your menu. One tab, a lobby, and tables that play for the roubles in your stash.
 
 There is no unlock, no hideout requirement and no quest. Install it, and a **CASINO** tab appears on the bar along the bottom of the menu — on a profile five minutes old or one with a thousand raids behind it.
