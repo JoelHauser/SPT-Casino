@@ -165,8 +165,29 @@ namespace Casino.Client
                 }
 
                 // The hideout and the narrated scenes are worlds without being raids.
-                return !(world is HideoutGameWorld) && !(world is NarrateGameWorld);
+                //
+                // Not a direct `is` check: HideoutGameWorld and NarrateGameWorld are
+                // internal as of EFT 0.16.9.5 build 40743, so the type names cannot be
+                // written here at all, only looked up at runtime. Walking the actual
+                // type's own base chain by name is what `is` does under the hood --
+                // this is that, done through reflection instead of the type itself.
+                var worldType = world.GetType();
+                return !DerivesFromNamed(worldType, "HideoutGameWorld")
+                    && !DerivesFromNamed(worldType, "NarrateGameWorld");
             }
+        }
+
+        private static bool DerivesFromNamed(Type type, string name)
+        {
+            for (var t = type; t != null; t = t.BaseType)
+            {
+                if (t.Name == name)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>Why the tab is dim, for the log. See the diagnostic in Update.</summary>

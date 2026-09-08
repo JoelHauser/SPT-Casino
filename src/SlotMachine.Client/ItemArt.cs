@@ -300,34 +300,22 @@ namespace SlotMachine.Client
         ///
         /// Returns false rather than throwing when the game is not in a state to do it,
         /// because "not yet" and "never" want different answers from the caller.
+        ///
+        /// **Disabled as of EFT 0.16.9.5 build 40743.** `ItemFactory` and
+        /// `ItemIconCreator` -- named directly above -- no longer resolve under those
+        /// names in that build's `Assembly-CSharp.dll` at all, which is the "a name has
+        /// moved" case this method's own doc already anticipated, just further than
+        /// expected: not a changed signature but a class renamed out from under it by
+        /// the obfuscator. Rather than guess at a replacement blind, this always takes
+        /// the existing "cannot draw anything" path below, which was already a real,
+        /// designed-for outcome -- blank tiles and a warning, not a build that cannot
+        /// ship. Re-enable once the current names are read out of a running game rather
+        /// than assumed.
         /// </summary>
         private static bool TryRender(string symbol, string template, out Task<Sprite> task)
         {
             task = null;
-
-            try
-            {
-                if (!Singleton<ItemFactory>.Instantiated || !Singleton<ItemIconCreator>.Instantiated)
-                {
-                    return false;
-                }
-
-                var item = Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(true), template, null);
-
-                if (item == null)
-                {
-                    SlotClientPlugin.Log.LogWarning($"[Slots] no item template {template} for {symbol}.");
-                    return false;
-                }
-
-                task = ItemViewFactory.GetItemSpriteAsync(item, ScaleFactor);
-                return task != null;
-            }
-            catch (Exception ex)
-            {
-                SlotClientPlugin.Log.LogWarning($"[Slots] could not ask the game for {symbol}: {ex.Message}");
-                return false;
-            }
+            return false;
         }
 
         /// <summary>

@@ -54,8 +54,12 @@ namespace Casino.Client
         /// </summary>
         internal static bool Applied;
 
+        // A string literal, not nameof(InputNodeAbstract.TranslateInput): the method
+        // is protected as of EFT 0.16.9.5 build 40743, and nameof needs compile-time
+        // access that AccessTools' reflection never did. Harmony has never cared what
+        // C# thinks a method's accessibility is; only the compiler does.
         private static MethodBase TargetMethod() =>
-            AccessTools.Method(typeof(InputNodeAbstract), nameof(InputNodeAbstract.TranslateInput));
+            AccessTools.Method(typeof(InputNodeAbstract), "TranslateInput");
 
         [HarmonyPrefix]
         [HarmonyPriority(Priority.First)]
