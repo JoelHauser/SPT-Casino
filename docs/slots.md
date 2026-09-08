@@ -616,6 +616,20 @@ this file has been looked at on a real machine.
 - Art: the game's own item icons, rendered on the player's machine and cached beside
   the plugin under their template ids. No stand-ins at all, and nothing drawn on the
   reels until every icon has landed.
+  **Rendering is switched off as of 8 Sep 2026, and the reels currently show blanks.**
+  `ItemArt.TryRender` looked up `Singleton<ItemFactory>` and `Singleton<ItemIconCreator>`
+  by name, and neither name resolves in `Assembly-CSharp.dll` on EFT 0.16.9.5 build
+  40743 -- not merely less accessible, the way two unrelated breaks in the same session
+  turned out to be, but genuinely absent, which reflection confirmed by finding a class
+  in that assembly with an empty, obfuscated name where `ItemFactory` used to be. That
+  is the obfuscator reshuffling between builds, the same class of problem this repo hit
+  once before with `MenuScreen.Awake`, and it blocked `Casino.Client` from compiling at
+  all -- Slots is bundled into the same plugin as the other three tables. `TryRender`
+  now always takes its own documented "cannot draw anything" fallback rather than
+  referencing the missing names, which was already a real designed-for outcome for
+  exactly this situation. Blank tiles are a regression from what this section describes
+  above, not a rewrite of it: the moment someone can read the current names back out of
+  a running game, that code should be the fix, not a rewrite of `TryRender`.
 - The stake is typed, and the server takes any whole amount between the two ends --
   or above the top one, with "No maximum stake" ticked in F12.
 - The win banner scales with the multiple: WIN, BIG WIN, HUGE WIN, JACKPOT.
