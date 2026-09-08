@@ -1560,11 +1560,18 @@ reads this first and would have started building one.
   world position sidesteps that entirely. A per-slot state cache (keyed on seat/board
   position, not on the GameObject) is what stops a card re-animating on every one of
   the redraws a single hand goes through -- only a slot whose content actually changed
-  since the last render plays. **Built against the engine and checked with an isolated
-  console repro of the deal-order LINQ, and this build actually compiled clean against
-  a real SPT 4.1.3 install (0.16.9.5 build 40743) on 8 Sep 2026, but still not yet
-  watched running in the actual game** -- that box could only run the server. Worth an
-  eyes-on pass before calling it done; see the identical note in `docs/blackjack.md`.
+  since the last render plays. A seat's hole cards resolving from backs to a real pair
+  at showdown is **not** treated as a deal, on purpose: `DealAnimator.Flip` turns the
+  card over in place instead -- shrinks `CardView.AddBackTo`'s temporary back to
+  edge-on, destroys it, grows the real card out from nothing -- because a card already
+  on the table is not arriving from anywhere, and sliding it in from the dealer point
+  the way a fresh deal does would have every other seat's hand appear to fly in from
+  off-table the moment the pot is read. **Built against the engine and checked with an
+  isolated console repro of the deal-order LINQ, and this build actually compiled
+  clean against a real SPT 4.1.3 install (0.16.9.5 build 40743) on 8 Sep 2026, but
+  still not yet watched running in the actual game** -- that box could only run the
+  server. Worth an eyes-on pass before calling it done; see the identical note in
+  `docs/blackjack.md`.
 - **The variant is no-limit Texas Hold'em against bots**, decided after two
   reversals. See the top of this file, and read it before reopening the question.
 - **THE MONEY HAS RUN, ON A REAL PROFILE, AND IT WAS RIGHT.** 3 Sep 2026 on the home

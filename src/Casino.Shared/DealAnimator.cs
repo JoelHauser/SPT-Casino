@@ -115,6 +115,111 @@ namespace Casino.Shared
             group.alpha = 1f;
         }
 
+        /// <summary>
+        /// Turns a card over in place -- shrinks <paramref name="back"/> to edge-on,
+        /// swaps it for <paramref name="face"/>, then grows that back out to full width.
+        /// <see cref="Deal"/> is the wrong shape for this: a reveal is not a card
+        /// arriving from anywhere, it is one already on the table turning over, so
+        /// nothing here moves position and only the width -- not the height -- scales,
+        /// which is what reads as a card rotating on its long axis rather than one
+        /// simply shrinking.
+        ///
+        /// <paramref name="back"/> is spent by this call: it exists only to be the
+        /// thing shrinking away, and this destroys it partway through. Build it with
+        /// <see cref="CardView.AddBackTo"/> immediately before calling, never reused.
+        /// </summary>
+        internal static void Flip(GameObject face, GameObject back, float delay)
+        {
+            var host = Host.Plugin;
+            var faceRect = face == null ? null : face.transform as RectTransform;
+            var backRect = back == null ? null : back.transform as RectTransform;
+
+            if (host == null || faceRect == null || backRect == null)
+            {
+                return;
+            }
+
+            host.StartCoroutine(AnimateFlip(faceRect, backRect, delay));
+        }
+
+        private static IEnumerator AnimateFlip(RectTransform face, RectTransform back, float delay)
+        {
+            // The rest scale is whatever the slot already gave the face card -- read
+            // once, before anything is hidden, the same number CardSlot/BuildSlotted
+            // set synchronously at creation. Unlike Deal's world position, localScale
+            // is not something a layout pass computes later, so there is nothing to
+            // wait a frame for here.
+            var restScale = face.localScale;
+            back.localScale = restScale;
+            face.gameObject.SetActive(false);
+
+            var waited = 0f;
+            while (waited < delay)
+            {
+                waited += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            if (face == null || back == null)
+            {
+                yield break;
+            }
+
+            var half = Duration * 0.5f;
+            var elapsed = 0f;
+
+            // The back shrinks to edge-on. Only x moves -- the height of a card does
+            // not change as it turns face down to face up, only how wide it reads.
+            while (elapsed < half)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var t = EaseIn(Mathf.Clamp01(elapsed / half));
+
+                if (back == null)
+                {
+                    yield break;
+                }
+
+                back.localScale = new Vector3(restScale.x * (1f - t), restScale.y, 1f);
+                yield return null;
+            }
+
+            if (back != null)
+            {
+                UnityEngine.Object.Destroy(back.gameObject);
+            }
+
+            if (face == null)
+            {
+                yield break;
+            }
+
+            // The swap happens at the edge-on instant, where the card reads as a
+            // sliver too thin to show a face either way -- the one moment a hard cut
+            // between two different GameObjects cannot be seen happening.
+            face.gameObject.SetActive(true);
+            face.localScale = new Vector3(0f, restScale.y, 1f);
+
+            elapsed = 0f;
+            while (elapsed < half)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var t = EaseOut(Mathf.Clamp01(elapsed / half));
+
+                if (face == null)
+                {
+                    yield break;
+                }
+
+                face.localScale = new Vector3(restScale.x * t, restScale.y, 1f);
+                yield return null;
+            }
+
+            face.localScale = restScale;
+        }
+
         private static float EaseOut(float t) => 1f - ((1f - t) * (1f - t));
+
+        private static float EaseIn(float t) => t * t;
     }
 }

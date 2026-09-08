@@ -642,6 +642,11 @@ the server half, deliberately, because so much of it has still only run once.
   immediately -- Unity does not lay out a fresh hierarchy until its own end-of-frame
   pass, so reading `rect.position` the same frame a card and its slot are built is not
   safe to trust.
+  **The hole card resolving from a back to a face at the dealer's turn is a flip, not
+  a deal** -- `DealAnimator.Flip` shrinks a temporary back (`CardView.AddBackTo`) to
+  edge-on, destroys it, and grows the real card out from nothing, in place, because a
+  card already on the table is not arriving from anywhere. Only width scales during a
+  flip, never height, which is what reads as the card rotating rather than shrinking.
   **Built against the engine's shape, and compiled clean as part of `Casino.Client`
   against a real SPT 4.1.3 install (0.16.9.5 build 40743) on 8 Sep 2026 -- but still
   not yet seen on a screen**, since that box could only run the server, not the game.

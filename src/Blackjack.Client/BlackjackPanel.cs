@@ -1617,16 +1617,32 @@ namespace Blackjack.Client
             var order = dealSequence++;
             var state = code ?? "back";
 
-            if (!_dealtState.TryGetValue(key, out var prev) || prev != state)
+            if (_dealtState.TryGetValue(key, out var prev))
             {
-                _dealtState[key] = state;
+                if (prev == state)
+                {
+                    return card;
+                }
 
-                // The dealer's own row, not a separate marker: it is where a shoe
-                // would actually sit, so the dealer's own cards get a short slide into
-                // place beside each other and the player's cards get the long one
-                // down the table -- both for free, from one honest origin.
-                DealAnimator.Deal(card, order * DealAnimator.CardStagger, _dealerCards);
+                // The hole card resolving from a back to a face at the dealer's turn
+                // is a reveal, not a deal -- it is not arriving from anywhere, it is
+                // already sitting there and turning over.
+                if (prev == "back" && state != "back")
+                {
+                    _dealtState[key] = state;
+                    var back = CardView.AddBackTo(card, _font);
+                    DealAnimator.Flip(card, back, order * DealAnimator.CardStagger);
+                    return card;
+                }
             }
+
+            _dealtState[key] = state;
+
+            // The dealer's own row, not a separate marker: it is where a shoe
+            // would actually sit, so the dealer's own cards get a short slide into
+            // place beside each other and the player's cards get the long one
+            // down the table -- both for free, from one honest origin.
+            DealAnimator.Deal(card, order * DealAnimator.CardStagger, _dealerCards);
 
             return card;
         }

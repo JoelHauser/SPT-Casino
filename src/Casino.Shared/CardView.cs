@@ -108,6 +108,33 @@ namespace Casino.Shared
             return card;
         }
 
+        /// <summary>
+        /// Adds a second, back-drawn card into an already-slotted card's own slot,
+        /// centred exactly the way <see cref="BuildSlotted"/> centres the real one --
+        /// same slot, same anchored position, same scale, so the two sit exactly on
+        /// top of each other.
+        ///
+        /// For animating a reveal: <see cref="DealAnimator.Flip"/> shrinks this one
+        /// away to edge-on, destroys it, and grows the real card out in its place.
+        /// This is spent by that call, not a general-purpose second card -- build it
+        /// immediately before flipping, never reused or kept around.
+        /// </summary>
+        internal static GameObject AddBackTo(GameObject slottedCard, TMP_FontAsset font)
+        {
+            var slot = slottedCard.transform.parent;
+            var scale = slottedCard.transform.localScale;
+
+            var back = Build(slot, null, font);
+
+            var rect = (RectTransform)back.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.localScale = scale;
+
+            return back;
+        }
+
         private static string PathFor(string code)
         {
             if (_cardDirectory == null)

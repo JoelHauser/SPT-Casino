@@ -676,9 +676,23 @@ namespace Poker.Client
         {
             var state = code ?? "back";
 
-            if (_dealtState.TryGetValue(key, out var prev) && prev == state)
+            if (_dealtState.TryGetValue(key, out var prev))
             {
-                return;
+                if (prev == state)
+                {
+                    return;
+                }
+
+                // A hidden card resolving to a face -- showdown, for a seat that was
+                // never folded -- is a reveal, not a deal. It is not arriving from
+                // anywhere; it is already sitting there and turning over.
+                if (prev == "back" && state != "back")
+                {
+                    _dealtState[key] = state;
+                    var back = CardView.AddBackTo(card, _font);
+                    DealAnimator.Flip(card, back, dealIndex * DealAnimator.CardStagger);
+                    return;
+                }
             }
 
             _dealtState[key] = state;
