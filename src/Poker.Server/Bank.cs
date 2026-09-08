@@ -39,9 +39,10 @@ public class Bank(
     private const long MailStorageSeconds = 90L * 24 * 60 * 60;
 
     /// <summary>
-    /// Total of every stack of this currency the profile holds. Counts money in
-    /// containers as well as loose in the stash, which is what a player would call
-    /// their balance.
+    /// Total of every stack of this currency sitting in the stash -- loose, or
+    /// nested inside a container that is itself in the stash. Deliberately excludes
+    /// pockets, the secure container, backpack and rig: see
+    /// <see cref="Casino.Server.StashScope"/>.
     /// </summary>
     public int GetBalance(MongoId sessionId, Wallet wallet)
     {
@@ -284,5 +285,6 @@ public class Bank(
     }
 
     private static IEnumerable<Item> StacksOf(PmcData pmcData, MongoId tpl) =>
-        pmcData.Inventory?.Items?.Where(item => item.Template == tpl) ?? [];
+        pmcData.Inventory?.Items?.Where(item =>
+            item.Template == tpl && Casino.Server.StashScope.IsInStash(pmcData, item)) ?? [];
 }
