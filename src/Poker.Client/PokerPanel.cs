@@ -489,13 +489,31 @@ namespace Poker.Client
             var awaiting = (bool?)table["AwaitingPlayer"] ?? false;
             var button = (int?)table["Button"] ?? -1;
 
-            SetBoard(table["Community"]?.Select(c => (string)c).ToArray());
+            // The latest moment anything actually animating this render will finish.
+            // Only the showdown headline waits on it -- see the comment on Headline --
+            // but board and seats both feed it, since a showdown redraw touches both.
+            var latestFinish = 0f;
+
+            SetBoard(table["Community"]?.Select(c => (string)c).ToArray(), ref latestFinish);
             SetPot(pot);
-            RenderSeats(table["Seats"] as JArray, button);
+            RenderSeats(table["Seats"] as JArray, button, ref latestFinish);
 
             if (!keepStatus)
             {
-                SetStatus(Headline(street, table));
+                var headline = Headline(street, table);
+
+                if (string.Equals(street, "Showdown", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Held back until every seat's reveal has actually finished
+                    // turning over -- announcing the winner the instant the reply
+                    // lands would tell the player the result before they could see
+                    // the cards that decided it.
+                    DealAnimator.After(latestFinish, () => SetStatus(headline));
+                }
+                else
+                {
+                    SetStatus(headline);
+                }
             }
 
             BuildActions(ActionsFor(street, awaiting, table["Options"] as JObject));
@@ -544,7 +562,7 @@ namespace Poker.Client
                 : "Hand over.";
         }
 
-        private static void RenderSeats(JArray seats, int button)
+        private static void RenderSeats(JArray seats, int button, ref float latestFinish)
         {
             ClearSeats();
 
@@ -572,7 +590,7 @@ namespace Poker.Client
 
             foreach (var seat in all)
             {
-                BuildSeat(seat, button, all.Count, dealOrder);
+                BuildSeat(seat, button, all.Count, dealOrder, ref latestFinish);
             }
         }
 
@@ -584,7 +602,8 @@ namespace Poker.Client
         /// Where a seat is drawn is presentation and never reaches the engine: the
         /// deal order is fixed by seat index, not by position on screen.
         /// </summary>
-        private static void BuildSeat(JObject seat, int button, int total, Dictionary<int, int> dealOrder)
+        private static void BuildSeat(
+            JObject seat, int button, int total, Dictionary<int, int> dealOrder, ref float latestFinish)
         {
             var index = (int?)seat["Index"] ?? 0;
             var name = (string)seat["Name"] ?? ("Seat " + index);
@@ -619,7 +638,7 @@ namespace Poker.Client
             column.childControlHeight = false;
 
             var seatRank = dealOrder.TryGetValue(index, out var rank) ? rank : 0;
-            BuildSeatCards(holder, cards, isPlayer, folded, index, seatRank, total);
+            BuildSeatCards(holder, cards, isPlayer, folded, index, seatRank, total, ref latestFinish);
             BuildSeatPlaque(holder, name, stack, committed, folded, allIn, isTurn, isPlayer, index == button);
 
             // Only at a showdown, and only for a seat that reached one -- the server
@@ -672,9 +691,10 @@ namespace Poker.Client
         /// </summary>
         private static readonly Dictionary<string, string> _dealtState = new Dictionary<string, string>();
 
-        private static void AnimateIfNew(string key, string code, GameObject card, int dealIndex)
+        private static void AnimateIfNew(string key, string code, GameObject card, int dealIndex, ref float latestFinish)
         {
             var state = code ?? "back";
+            var delay = dealIndex * DealAnimator.CardStagger;
 
             if (_dealtState.TryGetValue(key, out var prev))
             {
@@ -690,17 +710,20 @@ namespace Poker.Client
                 {
                     _dealtState[key] = state;
                     var back = CardView.AddBackTo(card, _font);
-                    DealAnimator.Flip(card, back, dealIndex * DealAnimator.CardStagger);
+                    DealAnimator.Flip(card, back, delay);
+                    latestFinish = Mathf.Max(latestFinish, DealAnimator.FinishTime(delay));
                     return;
                 }
             }
 
             _dealtState[key] = state;
-            DealAnimator.Deal(card, dealIndex * DealAnimator.CardStagger, _dealerPoint);
+            DealAnimator.Deal(card, delay, _dealerPoint);
+            latestFinish = Mathf.Max(latestFinish, DealAnimator.FinishTime(delay));
         }
 
         private static void BuildSeatCards(
-            RectTransform holder, string[] cards, bool isPlayer, bool folded, int seatIndex, int seatRank, int seatCount)
+            RectTransform holder, string[] cards, bool isPlayer, bool folded, int seatIndex, int seatRank, int seatCount,
+            ref float latestFinish)
         {
             var scale = isPlayer ? 0.66f : 0.44f;
 
@@ -728,7 +751,7 @@ namespace Poker.Client
                 // first card, then goes round again for the second -- not both cards
                 // to one seat before moving to the next. seatCount spaces the two
                 // passes apart so the second never overtakes the first.
-                AnimateIfNew("seat:" + seatIndex + ":" + i, code, card, (i * seatCount) + seatRank);
+                AnimateIfNew("seat:" + seatIndex + ":" + i, code, card, (i * seatCount) + seatRank, ref latestFinish);
 
                 // A folded seat keeps its cards, dimmed, so the shape of the table
                 // stays readable instead of seats vanishing mid-hand.
@@ -1019,7 +1042,15 @@ namespace Poker.Client
         /// Redraws the community cards. Rebuilt rather than mutated: five cards is
         /// nothing to build, and reusing them means tracking which slot holds what.
         /// </summary>
+        /// <summary>For a caller that is only ever clearing the board, where nothing
+        /// can be animating and there is no showdown headline waiting on it.</summary>
         private static void SetBoard(string[] codes)
+        {
+            var unused = 0f;
+            SetBoard(codes, ref unused);
+        }
+
+        private static void SetBoard(string[] codes, ref float latestFinish)
         {
             if (_board == null)
             {
@@ -1038,7 +1069,7 @@ namespace Poker.Client
 
                 if (dealt)
                 {
-                    AnimateIfNew("board:" + i, codes[i], card, i);
+                    AnimateIfNew("board:" + i, codes[i], card, i, ref latestFinish);
                 }
 
                 // An undealt slot is left as a ghost rather than a card back. A back

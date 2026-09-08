@@ -1566,7 +1566,17 @@ reads this first and would have started building one.
   edge-on, destroys it, grows the real card out from nothing -- because a card already
   on the table is not arriving from anywhere, and sliding it in from the dealer point
   the way a fresh deal does would have every other seat's hand appear to fly in from
-  off-table the moment the pot is read. **Built against the engine and checked with an
+  off-table the moment the pot is read.
+  **The showdown headline itself is held back the same way, and for the same
+  reason.** `Headline` used to be read into `SetStatus` synchronously, so "You win
+  4,820 with a flush" could appear before a single hole card had actually turned
+  over -- the reply landing and the reveal finishing are not the same moment, and
+  the old code treated them as one. `RenderSeats` and `SetBoard` now thread a
+  `latestFinish` out (the latest moment anything actually animating this redraw
+  will finish, via `DealAnimator.FinishTime`), and only the showdown case waits on
+  it through `DealAnimator.After` -- every other street still says its name the
+  instant it is dealt, since there is nothing on those to spoil. **Built against
+  the engine and checked with an
   isolated console repro of the deal-order LINQ, and this build actually compiled
   clean against a real SPT 4.1.3 install (0.16.9.5 build 40743) on 8 Sep 2026, but
   still not yet watched running in the actual game** -- that box could only run the
