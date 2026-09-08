@@ -313,7 +313,16 @@ namespace Blackjack.Client
             // A hand dealt behind the sheet would be dealt out of sight.
             HideStats();
 
-            Render(BlackjackApi.Deal(_wallet, _wager));
+            var reply = BlackjackApi.Deal(_wallet, _wager);
+
+            // Only once the engine has actually taken the stake -- a refused bet
+            // (an empty wallet, a wager over the table's ceiling) moved no chips.
+            if (reply?["Ok"]?.ToObject<bool>() == true)
+            {
+                SoundBoard.Play(Cue.ChipBet);
+            }
+
+            Render(reply);
 
             // The stake is taken before the first card, so the game is already out of
             // date by the time the hand is on screen.

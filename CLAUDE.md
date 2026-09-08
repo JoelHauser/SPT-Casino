@@ -84,6 +84,8 @@ takes an `instant` flag for this.
 | `ChipView.cs` | Roulette's was a strict superset of Poker's, zero lines lost |
 | `ProfileSync.cs` | identical but for the sync action, which is now a parameter |
 | `Host.cs` | new: the two things the shared code needs from its host |
+| `DealAnimator.cs` | new, 8 Sep 2026: slides a dealt card in and flips a revealed one over, for every table's cards at once |
+| `SoundBoard.cs` | new, 8 Sep 2026: plays a named `Cue` by loading a file for it out of a shared `sounds/` folder -- see "The sound boilerplate" |
 
 **`Host` is the whole seam.** These files used to reach for their own table's plugin
 by name, which is most of why they could not simply be shared, and there were only
@@ -108,6 +110,47 @@ writing the other two were never carried back. On 2026-09-05 that cost a real bu
 `InRaid` was wrong in all three copies at once, and every casino tab greyed out for
 the rest of the session after a visit to the hideout. That class of fault is what the
 extraction was for.
+
+## The sound boilerplate
+
+There are no sound files in the repo yet. `Casino.Shared.SoundBoard` exists so that
+adding them later needs no code changes: every table already calls
+`SoundBoard.Play(Cue.Something)` at the exact moment each cue belongs, and dropping a
+`.wav` or `.ogg` named for that cue into `sounds/` beside the installed DLL is the
+entire remaining task -- no rebuild, because
+`SoundBoard` reads from disk at request time rather than baking anything into the
+assembly, the same arrangement `CardView` and `ChipView` already use for art. A cue
+with no file is silent, not broken; every table plays correctly today with nothing to
+hear.
+
+`src/Casino.Client/assets/sounds/README.txt` is the manifest -- every cue, the exact
+file name it looks for, and one line on what it is. That folder ships inside the zip,
+so the manifest is sitting right next to where a file actually needs to go. **Read it
+before adding a cue**, and add the new file name to it -- the enum and the manifest
+are two places that have to agree and nothing enforces that automatically.
+
+**Timing is owned by whoever already knows it, never re-derived.** `SoundBoard.Play`
+does exactly one thing -- find a file, play it -- and is called from inside
+`DealAnimator`'s own coroutines (a deal's cue fires when the stagger delay ends and the
+card actually starts moving, not when `Deal()` was called; a flip's cue fires at the
+edge-on swap instant, not when the shrink starts), from `WheelView.Run` (spin start,
+and the ball's landing frame, not the callback that follows it), from `ReelView`'s
+`Spin`/`SpinOne` (once when all five reels start together, once per reel as each one
+settles), and from `SlotPanel.SetPaid` (alongside the win banner's own pop, using the
+identical multiple boundaries so the two tiers cannot drift apart). Every one of those
+call sites already had the timing this needed; the alternative was a second, separate
+system re-guessing it from outside and eventually disagreeing.
+
+**What plays on a button press waits for the server to agree.** Poker's `Act`,
+Blackjack's `Deal`, and Roulette's `Place` all check the reply for success before
+playing their chip cue -- a refused bet moved no chips, so a sound there would be
+lying about what just happened on screen.
+
+**Known gaps, not oversights**: a bot betting in Poker plays no sound (only the human
+player's own actions are hooked, since a bot's bet would need diffing server state the
+chips do not currently track, the way dealt cards already are); Blackjack's Double and
+Split take more money mid-hand and are unhooked; Roulette's `Lift` (taking a chip back)
+has no cue. All are listed in the manifest too.
 
 ## `dotnet` on this box is not the `dotnet` you want
 

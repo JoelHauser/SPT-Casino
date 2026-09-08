@@ -248,6 +248,10 @@ namespace SlotMachine.Client
 
             Spinning = true;
 
+            // Once, not per reel: every reel starts on the same frame below, so five
+            // copies of the same cue would just be one sound played five times over.
+            SoundBoard.Play(Cue.SlotReelSpin);
+
             for (var reel = 0; reel < 5; reel++)
             {
                 for (var i = 0; i < Cells; i++)
@@ -329,6 +333,11 @@ namespace SlotMachine.Client
             // measuring.
             _positions[reel] = Wrap(rest, StripLength);
             Render(reel);
+
+            // Per reel, unlike the spin start: each one settles on its own, staggered
+            // by Stagger above, and that staggered thump is most of what makes five
+            // reels read as five reels rather than one wide one.
+            SoundBoard.Play(Cue.SlotReelStop);
 
             done?.Invoke();
         }

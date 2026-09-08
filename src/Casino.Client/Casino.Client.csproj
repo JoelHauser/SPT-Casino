@@ -142,6 +142,23 @@
       <HintPath>$(GameManaged)\UnityEngine.ImageConversionModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!--
+      For Casino.Shared.SoundBoard: AudioSource/AudioClip, and loading a .wav/.ogg
+      off disk at runtime, which has no synchronous decode API and goes through
+      UnityWebRequestMultimedia instead.
+    -->
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>$(GameManaged)\UnityEngine.AudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>$(GameManaged)\UnityEngine.UnityWebRequestModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestAudioModule">
+      <HintPath>$(GameManaged)\UnityEngine.UnityWebRequestAudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(GameManaged)\Newtonsoft.Json.dll</HintPath>
       <Private>false</Private>

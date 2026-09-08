@@ -440,6 +440,17 @@ namespace Poker.Client
             // a client whose picture has drifted is exactly the case this covers.
             var error = ErrorOf(reply);
 
+            // Only the moves that actually put chips in warrant the sound, and only
+            // once the engine has accepted the move -- an error means nothing was
+            // staked. Checked against what a move is not, rather than a list of what
+            // it is, so a verb this client has never seen still gets it right.
+            if (error == null
+                && !string.Equals(move, "Fold", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(move, "Check", StringComparison.OrdinalIgnoreCase))
+            {
+                SoundBoard.Play(Cue.ChipBet);
+            }
+
             _raiseTo = 0;
             Render(reply, keepStatus: error != null);
 

@@ -1965,6 +1965,17 @@ namespace SlotMachine.Client
                 _ => (string.Empty, QuietSize, new Color(0.78f, 0.72f, 0.55f, 1f)),
             };
 
+            // Same boundaries as the word above, on purpose -- one switch to retune
+            // if the tiers ever move, rather than two that can quietly disagree.
+            var cue = multiple switch
+            {
+                >= 100d => Cue.SlotJackpot,
+                >= 20d => Cue.SlotHugeWin,
+                >= 5d => Cue.SlotBigWin,
+                >= 1d => Cue.SlotWin,
+                _ => (Cue?)null,
+            };
+
             // One space, and no plus sign on a tiered win. "WIN   +17,331" reads as two
             // separate things that happen to be near each other; "WIN 17,331" reads as
             // a sentence, which is what it is.
@@ -1987,6 +1998,13 @@ namespace SlotMachine.Client
                 }
 
                 _pop = SlotClientPlugin.Instance.StartCoroutine(Pop());
+
+                // Alongside the pop, not before it: the sound and the banner's own
+                // bounce are the same event and should start on the same frame.
+                if (cue.HasValue)
+                {
+                    SoundBoard.Play(cue.Value);
+                }
             }
             else
             {

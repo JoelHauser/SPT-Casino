@@ -314,9 +314,17 @@ namespace Roulette.Client
                 return;
             }
 
+            var error = (string)reply["Error"];
+
+            // Only once the engine has actually accepted the bet -- an error means
+            // no chip landed on the felt.
+            if (string.IsNullOrEmpty(error))
+            {
+                SoundBoard.Play(Cue.ChipPlace);
+            }
+
             Render(reply);
 
-            var error = (string)reply["Error"];
             if (!string.IsNullOrEmpty(error))
             {
                 SetStatus(error);

@@ -93,6 +93,12 @@ namespace Casino.Shared
                 yield break;
             }
 
+            // Here, not where Deal() was called: the stagger delay has just finished
+            // and the card is about to actually start moving. Playing this any
+            // earlier would fire every staggered card's sound in one burst at the
+            // moment a hand is dealt, instead of one card at a time as they go out.
+            SoundBoard.Play(Cue.CardDeal);
+
             var elapsed = 0f;
             while (elapsed < Duration)
             {
@@ -200,6 +206,11 @@ namespace Casino.Shared
             // between two different GameObjects cannot be seen happening.
             face.gameObject.SetActive(true);
             face.localScale = new Vector3(0f, restScale.y, 1f);
+
+            // Here, not at the start of the shrink: this is the instant the card
+            // actually becomes the thing it is turning into, which is what a flip
+            // sound is a sound *of*. The shrink half is silent leading up to it.
+            SoundBoard.Play(Cue.CardFlip);
 
             elapsed = 0f;
             while (elapsed < half)

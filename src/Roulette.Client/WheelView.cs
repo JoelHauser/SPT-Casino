@@ -326,6 +326,8 @@ namespace Roulette.Client
 
         private static IEnumerator Run(int position, Action onFinished)
         {
+            SoundBoard.Play(Cue.RouletteSpinStart);
+
             var spin = Roll(_diameter);
 
             var headFrom = _headAngle;
@@ -388,6 +390,11 @@ namespace Roulette.Client
 
             _headAngle = headTo;
             Apply(headTo, headTo + landAt, RestRadius);
+
+            // Here, not inside onFinished: that callback goes on to a server-driven
+            // re-render, which has its own timing once the table has more than one
+            // thing to say. This is the frame the ball itself actually stops.
+            SoundBoard.Play(Cue.RouletteBallLand);
 
             _spinning = null;
             onFinished?.Invoke();
