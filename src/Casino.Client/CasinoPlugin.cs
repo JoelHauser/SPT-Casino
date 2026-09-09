@@ -141,6 +141,58 @@ namespace Casino.Client
             StartCoroutine(CasinoTab.Heartbeat());
 
             Log.LogInfo($"[Casino] client loaded -- {Games.All.Count} tables");
+
+            WarnAboutRetiredMods();
+        }
+
+        /// <summary>
+        /// The mods this one replaced, by the GUID each registered under.
+        ///
+        /// Blackjack and Poker were both released standalone before the merge, so installs
+        /// of them are out there. **Extracting the casino over one does not remove it** --
+        /// an archive cannot delete anything, and `pack.ps1`, which retires those folders,
+        /// is a build script that has never shipped. What the player is left with is a
+        /// task-bar tab per leftover plugin and a second copy of the same server routes,
+        /// with nothing anywhere saying why.
+        ///
+        /// Saying so is all this does, deliberately. A mod that deleted another mod's
+        /// files would be a worse thing to ship than the duplicate tab it tidied up.
+        /// </summary>
+        private static readonly string[][] RetiredMods =
+        {
+            new[] { "com.mybutthasarash.blackjack", "Blackjack" },
+            new[] { "com.mybutthasarash.poker", "Poker" },
+            new[] { "com.mybutthasarash.roulette", "Roulette" },
+        };
+
+        private static void WarnAboutRetiredMods()
+        {
+            var found = new System.Collections.Generic.List<string>();
+
+            foreach (var mod in RetiredMods)
+            {
+                if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey(mod[0]))
+                {
+                    found.Add(mod[1]);
+                }
+            }
+
+            if (found.Count == 0)
+            {
+                return;
+            }
+
+            var names = string.Join(", ", found.ToArray());
+
+            // An error rather than a warning: this is the state an upgrade is most likely
+            // to go wrong in, and it is the line somebody will be asked to go and find.
+            Log.LogError(
+                $"[Casino] {names} {(found.Count == 1 ? "is" : "are")} still installed as "
+                + $"{(found.Count == 1 ? "a separate mod" : "separate mods")}, and this one "
+                + $"already includes {(found.Count == 1 ? "that table" : "those tables")}. "
+                + "Expect a duplicate task-bar tab for each. Delete them from BepInEx/plugins "
+                + "and from SPT_Runtime/user/mods, then restart. Nothing is lost by doing so: "
+                + "anything the house owes you is read out of the old folder and paid anyway.");
         }
 
         private void Update()
