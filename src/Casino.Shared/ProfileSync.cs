@@ -1,5 +1,7 @@
 using System;
+using System.Reflection;
 using Comfort.Common;
+using EFT;
 using EFT.UI;
 using SPT.Reflection.Utils;
 
@@ -77,11 +79,8 @@ namespace Casino.Shared
                     // anywhere to say so.
                     //
                     // The application always has a session while a profile is loaded, and
-                    // it is the same object -- its type implements the one `ClientSession`
-                    // hands back, which is why this assigns straight into it without a
-                    // cast. Neither type can be written down: both had their names emptied
-                    // by the obfuscator, so `var` above is doing real work.
-                    session = ClientAppUtils.GetMainApp()?.GetClientBackEndSession();
+                    // it is the same object the inventory screens hand back.
+                    session = MainAppSession();
                 }
 
                 if (session == null)
@@ -102,6 +101,48 @@ namespace Casino.Shared
                 // the game reloads, which is exactly where this started.
                 Host.Error($"[Casino] could not ask the game to resync: {error}");
             }
+        }
+
+        /// <summary>
+        /// The running application's session, reached without naming what it hands back.
+        ///
+        /// **`GetClientBackEndSession` cannot be called in written-down C#, and 1.2.6
+        /// shipped doing exactly that.** Its signature names a class the obfuscator has
+        /// renamed to a private-use glyph (U+EA28 in the build this was found on), so
+        /// writing the call puts a typeref to that name in this assembly. Mono resolves a
+        /// typeref the first time the instruction using it runs, and the name is only
+        /// correct for the exact `Assembly-CSharp.dll` it was compiled against -- a game
+        /// update moves it and the load throws:
+        ///
+        ///     TypeLoadException: Could not resolve type with token 01000068 from typeref
+        ///
+        /// That is the same trap as the pinned `ItemFactory` token, wearing a name instead
+        /// of a number, and it was worse here for two reasons. It landed in `Settled`
+        /// **before** the try that guards the presentation, so a spin took the money, paid
+        /// it, and then drew no win lines, no headline and no result -- and every table
+        /// shares this file, so one round killed all four. And before 1.2.6 nothing had
+        /// ever reached this line: the old code gave up when `ItemUiContext` was null, so
+        /// the typeref sat unresolved and harmless. Adding the fallback that finally found
+        /// a session is what turned a silent no-op into a crash.
+        ///
+        /// Reflection keeps the name out of our metadata entirely. `TarkovApplication` is
+        /// a real name and so is `IClientSession`, so both ends can be written down; only
+        /// the middle had to be described rather than named. `GetMethod` walks base types,
+        /// which is where this method is actually declared.
+        /// </summary>
+        private static IClientSession MainAppSession()
+        {
+            var app = ClientAppUtils.GetMainApp();
+
+            // Unity's ==, not a raw null check: a torn-down application is not null to one.
+            if (app == null)
+            {
+                return null;
+            }
+
+            return typeof(TarkovApplication)
+                .GetMethod("GetClientBackEndSession", BindingFlags.Public | BindingFlags.Instance)
+                ?.Invoke(app, null) as IClientSession;
         }
 
         private static bool _warned;

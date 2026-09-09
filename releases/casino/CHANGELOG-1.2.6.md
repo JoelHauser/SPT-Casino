@@ -4,6 +4,11 @@ The slot machine works again. 1.2.0 and 1.2.1 shipped it badly broken, in four s
 ways that each hid the next one, and all four are fixed here. **One of them affected every
 table, not just Slots.**
 
+> **Rebuilt 9 Sep 2026, evening.** The first 1.2.6 archive was packed from a plugin built
+> against an older copy of the game, and it crashed on the first payout at every table --
+> see "The resync crashed on a game it was not built against" below. If the DLL's file
+> properties read `1.2.6+dca357a`, replace it; the rebuilt one reads a different hash.
+
 ## A million roubles, once, by way of apology
 
 The mod came down off the hub while the below was sorted out, and anybody who already had it
@@ -18,6 +23,29 @@ one; a second profile on the same install gets its own. If your stash is too ful
 it arrives in the post like any other payout.
 
 No table's odds changed to pay for it, and nothing else about the money is different.
+
+## The resync crashed on a game it was not built against
+
+The last fix in this list -- "Money moved and the game was never told" -- called
+`GetClientBackEndSession()` in ordinary C#. That method's signature names a game class the
+obfuscator has renamed to an unprintable character, so the compiler wrote that character
+into the plugin as the name to go looking for. It is only ever the right name for the exact
+`Assembly-CSharp.dll` it was compiled against: update the game, the name moves, the lookup
+fails, and it throws before doing anything.
+
+    TypeLoadException: Could not resolve type with token 01000068 from typeref
+
+It landed in the step that runs once the reels stop, ahead of the win lines, the headline
+and the result text -- so a spin took the stake, paid the win, and then drew nothing at all.
+Every table shares that code, so one round left all four looking dead.
+
+**No money was involved.** The server settled every bet correctly and logged each payout;
+only the panel was struck dumb.
+
+This is the same mistake as the pinned `ItemFactory` token above, wearing a name instead of
+a number, and the answer is the same: describe the method, do not name the class it lives
+on. The plugin now carries no obfuscated names at all -- the build is checked for them,
+and the first 1.2.6 carried two.
 
 ## The reels were blank
 

@@ -605,6 +605,18 @@ its anchor is a test that is not running.**
 
 ## Current state
 
+**2026-09-09, evening.** 1.2.6 was rebuilt after shipping broken. The plugin in the first
+archive named an obfuscated game class at compile time, so `SlotPanel.Resync` threw a
+`TypeLoadException` on any install whose `Assembly-CSharp.dll` was not the one it was
+built against. `Resync` runs in `Settled` **before** the try that guards presentation, so a
+spin took the stake, paid the win, and drew no win lines, no banner and no result line --
+and since all four tables share `ProfileSync`, one round left every one of them dead. See
+"Writing the name down is the same trap as pinning the number" in the root `CLAUDE.md`.
+
+Worth keeping: **the reported symptom was "the win lines don't show up"**, and the cause
+was a line three statements earlier that had nothing to do with drawing. The log said so
+on the first try -- `[Slots] could not settle the spin:` with the whole stack under it.
+
 **2026-09-07.** Complete, installed, and played over several sittings. Every screen in
 this file has been looked at on a real machine.
 

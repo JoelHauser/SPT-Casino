@@ -255,6 +255,32 @@ it.** That is the trap, and it is not obvious: the check passes, confidently, an
 nothing about any other install. Hardcoding an offset, index or ordinal read out of a
 game file is the same mistake wearing different clothes.
 
+### Writing the name down is the same trap as pinning the number
+
+**A compile-time call into an obfuscated class puts its garbled name in our assembly**, and
+that name is no more portable than a token. `ProfileSync` called
+`ClientAppUtils.GetMainApp()?.GetClientBackEndSession()` -- perfectly ordinary C# -- and the
+compiler wrote a typeref to `U+EA28` because that method's signature names a renamed class.
+Mono resolves a typeref the first time the instruction using it runs, so it failed on a game
+build that was not the one it compiled against, and **shipped that way in 1.2.6**:
+
+```
+TypeLoadException: Could not resolve type with token 01000068 from typeref
+```
+
+It threw in `SlotPanel.Settled` ahead of everything presentational, so every table paid out
+correctly and then drew nothing -- and it was invisible until 1.2.6, because the old code
+gave up before reaching the line and left the typeref unresolved.
+
+Reach such a member by reflection off a type that *does* have a name (`TarkovApplication`),
+and hold the result in an interface that has one (`IClientSession`). `GetMethod` walks base
+types, so an inherited method needs nothing extra.
+
+**Check the built plugin for obfuscated names before shipping it.** They are private-use
+characters, so a byte scan of the DLL for UTF-8 `U+E000`-`U+F8FF` finds every one:
+`Casino.Client.dll` must come out at zero. The first 1.2.6 build carried two, and nothing
+else would have caught them.
+
 `ilspycmd` is still the right tool for *finding out what to search for* --
 `dotnet tool install -g ilspycmd`, then `--dump-table MethodDef <dll>` to list members
 with their tokens, or `-m 0x0600XXXX <dll>` to decompile one by token and see its real
