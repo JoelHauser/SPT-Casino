@@ -605,10 +605,12 @@ its anchor is a test that is not running.**
 
 ## Current state
 
-**2026-09-09, evening.** 1.2.6 was rebuilt after shipping broken. The plugin in the first
-archive named an obfuscated game class at compile time, so `SlotPanel.Resync` threw a
-`TypeLoadException` on any install whose `Assembly-CSharp.dll` was not the one it was
-built against. `Resync` runs in `Settled` **before** the try that guards presentation, so a
+**2026-09-09, evening. Rebuilt, republished, and played -- it works.** Win lines draw, the
+stash moves, and a table survives more than one round.
+
+1.2.6 had shipped broken. The plugin in the first archive named an obfuscated game class at
+compile time, so `SlotPanel.Resync` threw a `TypeLoadException` on any install whose
+`Assembly-CSharp.dll` was not the one it was built against. `Resync` runs in `Settled` **before** the try that guards presentation, so a
 spin took the stake, paid the win, and drew no win lines, no banner and no result line --
 and since all four tables share `ProfileSync`, one round left every one of them dead. See
 "Writing the name down is the same trap as pinning the number" in the root `CLAUDE.md`.
