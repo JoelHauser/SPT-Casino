@@ -53,7 +53,7 @@ namespace Casino.Client
         /// </summary>
         private static string[] Lines(string amount) => new[]
         {
-            "The casino was taken down for a few days, and you may have wondered "
+            "The casino was taken down for a day, and you may have wondered "
             + "where it went.",
             string.Empty,
             "An icon fix that worked perfectly on the machine it was written on turned "

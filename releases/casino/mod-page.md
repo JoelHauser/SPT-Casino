@@ -106,7 +106,7 @@ Extract into your SPT folder — the one that holds `SPT_Runtime` — and start 
 
 The first time an account walks in, a card explains what the money does. Read it once and it never comes back.
 
-**1.2.6 opens with a million roubles.** The mod came off the hub for a few days while the slot machine was put right, and the first time you open the casino on this version it hands you 1,000,000 roubles by way of apology. Once per profile, straight into your stash — or into your messages if the stash is too full to take it.
+**1.2.6 opens with a million roubles.** The mod came off the hub for a day while the slot machine was put right, and the first time you open the casino on this version it hands you 1,000,000 roubles by way of apology. Once per profile, straight into your stash — or into your messages if the stash is too full to take it.
 
 ## Getting around
 

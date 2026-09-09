@@ -9,6 +9,10 @@ table, not just Slots.**
 > see "The resync crashed on a game it was not built against" below. If the DLL's file
 > properties read `1.2.6+dca357a`, replace it; the rebuilt one reads a different hash.
 
+**With thanks to ABlindGuy**, who took 1.2.2 through 1.2.5 -- none of which were ever
+published -- as debugging builds, played each one, and reported back on what it actually
+did. Most of what follows was found that way rather than by reasoning about it here.
+
 ## A million roubles, once, by way of apology
 
 The mod came down off the hub while the below was sorted out, and anybody who already had it
