@@ -104,6 +104,10 @@ The machine pays up to a thousand times the stake by default. **F12 → Slots �
 
 Extract into your SPT folder — the one that holds `SPT_Runtime` — and start the server. It installs as one folder on each side: `BepInEx/plugins/Casino` and `SPT_Runtime/user/mods/Casino`.
 
+Upgrading from an earlier version is the same thing: extract over the top and let it overwrite. Nothing needs removing first, and your stash, your stats and anything the house owes you are all kept.
+
+**Unless you still have the old separate mods.** Blackjack, Poker and Roulette were folded into this one in 1.0, and extracting over them will not remove them — delete `Blackjack`, `Poker` and `Roulette` from both `BepInEx/plugins` and `SPT_Runtime/user/mods` if they are there, or you will get a duplicate tab for each. Any money owed on an interrupted hand is found in the old folder and paid regardless.
+
 The first time an account walks in, a card explains what the money does. Read it once and it never comes back.
 
 **1.2.6 opens with a million roubles.** The mod came off the hub for a day while the slot machine was put right, and the first time you open the casino on this version it hands you 1,000,000 roubles by way of apology. Once per profile, straight into your stash — or into your messages if the stash is too full to take it.

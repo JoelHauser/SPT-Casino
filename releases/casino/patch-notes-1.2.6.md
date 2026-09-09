@@ -42,6 +42,18 @@ Worth saying plainly, because "the stash never moved" reads like money going mis
 
 Extract over your SPT folder — the one that holds `SPT_Runtime` — and let it overwrite. It is one folder on each side, `BepInEx/plugins/Casino` and `SPT_Runtime/user/mods/Casino`.
 
+**Coming from any 1.x casino release, that is the whole job.** 1.2.6 replaces every file the older versions installed, so there is nothing left over to clean up.
+
+**Coming from the old separate Blackjack, Poker or Roulette mods?** Delete those first. They were folded into this one mod back in 1.0, and extracting over them does not remove them — leave them in place and you get a duplicate tab per old mod and two copies of the same server routes. Remove these if you have them, from both sides:
+
+```
+BepInEx/plugins/Blackjack        SPT_Runtime/user/mods/Blackjack
+BepInEx/plugins/Poker            SPT_Runtime/user/mods/Poker
+BepInEx/plugins/Roulette         SPT_Runtime/user/mods/Roulette
+```
+
+Nothing is lost by deleting them. If the house owed you money on an interrupted hand, 1.2.6 finds that record in the old folder and pays it either way.
+
 **If you downloaded 1.2.6 before this post went up, replace it.** The first archive under that version number had the last bug on the list above. To check which one you have, right-click `BepInEx/plugins/Casino/Casino.Client.dll` → Properties → Details: if the product version ends in `dca357a`, that is the old one.
 
 Nothing else changed. Same odds, same payouts, same buy-ins — the slot machine still returns 92.51%.
