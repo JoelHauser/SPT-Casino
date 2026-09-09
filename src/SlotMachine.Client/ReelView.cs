@@ -164,6 +164,7 @@ namespace SlotMachine.Client
                 _columns[reel] = column;
                 _cells[reel] = new Image[Cells];
                 _strips[reel] = NewStrip(new System.Random(reel * 7919));
+                Dress(reel);
 
                 for (var i = 0; i < Cells; i++)
                 {
@@ -204,7 +205,52 @@ namespace SlotMachine.Client
             for (var reel = 0; reel < 5; reel++)
             {
                 _strips[reel] = NewStrip(new System.Random(reel * 7919));
+                Dress(reel);
                 Render(reel);
+            }
+        }
+
+        /// <summary>
+        /// Writes what one reel shows before it has ever been spun.
+        ///
+        /// **The belts are seeded off the reel number and nothing else** -- see the two
+        /// callers -- so the arrangement a player is greeted with is not merely random,
+        /// it is the *same* arrangement for everybody, every time the panel is opened.
+        /// Whatever it happens to show, it shows for ever.
+        ///
+        /// What it happened to show was a win. Seed 7919 put Gold Rooster on the first
+        /// four reels and Moonshine on the first four as well: read as a result that is
+        /// six times the stake, and 243 ways means any row counts, so it reads that way
+        /// to anyone who knows the rules. Every player opened the machine, saw a paying
+        /// board sitting there, pressed SPIN, watched it turn into a loss, and correctly
+        /// concluded that something had just taken a win off them. Nothing had -- the
+        /// board was never a result, and the server had never seen it -- but there is no
+        /// way for a player to know that, and "it stopped paying out" is exactly how it
+        /// gets reported.
+        ///
+        /// So the resting board is dealt rather than rolled: three symbols per reel,
+        /// walking the paytable in order. Reel one and reel two therefore share nothing,
+        /// no symbol can run from the leftmost reel to a third, and no arrangement of it
+        /// can be read as a win. It also puts every symbol the machine has on the glass
+        /// at once, which is a better greeting than a random handful.
+        ///
+        /// Only ever the idle board: the first spin replaces the whole belt.
+        /// </summary>
+        private static void Dress(int reel)
+        {
+            // Below six symbols there is no pair of disjoint three-symbol reels to deal,
+            // so there is nothing this can promise and it leaves the belt as it found it.
+            // The server sends nine.
+            if (_symbols == null || _symbols.Length < 6)
+            {
+                return;
+            }
+
+            // Rows 0-2 sit at cells 3-5 with the belt at rest -- the same three the
+            // landing of a real spin is written into. See WriteLanding.
+            for (var row = 0; row < 3; row++)
+            {
+                _strips[reel][Wrap(3 + row, StripLength)] = _symbols[((reel * 3) + row) % _symbols.Length];
             }
         }
 
@@ -248,35 +294,91 @@ namespace SlotMachine.Client
 
             Spinning = true;
 
-            // Once, not per reel: every reel starts on the same frame below, so five
-            // copies of the same cue would just be one sound played five times over.
-            SoundBoard.Play(Cue.SlotReelSpin);
-
-            for (var reel = 0; reel < 5; reel++)
+            try
             {
-                for (var i = 0; i < Cells; i++)
+                // Once, not per reel: every reel starts on the same frame below, so five
+                // copies of the same cue would just be one sound played five times over.
+                SoundBoard.Play(Cue.SlotReelSpin);
+
+                for (var reel = 0; reel < 5; reel++)
                 {
-                    _cells[reel][i].color = Color.white;
+                    for (var i = 0; i < Cells; i++)
+                    {
+                        _cells[reel][i].color = Color.white;
+                    }
+                }
+
+                var running = 0;
+
+                for (var reel = 0; reel < 5 && reel < grid.Count; reel++)
+                {
+                    running++;
+                    host.StartCoroutine(
+                        SpinOne(reel, (MinDuration + (reel * Stagger)) / speed, grid[reel], () => running--));
+                }
+
+                // Bounded, not "until they all report in". Every reel has a known longest
+                // run, so still waiting past it means one is never going to answer -- and
+                // an unbounded wait here does not just lose the animation, it strands
+                // Spinning at true for the rest of the session. SlotPanel.Pull returns
+                // early while that is set, so the machine goes on taking clicks, never
+                // sends another pull, and the SPIN button never comes back from "...".
+                // Landing the grid the server already settled is the only ending that
+                // leaves a playable machine.
+                var longest = ((MinDuration + (4f * Stagger)) / Mathf.Max(speed, 0.01f))
+                    + SettleSeconds + GraceSeconds;
+
+                for (var waited = 0f; running > 0 && waited < longest; waited += Time.unscaledDeltaTime)
+                {
+                    yield return null;
+                }
+
+                if (running > 0)
+                {
+                    SlotClientPlugin.Log.LogWarning(
+                        $"[Slots] {running} reel(s) did not finish; landing the spin where the "
+                        + "server settled it.");
+
+                    Show(grid);
                 }
             }
-
-            var running = 0;
-
-            for (var reel = 0; reel < 5 && reel < grid.Count; reel++)
+            finally
             {
-                running++;
-                host.StartCoroutine(
-                    SpinOne(reel, (MinDuration + (reel * Stagger)) / speed, grid[reel], () => running--));
-            }
+                // In a finally because Unity disposes a stopped coroutine and unwinds one
+                // that throws. Either way this has to clear, or the machine wedges.
+                Spinning = false;
 
-            while (running > 0)
-            {
-                yield return null;
+                // And the result is settled from in here too, for the same reason.
+                //
+                // This sat after the finally until 1.2.5, which meant a spin that ended
+                // any way other than perfectly simply never settled: the reels stopped on
+                // the winning board, the flag cleared so the machine took clicks again,
+                // and `Settled` -- which pays the win into the panel, asks the game to
+                // pick the money up, and writes the result line -- was skipped entirely.
+                // What the player saw was a board that had plainly won, a SPIN button
+                // ready to go again, and the mid-spin "..." still sitting under the
+                // reels, because nothing had ever replaced it.
+                //
+                // The money is already the server's answer by this point. Settling is
+                // owed whatever happened to the animation, including the panel being
+                // closed mid-spin -- so it runs here, and its own failure cannot take
+                // the reels down with it.
+                try
+                {
+                    onStopped?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    SlotClientPlugin.Log.LogError($"[Slots] could not settle the spin: {ex}");
+                }
             }
-
-            Spinning = false;
-            onStopped?.Invoke();
         }
+
+        /// <summary>
+        /// How long past a reel's own longest possible run to keep waiting before
+        /// declaring it lost. Covers a dropped frame or two, not a dead coroutine.
+        /// </summary>
+        private const float GraceSeconds = 2f;
 
         /// <summary>
         /// One reel: up to speed, flat out, ease down, thump.
@@ -288,58 +390,72 @@ namespace SlotMachine.Client
         private static IEnumerator SpinOne(
             int reel, float duration, IReadOnlyList<string> landing, Action done)
         {
-            var random = new System.Random((reel * 7919) + Environment.TickCount);
-
-            // A fresh belt each spin, so the same order does not scroll past five times
-            // running and give the machine a pattern.
-            _strips[reel] = NewStrip(random);
-
-            var from = Mathf.Floor(_positions[reel]);
-
-            // Rounded to whole cells: a reel that stops a third of a cell along is a
-            // reel showing half of four symbols.
-            var travel = Mathf.Round(PeakCellsPerSecond * duration * ProfileArea);
-            var rest = (int)(from + travel);
-
-            WriteLanding(reel, rest, landing);
-
-            for (var elapsed = 0f; elapsed < duration; elapsed += Time.unscaledDeltaTime)
-            {
-                var u = Mathf.Clamp01(elapsed / duration);
-
-                // The overshoot is carried by the same curve, so the reel arrives past
-                // its stop still travelling rather than jumping there.
-                _positions[reel] = from + ((travel + Overshoot) * Travelled(u) / ProfileArea);
-                Render(reel);
-
-                yield return null;
-            }
-
-            // The bounce back onto the detent.
-            for (var t = 0f; t < SettleSeconds; t += Time.unscaledDeltaTime)
-            {
-                _positions[reel] = rest + (Overshoot * (1f - Mathf.SmoothStep(0f, 1f, t / SettleSeconds)));
-                Render(reel);
-
-                yield return null;
-            }
-
-            // Home exactly. A reel resting a pixel or two off its cell is the sort of
-            // thing nobody can name but everybody sees.
+            // The whole body is inside a try whose finally reports this reel finished.
             //
-            // Wrapped to the strip length as well: the faces are read modulo it, so this
-            // draws identically while keeping the position small. A float counting cells
-            // for a whole session would eventually be coarser than the cell it is
-            // measuring.
-            _positions[reel] = Wrap(rest, StripLength);
-            Render(reel);
+            // Unity kills a coroutine that throws -- it logs the exception and stops
+            // that one iterator, and nothing else notices. Ending the body with a plain
+            // done() therefore only reports in when nothing went wrong, which is the
+            // opposite of what a completion count wants: Spin() waits on that count, so
+            // one reel throwing anywhere above left the wait running for ever and the
+            // machine unusable until the game restarted. A finally also runs when Unity
+            // disposes a stopped coroutine, so closing the panel mid-spin settles up too.
+            try
+            {
+                var random = new System.Random((reel * 7919) + Environment.TickCount);
 
-            // Per reel, unlike the spin start: each one settles on its own, staggered
-            // by Stagger above, and that staggered thump is most of what makes five
-            // reels read as five reels rather than one wide one.
-            SoundBoard.Play(Cue.SlotReelStop);
+                // A fresh belt each spin, so the same order does not scroll past five times
+                // running and give the machine a pattern.
+                _strips[reel] = NewStrip(random);
 
-            done?.Invoke();
+                var from = Mathf.Floor(_positions[reel]);
+
+                // Rounded to whole cells: a reel that stops a third of a cell along is a
+                // reel showing half of four symbols.
+                var travel = Mathf.Round(PeakCellsPerSecond * duration * ProfileArea);
+                var rest = (int)(from + travel);
+
+                WriteLanding(reel, rest, landing);
+
+                for (var elapsed = 0f; elapsed < duration; elapsed += Time.unscaledDeltaTime)
+                {
+                    var u = Mathf.Clamp01(elapsed / duration);
+
+                    // The overshoot is carried by the same curve, so the reel arrives past
+                    // its stop still travelling rather than jumping there.
+                    _positions[reel] = from + ((travel + Overshoot) * Travelled(u) / ProfileArea);
+                    Render(reel);
+
+                    yield return null;
+                }
+
+                // The bounce back onto the detent.
+                for (var t = 0f; t < SettleSeconds; t += Time.unscaledDeltaTime)
+                {
+                    _positions[reel] = rest + (Overshoot * (1f - Mathf.SmoothStep(0f, 1f, t / SettleSeconds)));
+                    Render(reel);
+
+                    yield return null;
+                }
+
+                // Home exactly. A reel resting a pixel or two off its cell is the sort of
+                // thing nobody can name but everybody sees.
+                //
+                // Wrapped to the strip length as well: the faces are read modulo it, so this
+                // draws identically while keeping the position small. A float counting cells
+                // for a whole session would eventually be coarser than the cell it is
+                // measuring.
+                _positions[reel] = Wrap(rest, StripLength);
+                Render(reel);
+
+                // Per reel, unlike the spin start: each one settles on its own, staggered
+                // by Stagger above, and that staggered thump is most of what makes five
+                // reels read as five reels rather than one wide one.
+                SoundBoard.Play(Cue.SlotReelStop);
+            }
+            finally
+            {
+                done?.Invoke();
+            }
         }
 
         /// <summary>

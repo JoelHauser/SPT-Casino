@@ -456,36 +456,56 @@ namespace SlotMachine.Client
         private static void Settled(
             IReadOnlyList<IReadOnlyList<string>> grid, long paid, JArray wins)
         {
-            // Now, with the reels. Any earlier and the stash gives the answer away.
-            Resync();
+            // The button first, before anything that reads a reply the server wrote.
+            //
+            // This used to sit under Resync(), and everything below it is presentation
+            // -- win lines, a headline, the paytable -- reading a JSON reply. Any of
+            // that throwing skipped the one line that puts SPIN back, so the machine
+            // was left showing "..." for good: still clickable, and Pull() would go on
+            // sending pulls that the player could not see the result of. Whatever else
+            // fails about a spin, the machine has to end it playable.
             SetSpinEnabled(Ready);
 
-            if (paid > 0 && wins is { Count: > 0 })
+            // Now, with the reels. Any earlier and the stash gives the answer away.
+            Resync();
+
+            try
             {
-                var best = wins[0] as JObject;
-                var symbol = (string)best?["Symbol"] ?? "something";
-                var reels = (int?)best?["Reels"] ?? 0;
-                var ways = (int?)best?["Ways"] ?? 1;
+                if (paid > 0 && wins is { Count: > 0 })
+                {
+                    var best = wins[0] as JObject;
+                    var symbol = (string)best?["Symbol"] ?? "something";
+                    var reels = (int?)best?["Reels"] ?? 0;
+                    var ways = (int?)best?["Ways"] ?? 1;
 
-                SetPaid(paid, _paidStake);
+                    SetPaid(paid, _paidStake);
 
-                var drawn = DrawWinLines(grid, wins);
-                var total = wins.Sum(w => (int?)w["Ways"] ?? 0);
+                    var drawn = DrawWinLines(grid, wins);
+                    var total = wins.Sum(w => (int?)w["Ways"] ?? 0);
 
-                SetStatus(
-                    $"{reels} x {NameOf(symbol)} on {ways} way{(ways == 1 ? string.Empty : "s")}."
-                    + (wins.Count > 1 ? $"  And {wins.Count - 1} more." : string.Empty)
-                    + (total > drawn ? $"  Showing {drawn} of {total} ways." : string.Empty));
+                    SetStatus(
+                        $"{reels} x {NameOf(symbol)} on {ways} way{(ways == 1 ? string.Empty : "s")}."
+                        + (wins.Count > 1 ? $"  And {wins.Count - 1} more." : string.Empty)
+                        + (total > drawn ? $"  Showing {drawn} of {total} ways." : string.Empty));
 
-                ReelView.Highlight([.. Enumerable.Range(0, reels)]);
+                    ReelView.Highlight([.. Enumerable.Range(0, reels)]);
+                }
+                else
+                {
+                    SetPaid(0);
+                    SetStatus("Nothing. Press SPIN.");
+                }
+
+                Refresh();
             }
-            else
+            catch (Exception ex)
             {
-                SetPaid(0);
-                SetStatus("Nothing. Press SPIN.");
+                // The money is already settled and the reels are already showing it.
+                // Say so and leave the machine playable rather than taking it down over
+                // a headline.
+                SlotClientPlugin.Log.LogError($"[Slots] could not show the result: {ex}");
+                SetStatus("The spin settled, but this panel could not draw the result.");
             }
-
-            Refresh();
 
             // The only place another pull ever gets scheduled from. A run that was
             // disarmed mid-spin, or that just failed inside Pull, leaves this false and
