@@ -4,6 +4,21 @@ The slot machine works again. 1.2.0 and 1.2.1 shipped it badly broken, in four s
 ways that each hid the next one, and all four are fixed here. **One of them affected every
 table, not just Slots.**
 
+## A million roubles, once, by way of apology
+
+The mod came down off the hub while the below was sorted out, and anybody who already had it
+installed spent that time with a casino whose newest table did not work.
+
+**The first time you open the casino on this version, it gives you 1,000,000 roubles** and a
+short note saying why. It is in your stash before you have finished reading it.
+
+Paid once per profile, and the server keeps the record in
+`SPT_Runtime/user/mods/Casino/data/gifts.json`. Reinstalling the mod does not earn a second
+one; a second profile on the same install gets its own. If your stash is too full to take it,
+it arrives in the post like any other payout.
+
+No table's odds changed to pay for it, and nothing else about the money is different.
+
 ## The reels were blank
 
 1.2.0 restored item-icon rendering after an EFT update renamed the game's item factory out

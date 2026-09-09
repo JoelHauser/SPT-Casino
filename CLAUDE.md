@@ -27,13 +27,14 @@ repo's front page before the merge.
 ## How the casino is put together
 
 ```
-src/Casino.Client/        the only plugin. Tab, lobby, welcome card, escape key
+src/Casino.Client/        the only plugin. Tab, lobby, welcome + gift card, escape key
 src/Casino.Shared/        one copy of what every table draws with. No project of its own
 src/<Table>.Client/       each table's panel and views. NOT shipped as plugins
-src/Casino.Server/        the one IModMetadata, and the legacy-data finder
+src/Casino.Server/        the one IModMetadata, the legacy-data finder, the gift
 src/<Table>.Server/       each table's server code. No metadata of its own any more
 src/<Table>.Game/         the rules, no SPT types, unit tested
 tests/<Table>.*.Tests/
+tests/Casino.Server.Tests/  the gift's money invariants
 tools/<Table>.Console/    a harness that plays the game in a terminal
 scripts/casino/pack.ps1   builds and installs the whole thing
 scripts/<table>/          the per-table server pack and smoke scripts
@@ -65,6 +66,7 @@ without being told.
 | --- | --- |
 | Lobby | 2900 |
 | Welcome card | 2950 |
+| Gift card | 2960 |
 | The tables | 30000 |
 
 Everything covers the lobby. That is what makes the transitions work: bring the lobby
@@ -72,6 +74,10 @@ up **solid underneath** whatever is on screen, then fade that away. Fading the l
 *in* after removing the thing above it leaves frames where only the game's menu is
 drawn, which is exactly the flash that had to be fixed once already. `CasinoLobby.Show`
 takes an `instant` flag for this.
+
+The gift card sits above the welcome card rather than beside it because a brand new
+profile on 1.2.6 gets both, and the gift is built on top of the lobby while the welcome
+is still fading off it. See `CasinoLobby.AfterIntro`.
 
 ## What the tables share, and where it lives
 
@@ -152,26 +158,29 @@ chips do not currently track, the way dealt cards already are); Blackjack's Doub
 Split take more money mid-hand and are unhooked; Roulette's `Lift` (taking a chip back)
 has no cue. All are listed in the manifest too.
 
-## `dotnet` on this box is not the `dotnet` you want
+## `dotnet` on this box
 
-The one first on PATH is `C:\Program Files\dotnet\dotnet.exe` and it carries **only
-the 8.0.423 SDK**, so every .NET 10 project here dies on NETSDK1045 before compiling a
-line. That reads exactly like the repo targeting something impossible. The .NET 10 SDK
-is installed, just user-local:
-
-```
-C:\Users\Hoel\.dotnet\dotnet.exe --list-sdks   # 9.0.317, 10.0.400
-```
-
-Put that directory ahead of `C:\Program Files\dotnet` on PATH for any `dotnet build`,
-`dotnet test` or `dotnet run`, and for the pack scripts, which shell out to plain
-`dotnet`. The `.Client` projects are net472 and build under either.
+**Corrected 2026-09-09.** This section used to say that the `dotnet` first on PATH
+carried only the 8.0.423 SDK, so every .NET 10 project here died on NETSDK1045, and that
+the real SDK was user-local under a `C:\Users\Hoel\.dotnet`. Neither is true on this
+machine now: `dotnet --list-sdks` from the one on PATH reports **10.0.202**, there is no
+`C:\Users\Hoel` on the box at all, and the whole solution builds and tests off it with
+nothing prepended.
 
 ```
-dotnet build SPT-Casino.slnx      # 18 projects, clean
-dotnet test  SPT-Casino.slnx      # 428 tests
-scripts/casino/pack.ps1 -InstallPath 'H:\SPT4.1.X'
+dotnet build SPT-Casino.slnx -p:SPTPath=C:\HUH
+dotnet test  SPT-Casino.slnx -p:SPTPath=C:\HUH   # 504 tests
+scripts/casino/pack.ps1 -SPTPath C:\HUH
 ```
+
+If NETSDK1045 ever does appear, the old note is still the shape of the answer -- find a
+newer SDK and put its directory first on PATH -- but run `--list-sdks` before believing
+any of it.
+
+**Pass `-p:SPTPath` through PowerShell, not Bash.** Still true, and it still fails
+confusingly: a backslash path mangled on the way through arrives as `C:HUH` and the build
+stops with "is not an SPT install root", which reads like a missing install rather than a
+quoting problem.
 
 `tools/Blackjack.Installer` is deliberately outside the solution: it embeds a
 `payload.zip` that `tools/build-installer.py` generates, so from a clean checkout it
@@ -179,6 +188,15 @@ fails with CS1566.
 
 **`.slnx` files are XML, so a `--` inside a comment is a parse error.** This has broken
 the build twice; both times the comment was written in this repo's own house style.
+
+**Three projects in the solution do not build, and did not before the gift either.**
+`Blackjack.Client`, `Poker.Client` and `Roulette.Client` -- the retired standalone
+plugins kept as an editing surface and never shipped -- fail with nine CS0122 errors
+about `HideoutGameWorld`, `NarrateGameWorld` and `InputNodeAbstract.TranslateInput` being
+inaccessible, out of `TaskBarTab.cs` and `EscapePatch.cs`. `Casino.Client` compiles the
+panels it needs from those projects directly and is unaffected, so the plugin, the server
+and all 504 tests still build. Check a pristine checkout before blaming a change for
+those nine.
 
 ## The SPT install on this box is not `H:\SPT4.1.X`
 
@@ -292,6 +310,53 @@ it covers, not how many.
 **Write `MoneyInvariantTests` before the settlement, not after.** An end-of-run balance
 check misses errors that cancel, and a settlement written first gets tests shaped around
 what it already does rather than around what it owes.
+
+## The one-off gift, and why the server owns it
+
+1.2.6 pays every profile 1,000,000 roubles the first time it opens the casino, as an
+apology for the pull. It is the only money in this mod that comes from nowhere rather
+than out of somebody's stake, so it is also the only money with a way to be paid twice.
+
+```
+src/Casino.Server/GiftLedger.cs    who has been paid. No file, no clock, no SPT types
+src/Casino.Server/GiftStore.cs     that ledger, plus data/gifts.json and the lock
+src/Casino.Server/GiftBank.cs      credit only. Splits stacks, posts the shortfall
+src/Casino.Server/GiftService.cs   claim first, pay second
+src/Casino.Server/CasinoRouter.cs  /casino/gift/status, /casino/gift/claim, CasinoSync
+src/Casino.Client/CasinoGift.cs    the card, drawn like the welcome card above it
+```
+
+**The flag lives on the server, not beside the plugin.** `CasinoIntro` keeps its own in
+`seen.txt`, which is fine for a card that costs a second reading if it is lost. The same
+arrangement here would be a file players could delete for another million. The client is
+told what is *pending* and is never believed about what was *paid*.
+
+**Claim first, pay second.** The two failures are not equal. Paying twice invents roubles
+and there is no taking them back; a payment that fails after the claim is recorded is
+recoverable, logged, and visible in `gifts.json`. So the claim is written before the
+money moves, and put back only on the one path that knows nothing moved -- a bank that
+threw, or a payment that landed nowhere at all. **Money that reached the message tab is
+already the player's and must never be released**, or the mail and a second payment
+together are worth two million. There is a test for exactly that.
+
+**A record that cannot be trusted pays nobody.** An unwritable mod folder, or a
+`gifts.json` that will not parse, both mean a payment cannot be remembered -- which would
+pay the gift again on every open, for ever. Both switch the gift off instead, and the
+corrupt file is deliberately *not* overwritten with an empty one, because it is the only
+evidence of what was already paid.
+
+**The key is not the mod version.** `GiftOffer.Key` is `1.2.6-apology`, frozen. Bumping
+to 1.2.7 must not hand everyone another million, and a future gift is a new key rather
+than a migration.
+
+Written the way `docs/roulette.md` asks for: 24 tests, then mutation-tested against nine
+deliberate faults -- pay twice, pay on a refused claim, pay with no record, release money
+that was posted, forget to release money that was not -- and all nine caught.
+
+The card claims as it *opens*, not when CONTINUE is pressed, so escape or alt-F4 over the
+top of it cannot cost a player the gift. That is also why a double click on the tab is a
+real race rather than a hypothetical one, and why the store's lock is around the whole
+read-decide-write rather than around the write.
 
 ## Publishing
 

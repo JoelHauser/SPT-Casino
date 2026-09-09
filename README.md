@@ -96,9 +96,9 @@ the plugin anyway, so a client-only change does not need the server stopped.
 ## How it is laid out
 
 ```
-src/Casino.Client     the plugin: tab, lobby, welcome card, escape key
+src/Casino.Client     the plugin: tab, lobby, welcome and gift cards, escape key
 src/Casino.Shared     one copy of what every table draws with
-src/Casino.Server     the mod metadata, and the one line printed at startup
+src/Casino.Server     the mod metadata, the startup line, and the 1.2.6 gift
 src/<Table>.Client    each table's panel and views, compiled into the plugin
 src/<Table>.Server    each table's server code, on its own routes
 src/<Table>.Game      the rules, with no SPT types in them, unit tested

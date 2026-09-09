@@ -19,6 +19,7 @@
     -->
     <Project Path="src/Casino.Client/Casino.Client.csproj" />
     <Project Path="src/Casino.Server/Casino.Server.csproj" />
+    <Project Path="tests/Casino.Server.Tests/Casino.Server.Tests.csproj" />
   </Folder>
   <Folder Name="/SlotMachine/">
     <!--

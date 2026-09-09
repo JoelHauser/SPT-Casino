@@ -42,7 +42,8 @@ namespace Casino.Client
         /// True when the casino is showing anything at all -- the lobby, the intro, or
         /// a table. What the tab and the escape key ask.
         /// </summary>
-        internal static bool Anything => IsOpen || CasinoIntro.IsOpen || Games.Playing() != null;
+        internal static bool Anything =>
+            IsOpen || CasinoIntro.IsOpen || CasinoGift.IsOpen || Games.Playing() != null;
 
         internal static void Toggle()
         {
@@ -56,11 +57,40 @@ namespace Casino.Client
             // on to. A player who has read it never sees this branch again.
             if (CasinoIntro.ShouldShow())
             {
-                CasinoIntro.Open(() => Show(instant: true));
+                CasinoIntro.Open(AfterIntro);
+                return;
+            }
+
+            // Then the 1.2.6 apology, once per profile, which the server decides on.
+            // Its money moves as it opens rather than when it is dismissed, so nothing
+            // below this point can cost a player the gift.
+            if (CasinoGift.ShouldShow())
+            {
+                CasinoGift.Open(() => Show(instant: true));
                 return;
             }
 
             Show();
+        }
+
+        /// <summary>
+        /// What the welcome card opens on to.
+        ///
+        /// The lobby goes up solid first either way, so the welcome has something
+        /// underneath it to fade away over -- see the note on <see cref="Show"/>'s
+        /// instant flag. A profile new enough to be reading the welcome on 1.2.6 is
+        /// also owed the apology, so the gift card is built straight on top of the
+        /// lobby while the welcome is still fading off it. It sits a layer above both.
+        /// </summary>
+        private static void AfterIntro()
+        {
+            Show(instant: true);
+
+            if (CasinoGift.ShouldShow())
+            {
+                // No continuation: the lobby is already up and solid behind it.
+                CasinoGift.Open(null);
+            }
         }
 
         /// <summary>
@@ -138,6 +168,7 @@ namespace Casino.Client
         {
             Games.CloseAll();
             CasinoIntro.Close();
+            CasinoGift.Close();
             Close();
         }
 
