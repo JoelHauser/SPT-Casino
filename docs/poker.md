@@ -1582,6 +1582,22 @@ reads this first and would have started building one.
   still not yet watched running in the actual game** -- that box could only run the
   server. Worth an eyes-on pass before calling it done; see the identical note in
   `docs/blackjack.md`.
+  **`SetBoard` had the same stagger bug Blackjack's `AnimateIfNew` was fixed for,
+  reported 8 Sep 2026 as a check hanging before its turn/river card showed up.**
+  The delay passed to `AnimateIfNew` was the card's *absolute* board slot (0-4),
+  not how many cards are actually new this redraw. The flop's three land together
+  so slot 0/1/2 doubles as both and the stagger looks right by accident; the turn
+  and river are each the only new card in their own redraw, so slot 3 or 4 made
+  each wait three or four `CardStagger` steps (0.9s-1.2s at the shared 0.3s
+  default, which Poker still uses) for cards that landed streets ago and were not
+  moving. Fixed by tracking a separate `revealOrder` in `SetBoard` that only
+  advances for a slot whose code actually changed since the last render, and
+  passing that instead of the raw loop index -- `AnimateIfNew` itself did not
+  need to change, since seat cards (the other caller) use `dealIndex` for a
+  deliberate round-the-table formula, not board position, and are dealt all-new
+  together at the start of a hand so this bug never applied to them. Compiled
+  clean as part of `Casino.Client`, packed into `SPT_CasinoV1.2.1.zip` alongside
+  Blackjack's own stagger fix -- **still not seen on a screen.**
 - **Sound cues added, 8 Sep 2026, no audio files behind them yet.** `DealAnimator`
   itself plays `CardDeal`/`CardFlip` -- shared with Blackjack, so nothing poker-
   specific to wire there. `Act` plays `ChipBet` once the engine has accepted a

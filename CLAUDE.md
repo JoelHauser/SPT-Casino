@@ -84,7 +84,7 @@ takes an `instant` flag for this.
 | `ChipView.cs` | Roulette's was a strict superset of Poker's, zero lines lost |
 | `ProfileSync.cs` | identical but for the sync action, which is now a parameter |
 | `Host.cs` | new: the two things the shared code needs from its host |
-| `DealAnimator.cs` | new, 8 Sep 2026: slides a dealt card in and flips a revealed one over, for every table's cards at once |
+| `DealAnimator.cs` | new, 8 Sep 2026: slides a dealt card in and flips a revealed one over. `Deal`/`Flip`/`FinishTime` take an optional `duration`; Blackjack passes its own (faster) one, Poker takes the default -- see `docs/blackjack.md` |
 | `SoundBoard.cs` | new, 8 Sep 2026: plays a named `Cue` by loading a file for it out of a shared `sounds/` folder -- see "The sound boilerplate" |
 
 **`Host` is the whole seam.** These files used to reach for their own table's plugin

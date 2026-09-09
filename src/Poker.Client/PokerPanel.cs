@@ -1073,6 +1073,16 @@ namespace Poker.Client
                 UnityEngine.Object.Destroy(_board.GetChild(i).gameObject);
             }
 
+            // Absolute board position, not how many cards are actually new this
+            // redraw. The flop's three land together, so 0/1/2 doubles as both and
+            // staggering them by slot is correct. The turn and river are each the
+            // only new card in their own redraw, so stamping them with slot 3 or 4
+            // made each wait three or four stagger steps for cards that landed
+            // streets ago and are not moving -- reported 8 Sep 2026 as the board
+            // hanging before a check's turn/river card showed up. Only a card that
+            // is actually new consumes a slot in this count.
+            var revealOrder = 0;
+
             for (var i = 0; i < 5; i++)
             {
                 var dealt = codes != null && i < codes.Length;
@@ -1080,7 +1090,15 @@ namespace Poker.Client
 
                 if (dealt)
                 {
-                    AnimateIfNew("board:" + i, codes[i], card, i, ref latestFinish);
+                    var key = "board:" + i;
+                    var isNew = !_dealtState.TryGetValue(key, out var prev) || prev != codes[i];
+
+                    AnimateIfNew(key, codes[i], card, revealOrder, ref latestFinish);
+
+                    if (isNew)
+                    {
+                        revealOrder++;
+                    }
                 }
 
                 // An undealt slot is left as a ghost rather than a card back. A back

@@ -35,12 +35,12 @@ $ErrorActionPreference = 'Stop'
 # Two levels up: this sits in scripts/<mod>/.
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
-$version = '1.2.0'
+$version = '1.2.1'
 
 # What the download is called. Deliberately not $version: the plugin carries a
 # three-part version because BepInEx expects one, and the release is named the way it
 # is published.
-$release = '1.2.0'
+$release = '1.2.1'
 $tables = @('Blackjack', 'Poker', 'Roulette', 'SlotMachine')
 $plugin = Join-Path $root 'src\Casino.Client\Casino.Client.csproj'
 $stage = Join-Path $root 'dist\casino'

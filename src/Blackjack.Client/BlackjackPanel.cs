@@ -660,7 +660,22 @@ namespace Blackjack.Client
             // 220 of width for its total and the hands drift apart for no reason.
             var labelWidth = Mathf.Max(rowWidth, 140f);
 
-            SetSize(Label(column, $"{value}{(soft ? " soft" : "")}", 26f, Ink, TextAlignmentOptions.Center).rectTransform, labelWidth, 32f);
+            // Held back the same way the outcome label below is: this already reflects
+            // a card that is still sliding toward the felt on a Hit or a Split, so
+            // showing it the instant BuildHand runs reads as the total arriving before
+            // the card that produced it. Alpha, not a delayed SetSize -- the column's
+            // layout needs the label's space reserved from the first frame or the hand
+            // shifts when the number appears.
+            var valueLabel = Label(column, $"{value}{(soft ? " soft" : "")}", 26f, Ink, TextAlignmentOptions.Center);
+            SetSize(valueLabel.rectTransform, labelWidth, 32f);
+            valueLabel.alpha = 0f;
+            DealAnimator.After(latestFinish, () =>
+            {
+                if (valueLabel != null)
+                {
+                    valueLabel.alpha = 1f;
+                }
+            });
             SetSize(Label(column, $"{wager:N0} {Short(_wallet)}", 17f, Faint, TextAlignmentOptions.Center).rectTransform, labelWidth, 22f);
 
             if (!string.IsNullOrEmpty(outcome) && outcome != "Pending")
@@ -1653,12 +1668,27 @@ namespace Blackjack.Client
             rect.offsetMax = Vector2.zero;
         }
 
+        // Faster than DealAnimator's shared default (0.5s / 0.3s stagger). A blackjack
+        // hand redraws on every Hit and Split, far more often than a poker board turns
+        // over, so the same deliberate-dealer pace that suits Poker reads as sluggish
+        // here. Local to this panel rather than a change to the shared constants --
+        // Poker keeps DealAnimator.CardStagger and DefaultDuration untouched.
+        private const float DealStagger = 0.2f;
+        private const float DealDuration = 0.35f;
+
         /// <summary>
         /// Builds one card in a slotted, animation-safe wrapper (see
         /// <see cref="CardView.BuildSlotted"/>) and plays the deal animation on it if
         /// its slot's content is new since the last render. <paramref name="dealSequence"/>
-        /// is threaded through the whole round so every card built this render -- the
-        /// dealer's, then each hand's -- gets a later stagger than the one before it.
+        /// is threaded through the whole round so every card that actually animates
+        /// this render -- the dealer's, then each hand's -- gets a later stagger than
+        /// the one before it. It only advances for a card that is about to animate: a
+        /// card whose state has not changed must not consume a stagger slot, or a
+        /// single new card from a Hit inherits the delay of a full fresh deal just for
+        /// being counted alongside every card already sitting on the table -- reported
+        /// 8 Sep 2026 as the active hand's highlighted box expanding to the new width
+        /// (a synchronous layout rebuild) and then sitting empty for up to a second
+        /// while that borrowed delay ran out before the card itself started moving.
         /// <paramref name="latestFinish"/> comes along for the same reason and tracks
         /// the opposite end: the latest moment anything actually animating this render
         /// will finish, in seconds from now, so a caller can hold outcome text back
@@ -1669,28 +1699,26 @@ namespace Blackjack.Client
             RectTransform parent, string code, string key, ref int dealSequence, ref float latestFinish)
         {
             var card = CardView.BuildSlotted(parent, code, _font);
-            var order = dealSequence++;
-            var delay = order * DealAnimator.CardStagger;
             var state = code ?? "back";
 
-            if (_dealtState.TryGetValue(key, out var prev))
+            if (_dealtState.TryGetValue(key, out var prev) && prev == state)
             {
-                if (prev == state)
-                {
-                    return card;
-                }
+                return card;
+            }
 
-                // The hole card resolving from a back to a face at the dealer's turn
-                // is a reveal, not a deal -- it is not arriving from anywhere, it is
-                // already sitting there and turning over.
-                if (prev == "back" && state != "back")
-                {
-                    _dealtState[key] = state;
-                    var back = CardView.AddBackTo(card, _font);
-                    DealAnimator.Flip(card, back, delay);
-                    latestFinish = Mathf.Max(latestFinish, DealAnimator.FinishTime(delay));
-                    return card;
-                }
+            var order = dealSequence++;
+            var delay = order * DealStagger;
+
+            // The hole card resolving from a back to a face at the dealer's turn is a
+            // reveal, not a deal -- it is not arriving from anywhere, it is already
+            // sitting there and turning over.
+            if (prev == "back" && state != "back")
+            {
+                _dealtState[key] = state;
+                var back = CardView.AddBackTo(card, _font);
+                DealAnimator.Flip(card, back, delay, DealDuration);
+                latestFinish = Mathf.Max(latestFinish, DealAnimator.FinishTime(delay, DealDuration));
+                return card;
             }
 
             _dealtState[key] = state;
@@ -1699,8 +1727,8 @@ namespace Blackjack.Client
             // would actually sit, so the dealer's own cards get a short slide into
             // place beside each other and the player's cards get the long one
             // down the table -- both for free, from one honest origin.
-            DealAnimator.Deal(card, delay, _dealerCards);
-            latestFinish = Mathf.Max(latestFinish, DealAnimator.FinishTime(delay));
+            DealAnimator.Deal(card, delay, _dealerCards, DealDuration);
+            latestFinish = Mathf.Max(latestFinish, DealAnimator.FinishTime(delay, DealDuration));
 
             return card;
         }

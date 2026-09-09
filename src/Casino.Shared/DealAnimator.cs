@@ -21,7 +21,15 @@ namespace Casino.Shared
         /// <summary>What a caller multiplies a card's place in the deal by.</summary>
         internal const float CardStagger = 0.3f;
 
-        private const float Duration = 0.5f;
+        /// <summary>
+        /// The duration every caller got before <c>Deal</c>/<c>Flip</c>/<c>FinishTime</c>
+        /// took an explicit one. Poker still relies on this default; Blackjack passes
+        /// its own shorter duration (see <c>BlackjackPanel.DealDuration</c>) because a
+        /// hand there changes far more often than a poker board and the same pace read
+        /// as sluggish on every Hit.
+        /// </summary>
+        internal const float DefaultDuration = 0.5f;
+
         private const float StartScale = 0.6f;
 
         /// <summary>
@@ -35,7 +43,7 @@ namespace Casino.Shared
         /// no origin to slide in from: a card that never animates in is still a dealt
         /// card.
         /// </summary>
-        internal static void Deal(GameObject card, float delay, RectTransform origin)
+        internal static void Deal(GameObject card, float delay, RectTransform origin, float duration = DefaultDuration)
         {
             var host = Host.Plugin;
             var rect = card == null ? null : card.transform as RectTransform;
@@ -45,10 +53,10 @@ namespace Casino.Shared
                 return;
             }
 
-            host.StartCoroutine(Animate(rect, delay, origin));
+            host.StartCoroutine(Animate(rect, delay, origin, duration));
         }
 
-        private static IEnumerator Animate(RectTransform rect, float delay, RectTransform origin)
+        private static IEnumerator Animate(RectTransform rect, float delay, RectTransform origin, float duration)
         {
             var group = rect.GetComponent<CanvasGroup>();
             if (group == null)
@@ -100,10 +108,10 @@ namespace Casino.Shared
             SoundBoard.Play(Cue.CardDeal);
 
             var elapsed = 0f;
-            while (elapsed < Duration)
+            while (elapsed < duration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                var t = EaseOut(Mathf.Clamp01(elapsed / Duration));
+                var t = EaseOut(Mathf.Clamp01(elapsed / duration));
 
                 if (rect == null)
                 {
@@ -135,7 +143,7 @@ namespace Casino.Shared
         /// thing shrinking away, and this destroys it partway through. Build it with
         /// <see cref="CardView.AddBackTo"/> immediately before calling, never reused.
         /// </summary>
-        internal static void Flip(GameObject face, GameObject back, float delay)
+        internal static void Flip(GameObject face, GameObject back, float delay, float duration = DefaultDuration)
         {
             var host = Host.Plugin;
             var faceRect = face == null ? null : face.transform as RectTransform;
@@ -146,10 +154,10 @@ namespace Casino.Shared
                 return;
             }
 
-            host.StartCoroutine(AnimateFlip(faceRect, backRect, delay));
+            host.StartCoroutine(AnimateFlip(faceRect, backRect, delay, duration));
         }
 
-        private static IEnumerator AnimateFlip(RectTransform face, RectTransform back, float delay)
+        private static IEnumerator AnimateFlip(RectTransform face, RectTransform back, float delay, float duration)
         {
             // The rest scale is whatever the slot already gave the face card -- read
             // once, before anything is hidden, the same number CardSlot/BuildSlotted
@@ -172,7 +180,7 @@ namespace Casino.Shared
                 yield break;
             }
 
-            var half = Duration * 0.5f;
+            var half = duration * 0.5f;
             var elapsed = 0f;
 
             // The back shrinks to edge-on. Only x moves -- the height of a card does
@@ -233,11 +241,14 @@ namespace Casino.Shared
         /// <summary>
         /// When a card started with <paramref name="delay"/> will actually have
         /// finished moving -- <see cref="Deal"/> and <see cref="Flip"/> take the same
-        /// total time, so one formula covers both. For a caller that needs to hold
-        /// something back until every card in a redraw is done: an outcome the player
-        /// should not read before they can see the card that decided it.
+        /// total time, so one formula covers both. <paramref name="duration"/> must
+        /// match whatever was passed to the <c>Deal</c>/<c>Flip</c> call it is timing,
+        /// or this understates how long that card is still moving for. For a caller
+        /// that needs to hold something back until every card in a redraw is done: an
+        /// outcome the player should not read before they can see the card that
+        /// decided it.
         /// </summary>
-        internal static float FinishTime(float delay) => delay + Duration;
+        internal static float FinishTime(float delay, float duration = DefaultDuration) => delay + duration;
 
         /// <summary>
         /// Runs <paramref name="action"/> once, <paramref name="delay"/> seconds from

@@ -663,6 +663,45 @@ the server half, deliberately, because so much of it has still only run once.
   not yet seen on a screen**, since that box could only run the server, not the game.
   Worth an eyes-on pass before calling it done; see the identical note in
   `docs/poker.md`.
+  **A hand's own total had the same bug the outcome label was already fixed for,
+  reported 8 Sep 2026 as "the number pops up before the card arrives" on Hit and
+  Split.** `BuildHand`'s value label (`{value}{soft}`) was still being set the
+  moment `RenderRound` ran, synchronously, while the card that produced that value
+  was still 0.5s (plus its stagger delay) from sliding into place -- the same
+  desync the outcome label and dealer total were already held back to prevent, just
+  never applied to this label. Fixed the same way: alpha 0 at build time, set to 1
+  by `DealAnimator.After(latestFinish, ...)`, so the total appears exactly when the
+  card that produced it finishes arriving rather than the instant the hand is
+  redrawn. Compiled clean (`Blackjack.Client` and `Casino.Client` both, against
+  `H:\SPT4.1.X` -- Joel's box, not the `C:\HUH` this file otherwise assumes) and
+  the 52 engine tests still pass, but **not yet seen on a screen** -- same caveat
+  as the rest of this animator work.
+  **Blackjack's deal/flip pace is now its own, not the shared default, requested
+  8 Sep 2026.** `DealAnimator.Deal`/`Flip`/`FinishTime` took an explicit
+  `duration` parameter (defaulting to the old `0.5f`, renamed `DefaultDuration`),
+  so `BlackjackPanel` can pass its own `DealDuration = 0.35f` and compute delay
+  from its own `DealStagger = 0.2f` instead of `DealAnimator.CardStagger` --
+  roughly 30% faster. Poker was left untouched: it still calls the same methods
+  with no duration argument and gets the original 0.5s/0.3s pace, since a hand
+  here redraws on every Hit and Split and the same deliberate-dealer timing that
+  suits a poker board read as sluggish on a table that changes this often.
+  **The 30% cut above didn't fix it -- reported still sluggish 8 Sep 2026, described
+  as the active hand's gold box snapping to its new width and then sitting there
+  before the card shows up.** The real fault was in `AnimateIfNew`'s stagger math,
+  not the duration constants: `dealSequence` advanced for every card the render
+  visited -- the dealer's two, the hole-card back, every card already in the hand
+  -- not only the ones about to animate, so a Hit's one new card inherited the
+  `order` of a full fresh deal (dealer + hole + existing hand) even though nothing
+  ahead of it was moving. At `DealStagger = 0.2f` that borrowed as much as a full
+  second of dead time before the new card's own 0.35s slide even started, while
+  `FitHands`' synchronous `ForceRebuildLayoutImmediate` had already snapped the
+  hand's column -- and the active hand's gold border with it -- to the width the
+  new card needs. `order`/`delay` are now computed only for a card that is about
+  to actually animate (past the unchanged-state early return), so a lone Hit gets
+  `order = 0` and starts moving next frame; an initial deal, where every card is
+  new, staggers exactly as before. Compiled clean as part of `Casino.Client`
+  against `H:\SPT4.1.X`, packed into `SPT_CasinoV1.2.1.zip` -- **still not seen on
+  a screen.**
 - **Sound cues added, 8 Sep 2026, no audio files behind them yet.** `DealAnimator`
   plays `CardDeal`/`CardFlip` -- shared with Poker. `Deal()` (placing the bet and
   starting the round) plays `ChipBet` once the server confirms the stake was
