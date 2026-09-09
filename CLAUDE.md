@@ -208,27 +208,45 @@ glyph the way `ItemIconCreator`'s is, it is the empty string. There is no identi
 C# will let anyone write for that -- `nameof` and Harmony's `AccessTools.TypeByName`
 both still need a real string to search for, and an empty one is not one.
 
-A metadata token survives that, because it addresses the member directly instead of
-searching for its name:
+**Search for the member by its shape. Do not pin a metadata token.** That is the one
+thing to take from this, and it was learned the expensive way:
 
-1. `dotnet tool install -g ilspycmd`, then point it at the installed
-   `EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll`. `ilspycmd --dump-table
-   MethodDef <dll>` lists every method with its RID/token -- fast, metadata only, no
-   full decompile needed just to find candidates.
-2. Find the one shaped like the call site that broke -- same parameter count, same
-   rough parameter and return types -- and confirm it with `ilspycmd -m 0x0600XXXX
-   <dll>`, which decompiles a single member by token and shows its real body even
-   when its declaring type has no name to show one under.
-3. At runtime, `Module.ResolveMethod(token)` hands back a working `MethodInfo` off
-   that address alone, and `methodInfo.DeclaringType` is a real, usable `Type` --
-   `Type.MakeGenericType` accepts it exactly like any named type, which is how
-   `Singleton<>.Instance` gets reached for a class with nothing to write inside the
-   angle brackets.
+```csharp
+foreach (var type in module.GetTypes())          // wrap: ReflectionTypeLoadException
+    foreach (var m in type.GetMethods(Public | Instance | DeclaredOnly))
+        if (m.Name == "CreateItem" && m.ReturnType == typeof(Item) && /* params match */)
+            return m;                            // DeclaringType is usable, named or not
+```
 
-See `ItemArt.TryResolveFactory` in `src/SlotMachine.Client/ItemArt.cs` for the whole
-pattern working end to end, token `0x06009726` pinned for build 40743. It is exactly
-as build-specific as the name it replaces -- the next patch can move it too, and the
-fix is the same three steps again, not a rewrite of whatever calls it.
+The declaring type is what loses its name; the *method's* own name has survived every
+rename this repo has hit, so there is still something stable to search on. Once found,
+`methodInfo.DeclaringType` is a real `Type` that `MakeGenericType` accepts exactly like
+a named one, which is how `Singleton<>.Instance` gets reached for a class with nothing
+to write inside the angle brackets. See `ItemArt.FindCreateItem`.
+
+A pinned token was tried first and **shipped broken in 1.2.0 and 1.2.1**.
+`Module.ResolveMethod(0x06009726)` addresses the member directly, so it ignores names
+entirely -- and it is correct only for the exact copy of `Assembly-CSharp.dll` it was
+read out of. It verified against `C:\HUH` twice, by two people using two different
+tools. On a player's clean install it came back as something that was not a
+`MethodInfo`, and the cast threw `Specified cast is not valid` before an icon could be
+drawn.
+
+**Verifying a token on the machine you read it from cannot detect what is wrong with
+it.** That is the trap, and it is not obvious: the check passes, confidently, and says
+nothing about any other install. Hardcoding an offset, index or ordinal read out of a
+game file is the same mistake wearing different clothes.
+
+`ilspycmd` is still the right tool for *finding out what to search for* --
+`dotnet tool install -g ilspycmd`, then `--dump-table MethodDef <dll>` to list members
+with their tokens, or `-m 0x0600XXXX <dll>` to decompile one by token and see its real
+body even when its declaring type has no name to show it under. Use it to learn the
+member's shape, then write the shape into the code, not the number.
+
+And before shipping such a search, load the real assembly in a throwaway
+`MetadataLoadContext` harness and **count the matches**. `FindCreateItem` was checked
+that way and matches exactly one method out of 15,136 types, which is the difference
+between a search and a guess.
 
 ## The things that are true of every table
 

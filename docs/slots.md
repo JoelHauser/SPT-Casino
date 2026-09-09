@@ -626,17 +626,45 @@ this file has been looked at on a real machine.
   "cannot draw anything" fallback for everyone. It turned out `ItemIconCreator` never
   needed naming at all: `ItemViewFactory.GetItemSpriteAsync`, the actual call site this
   file uses, is still a normal public method and resolves it internally. Only
-  `ItemFactory.CreateItem` had to be reached another way -- `Module.ResolveMethod` against
-  its exact metadata token (`0x06009726`, found once by decompiling `Assembly-CSharp.dll`
-  with `ilspycmd` and matching the `CreateItem(string, string, diff)` overload shaped
-  like the old call site), then `Singleton<>.MakeGenericType` against whatever `Type`
-  that method's `DeclaringType` turns out to be -- a token addresses metadata directly
-  and does not care what the type is named. See `ItemArt.TryResolveFactory`. Verified by
-  building `Casino.Client` clean against the real `C:\HUH` install and re-running both
-  Slots test suites (52 passing); **not yet confirmed against a live session** -- the
-  panel itself has not been reopened in-game since. The token is exactly as fragile as
-  the name it replaces: a future build can move it the same way this one moved the name,
-  and the fix then is the same decompile-and-repin, not a rewrite of `TryRender`.
+  `ItemFactory.CreateItem` had to be reached another way. `ItemViewFactory
+  .GetItemSpriteAsync`, the actual call site this file uses, is still a normal public
+  method and resolves `ItemIconCreator` internally, so only the factory needed solving.
+
+  **That was first tried as a pinned metadata token (`0x06009726`), and 1.2.0 and 1.2.1
+  shipped broken because of it.** A token addresses metadata directly, so it does not
+  care what anything is named -- but it is only correct for the exact copy of
+  `Assembly-CSharp.dll` it was read out of. Against `C:\HUH` it verified perfectly, twice,
+  by two different people using two different tools. On a player's clean install it
+  resolved to something that was not a `MethodInfo` at all, and the `(MethodInfo)` cast
+  threw before anything could be drawn:
+
+  ```
+  [Slots] item icon rendering is off: the factory token no longer resolves
+          (Specified cast is not valid.). The reels will show blanks until it is re-pinned.
+  ```
+
+  **`ItemArt.FindCreateItem` describes the method instead of numbering it**, which is what
+  it should always have done: a walk over every type in the module for a public instance
+  method named `CreateItem`, taking `(string, string, <reference type>)` and returning
+  `Item`. The *method's* name has survived every rename this repo has hit -- it is the
+  declaring type that keeps losing its own -- so there is a stable thing to search on. The
+  search was checked against the real assembly with a `MetadataLoadContext` harness before
+  shipping: **exactly one method out of 15,136 types matches**, its declaring type's `Name`
+  is the empty string, and it sits at `0x06009726` -- the very token that was pinned, which
+  is why the pin verified locally and still failed in the field. `Module.GetTypes()` is
+  wrapped for `ReflectionTypeLoadException`, since a heavily modded install can have types
+  that will not load and none of that is this mod's business.
+
+  The lesson is worth keeping: **a number read off one machine's copy of the file was
+  never going to survive the fleet, and verifying it on that same machine could not
+  detect that.** Describe the member; do not number it.
+
+  Also fixed in the same release: `FetchAll`'s pass over the nine symbols used to `break`
+  out entirely on the first symbol `TryRender` could not draw, rather than trying the
+  rest. The same symbol failed first every pass, so three panel opens reached
+  `MaxAttempts` and abandoned every symbol still unrendered -- including eight that had
+  never been attempted -- for the rest of the session. It `continue`s now, so each symbol
+  gets its own attempts.
 - The stake is typed, and the server takes any whole amount between the two ends --
   or above the top one, with "No maximum stake" ticked in F12.
 - The win banner scales with the multiple: WIN, BIG WIN, HUGE WIN, JACKPOT.

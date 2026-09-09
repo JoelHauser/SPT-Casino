@@ -246,9 +246,16 @@ namespace SlotMachine.Client
                 {
                     // No session, no renderer -- usually "not yet". Ask again next time
                     // the panel opens, but not for ever.
+                    //
+                    // continue, not break: this used to stop the whole pass on the first
+                    // symbol that could not be drawn, so one bad symbol -- or the game
+                    // simply not being ready yet on the pass that happened to test the
+                    // first reel -- meant the other eight were never even attempted, and
+                    // three such passes abandoned all nine for the rest of the session.
+                    // Every symbol earns its own MaxAttempts now.
                     Asked.Remove(symbol);
                     unable = true;
-                    break;
+                    continue;
                 }
 
                 while (!task.IsCompleted)
@@ -299,30 +306,6 @@ namespace SlotMachine.Client
             onArrived?.Invoke();
         }
 
-        /// <summary>
-        /// The metadata token of the item factory's own
-        /// <c>CreateItem(string itemId, string templateId, ItemComponentsProperties diff)</c>
-        /// method, on EFT 0.16.9.5 build 40743.
-        ///
-        /// The class that method lives on was called `ItemFactory` until this build. It
-        /// is not renamed here -- its `Name` in the assembly's own metadata is the empty
-        /// string, which is not a name C# will let anyone write, `nameof` included. A
-        /// token sidesteps that: <see cref="Module.ResolveMethod(int)"/> hands back a
-        /// working <see cref="MethodInfo"/> from the address alone, and its
-        /// <see cref="MemberInfo.DeclaringType"/> is a real, usable <see cref="Type"/>
-        /// regardless of what it is called.
-        ///
-        /// Found by decompiling `Assembly-CSharp.dll` (ilspycmd) and matching the one
-        /// `CreateItem` overload shaped like the call this file always made -- an
-        /// instance method taking an id, a template id and an optional diff, returning
-        /// an `Item` -- against the handful the assembly has. Pinned as a constant
-        /// rather than re-discovered every launch, which is exactly why it is this
-        /// fragile: the next build can move it precisely the way this one moved the
-        /// name. There is no way to make a token outlive the build it was read from --
-        /// when this breaks again, decompile again and replace the constant.
-        /// </summary>
-        private const int FactoryCreateItemToken = 0x06009726;
-
         private static MethodInfo _createItem;
 
         private static PropertyInfo _factoryInstantiated;
@@ -333,12 +316,11 @@ namespace SlotMachine.Client
 
         /// <summary>
         /// Resolves <see cref="_createItem"/> and its matching
-        /// <c>Singleton&lt;&gt;.Instantiated</c> / <c>.Instance</c> accessors from
-        /// <see cref="FactoryCreateItemToken"/>, once.
+        /// <c>Singleton&lt;&gt;.Instantiated</c> / <c>.Instance</c> accessors, once.
         ///
-        /// A token that fails to resolve on this build will fail again on the next
-        /// attempt for the same reason, so a failure is cached rather than retried --
-        /// one warning for the session instead of one per symbol per panel open.
+        /// A lookup that fails on this build will fail again on the next attempt for the
+        /// same reason, so a failure is cached rather than retried -- one warning for the
+        /// session instead of one per symbol per panel open.
         /// </summary>
         private static bool TryResolveFactory()
         {
@@ -354,7 +336,13 @@ namespace SlotMachine.Client
 
             try
             {
-                _createItem = (MethodInfo)typeof(MongoID).Module.ResolveMethod(FactoryCreateItemToken);
+                _createItem = FindCreateItem();
+
+                if (_createItem == null)
+                {
+                    throw new MissingMethodException(
+                        "nothing in Assembly-CSharp is shaped like CreateItem(string, string, diff) -> Item.");
+                }
 
                 var singletonOfFactory = typeof(Singleton<>).MakeGenericType(_createItem.DeclaringType);
 
@@ -377,10 +365,120 @@ namespace SlotMachine.Client
                 _createItem = null;
 
                 SlotClientPlugin.Log.LogWarning(
-                    $"[Slots] item icon rendering is off: the factory token no longer resolves "
-                    + $"({ex.Message}). The reels will show blanks until it is re-pinned.");
+                    $"[Slots] item icon rendering is off: {ex.Message} "
+                    + "The reels will show blanks.");
 
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Finds the item factory's
+        /// <c>CreateItem(string itemId, string templateId, ItemComponentsProperties diff)</c>
+        /// by its shape, because it cannot be found by the name of the class it is on.
+        ///
+        /// The class was `ItemFactory` until EFT 0.16.9.5. Its `Name` in the assembly's
+        /// own metadata is now the empty string -- not garbled, absent -- which is not
+        /// something `nameof` or `AccessTools.TypeByName` can be handed.
+        ///
+        /// **This was a pinned metadata token (`0x06009726`) between 8 Sep and 9 Sep 2026,
+        /// and that is what shipped broken in 1.2.0 and 1.2.1.** A token addresses
+        /// metadata directly, so it does not care what anything is named -- but it is
+        /// only correct for the exact assembly it was read out of. On a player's install
+        /// it came back as something that was not even a `MethodInfo`, and the cast threw
+        /// `Specified cast is not valid` before anything could be drawn. A number read
+        /// off one machine's copy of the file was never going to survive the fleet.
+        ///
+        /// A search does. The *method's* name has stayed readable through every rename
+        /// this repo has hit -- it is the declaring type that keeps losing its own -- so
+        /// the search is over every type in the assembly for a method that is named
+        /// `CreateItem`, takes an id, a template id and a nullable diff, and returns an
+        /// `Item`. That is the call site this file has always made, described instead of
+        /// numbered, and it re-derives itself on whatever build it is actually running
+        /// on rather than on the one somebody last decompiled.
+        ///
+        /// Costs one pass over the assembly's types, once per session, behind the same
+        /// cache the token sat behind.
+        /// </summary>
+        private static MethodInfo FindCreateItem()
+        {
+            foreach (var type in TypesIn(typeof(MongoID).Module))
+            {
+                // Cheap tests before the expensive one. `GetMethods` resolves every
+                // signature on the type and allocates an array to hand back, and this
+                // runs on the main thread with the panel already open -- across an
+                // assembly this size that is worth not doing fifteen thousand times.
+                // What is being looked for reaches `Singleton<>`, so it is an ordinary
+                // instantiable class.
+                if (!type.IsClass || type.IsAbstract || type.ContainsGenericParameters)
+                {
+                    continue;
+                }
+
+                MethodInfo[] methods;
+
+                try
+                {
+                    methods = type.GetMethods(
+                        BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                }
+                catch (Exception)
+                {
+                    // A type whose own members will not load. Not the one being looked for.
+                    continue;
+                }
+
+                foreach (var method in methods)
+                {
+                    if (method.Name != "CreateItem" || method.ReturnType != typeof(Item))
+                    {
+                        continue;
+                    }
+
+                    var parameters = method.GetParameters();
+
+                    if (parameters.Length != 3
+                        || parameters[0].ParameterType != typeof(string)
+                        || parameters[1].ParameterType != typeof(string)
+                        || parameters[2].ParameterType.IsValueType)
+                    {
+                        continue;
+                    }
+
+                    return method;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Every type in a module that will actually load.
+        ///
+        /// `Module.GetTypes()` throws on the first type it cannot resolve and hands back
+        /// the rest on the exception. In a heavily modded install that is a real
+        /// possibility and none of it is this mod's business -- the wanted type is
+        /// almost certainly among the ones that did load.
+        /// </summary>
+        private static Type[] TypesIn(Module module)
+        {
+            try
+            {
+                return module.GetTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                var loaded = new List<Type>();
+
+                foreach (var type in ex.Types)
+                {
+                    if (type != null)
+                    {
+                        loaded.Add(type);
+                    }
+                }
+
+                return loaded.ToArray();
             }
         }
 
@@ -529,22 +627,35 @@ namespace SlotMachine.Client
                 var buffer = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
                 var previous = RenderTexture.active;
 
-                // The crop as a UV transform, so the render texture holds exactly the
-                // sprite and the read below can take all of it.
-                Graphics.Blit(
-                    source,
-                    buffer,
-                    new Vector2(rect.width / source.width, rect.height / source.height),
-                    new Vector2(rect.x / source.width, rect.y / source.height));
+                // Restoring the active render texture is a finally, not two lines after
+                // the read. `RenderTexture.active` is global to the whole game: leaving
+                // it pointed at this buffer -- worse, at this buffer after it has gone
+                // back to the temporary pool -- is not a leak confined to the mod, it is
+                // the game's next frame drawing into somebody else's target. ReadPixels
+                // and Apply are exactly the calls that throw on a texture the driver
+                // will not hand back, and until this release nothing here had ever run
+                // on a player's machine, because no icon had ever rendered to save.
+                try
+                {
+                    // The crop as a UV transform, so the render texture holds exactly the
+                    // sprite and the read below can take all of it.
+                    Graphics.Blit(
+                        source,
+                        buffer,
+                        new Vector2(rect.width / source.width, rect.height / source.height),
+                        new Vector2(rect.x / source.width, rect.y / source.height));
 
-                RenderTexture.active = buffer;
+                    RenderTexture.active = buffer;
 
-                cut = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                cut.ReadPixels(new Rect(0f, 0f, width, height), 0, 0);
-                cut.Apply();
-
-                RenderTexture.active = previous;
-                RenderTexture.ReleaseTemporary(buffer);
+                    cut = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                    cut.ReadPixels(new Rect(0f, 0f, width, height), 0, 0);
+                    cut.Apply();
+                }
+                finally
+                {
+                    RenderTexture.active = previous;
+                    RenderTexture.ReleaseTemporary(buffer);
+                }
 
                 return cut.EncodeToPNG();
             }
