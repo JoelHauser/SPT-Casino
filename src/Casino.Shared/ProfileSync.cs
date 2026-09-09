@@ -1,6 +1,7 @@
 using System;
 using Comfort.Common;
 using EFT.UI;
+using SPT.Reflection.Utils;
 
 namespace Casino.Shared
 {
@@ -61,10 +62,34 @@ namespace Casino.Shared
             try
             {
                 var session = ItemUiContext.Instance?.ClientSession;
+
                 if (session == null)
                 {
-                    // No session outside the menu, which is the only place the table
-                    // opens. Nothing to sync to, and nothing worth logging every frame.
+                    // `ItemUiContext` is built by the inventory screens, not by the menu:
+                    // walk from the task bar straight into the casino without opening a
+                    // stash first and there is no instance, so this used to return here
+                    // and say nothing -- by design, to avoid a log line every frame.
+                    //
+                    // The cost of that silence was the whole bug it was hiding. The money
+                    // had already moved on the server, but nothing ever asked the client
+                    // to collect the changes, so the stash on screen never budged and the
+                    // table looked like it was playing for nothing. There was no warning
+                    // anywhere to say so.
+                    //
+                    // The application always has a session while a profile is loaded, and
+                    // it is the same object -- its type implements the one `ClientSession`
+                    // hands back, which is why this assigns straight into it without a
+                    // cast. Neither type can be written down: both had their names emptied
+                    // by the obfuscator, so `var` above is doing real work.
+                    session = ClientAppUtils.GetMainApp()?.GetClientBackEndSession();
+                }
+
+                if (session == null)
+                {
+                    WarnOnce(
+                        "[Casino] there is no session to sync against, so the stash on screen "
+                        + "will read stale until the game reloads. The money itself has moved.");
+
                     return;
                 }
 
@@ -77,6 +102,23 @@ namespace Casino.Shared
                 // the game reloads, which is exactly where this started.
                 Host.Error($"[Casino] could not ask the game to resync: {error}");
             }
+        }
+
+        private static bool _warned;
+
+        /// <summary>
+        /// Says it the first time and then stops. Once per session is a bug report;
+        /// once per spin is a reason to stop reading the log.
+        /// </summary>
+        private static void WarnOnce(string message)
+        {
+            if (_warned)
+            {
+                return;
+            }
+
+            _warned = true;
+            Host.Warn(message);
         }
 
         private static void OnSynced(IResult result)
