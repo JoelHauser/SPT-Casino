@@ -605,6 +605,24 @@ its anchor is a test that is not running.**
 
 ## Current state
 
+**2026-09-10. Shipped in 1.2.61, played, and confirmed working.** A balance readout
+next to STATS and CLOSE, showing what the selected wallet currently holds. A player
+asked for it -- the panel covers the stash counter, and there was previously no way to
+see what you had left to spend while it was open.
+
+The server was already sending this: `PingResponse.Balances` has existed since the
+first version, read by `SlotService.Ping` straight off `IBank`. The panel simply never
+looked at it. `RefreshBalances` reads it off the ping already fetched on open, and off
+a fresh one after every settle -- **not** stake-minus-paid worked out on the client,
+because a win big enough to overflow the stash posts the rest as mail (see the root
+`CLAUDE.md`, "Where the money is") and only the server knows what actually landed.
+Switching currency redraws the same cached figure rather than asking again, the same
+as the wallet label beside it.
+
+`SPT_CasinoV1.2.61.zip` is only the plugin version bumped for this -- Slots' own
+`TableInfo.Version` ("0.1.0") was left alone, since that number describes the table
+rather than the download and nothing about the table's own maturity changed.
+
 **2026-09-09, evening. Rebuilt, republished, and played -- it works.** Win lines draw, the
 stash moves, and a table survives more than one round.
 

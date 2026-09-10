@@ -187,6 +187,7 @@ namespace SlotMachine.Client
         private static TextMeshProUGUI _status;
         private static TMP_InputField _stakeInput;
         private static TextMeshProUGUI _walletLabel;
+        private static TextMeshProUGUI _balanceLabel;
         private static TextMeshProUGUI _paidLabel;
         private static Coroutine _pop;
         private static Coroutine _rainbow;
@@ -234,6 +235,7 @@ namespace SlotMachine.Client
 
         private static string _wallet = "Roubles";
         private static long _stake;
+        private static readonly Dictionary<string, long> Balances = new Dictionary<string, long>();
         private static readonly Dictionary<string, long[]> Limits = new Dictionary<string, long[]>();
         private static readonly List<string> Symbols = new List<string>();
         private static readonly Dictionary<string, int[]> Pays = new Dictionary<string, int[]>();
@@ -288,6 +290,11 @@ namespace SlotMachine.Client
                 {
                     ReadMachine(ping);
                 }
+
+                // Unconditionally, unlike the paytable and limits above: the balance can
+                // have moved between one open and the next just from playing another
+                // table, so it is read fresh every time rather than only the first.
+                RefreshBalances(ping);
 
                 // Before Build, not after: the coroutine that renders icons cannot run
                 // until the next frame, so a cache hit read there would still mean one
@@ -468,6 +475,12 @@ namespace SlotMachine.Client
 
             // Now, with the reels. Any earlier and the stash gives the answer away.
             Resync();
+
+            // A fresh ping rather than staking-minus-paid worked out here: a win big
+            // enough to overflow the stash posts the rest as mail (see the root
+            // CLAUDE.md, "Where the money is"), so the server is the only thing that
+            // actually knows what landed in the wallet.
+            RefreshBalances(SlotApi.Ping());
 
             try
             {
@@ -828,6 +841,42 @@ namespace SlotMachine.Client
         }
 
         // ------------------------------------------------------------------ reading
+
+        /// <summary>
+        /// What the wallet actually holds, read off a ping response and shown beside
+        /// STATS and CLOSE -- the one place on the panel visible whether the reels are
+        /// spinning or STATS is covering them. The stake box only ever says what the
+        /// next pull will cost; a player asked to see what they had left to spend it
+        /// with.
+        /// </summary>
+        private static void RefreshBalances(JObject ping)
+        {
+            if (ping?["Balances"] is not JObject balances)
+            {
+                return;
+            }
+
+            Balances.Clear();
+
+            foreach (var pair in balances)
+            {
+                Balances[pair.Key] = (long?)pair.Value ?? 0;
+            }
+
+            SetBalanceLabel();
+        }
+
+        private static void SetBalanceLabel()
+        {
+            if (_balanceLabel == null)
+            {
+                return;
+            }
+
+            _balanceLabel.text = Balances.TryGetValue(_wallet, out var held)
+                ? $"{held:N0}  {Short(_wallet)}"
+                : string.Empty;
+        }
 
         private static void ReadMachine(JObject ping)
         {
@@ -1369,8 +1418,35 @@ namespace SlotMachine.Client
             strip.childControlWidth = false;
             strip.childControlHeight = false;
 
+            _balanceLabel = BuildReadout(row, "Balance", 220f);
+
             SmallButton(row, "STATS", ToggleStats, 200f);
             SmallButton(row, "CLOSE", Close, 200f);
+        }
+
+        /// <summary>
+        /// A dark plate the same size a button would be, but with no <see cref="Button"/>
+        /// on it -- it says something rather than doing something. Gold rather than the
+        /// ink every button label uses, so it reads as money on sight the way the win
+        /// banner and the paytable's own figures do.
+        /// </summary>
+        private static TextMeshProUGUI BuildReadout(RectTransform parent, string name, float width)
+        {
+            var box = NewBox(name, parent, Color.white);
+            box.sizeDelta = new Vector2(width, 46f);
+
+            var image = box.GetComponent<Image>();
+            image.sprite = Textures.RoundedBox(6, ButtonFace, Edge, 2);
+            image.type = Image.Type.Sliced;
+
+            var text = NewText("Label", box, string.Empty, 19f);
+            text.rectTransform.anchorMin = Vector2.zero;
+            text.rectTransform.anchorMax = Vector2.one;
+            text.rectTransform.offsetMin = Vector2.zero;
+            text.rectTransform.offsetMax = Vector2.zero;
+            text.color = Gold;
+
+            return text;
         }
 
         private static void SmallButton(
@@ -1935,6 +2011,11 @@ namespace SlotMachine.Client
             {
                 _walletLabel.text = _wallet.ToUpperInvariant();
             }
+
+            // Redrawn from whatever RefreshBalances last fetched -- switching currency
+            // needs no round trip, since a single ping already brought back every
+            // wallet's balance at once.
+            SetBalanceLabel();
         }
 
         /// <summary>
