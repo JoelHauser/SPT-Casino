@@ -1,5 +1,4 @@
 using System.Text;
-using Spectre.Console;
 
 namespace Casino.Server;
 
@@ -25,17 +24,33 @@ namespace Casino.Server;
 /// other candidate for keeping a plain copy in the file, and it is not one: the log
 /// holds Information, Warning and Critical and no Debug lines at all, so a line logged
 /// there would appear nowhere.
+///
+/// ## Why this writes ANSI rather than Spectre markup
+///
+/// Spectre.Console arrived with SPT 4.1 -- it is a dependency of `SPTarkov.Common`
+/// there, and 4.0 installs ship no Spectre assembly at all, so the mainline build's
+/// `AnsiConsole.MarkupLine` would throw `FileNotFoundException` on the first character
+/// written. The codes below are what Spectre would have emitted anyway, and they are
+/// the same ones 4.0's own `LogTextColor` is defined in terms of, so a console that
+/// renders SPT's coloured log lines renders these.
 /// </summary>
 public static class Banner
 {
     /// <summary>
-    /// Markup names rather than <see cref="Color"/> values, because these are written
-    /// straight into a markup string. Spectre knows all eight by name.
+    /// ANSI foreground codes rather than colour names, because there is no markup
+    /// parser here to look a name up in. Six rather than the mainline build's eight,
+    /// for the reason given on <see cref="Palette"/>.
     /// </summary>
-    private static readonly string[] Cycle =
-    [
-        "red", "orange1", "yellow", "green", "aqua", "dodgerblue1", "purple", "magenta1",
-    ];
+    private static readonly int[] Cycle = [31, 33, 32, 36, 34, 35];
+
+    /// <summary>
+    /// ESC built from its code point rather than typed. A literal ESC byte in a source
+    /// file is invisible in every diff and editor, does not survive a paste, and an
+    /// editor that strips control characters would silently turn the colour off.
+    /// </summary>
+    private const char Esc = (char)0x1b;
+
+    private static readonly string Reset = $"{Esc}[0m";
 
     /// <summary>
     /// Writes one line, cycling a colour per visible character.
@@ -43,10 +58,6 @@ public static class Banner
     /// Spaces are passed through uncoloured: colouring them shifts every letter after
     /// them along the cycle for no visible gain, and it makes the rainbow drift out of
     /// step between one line and the next.
-    ///
-    /// Every character is escaped individually. The lines start with "[Blackjack]" and
-    /// a bare bracket in markup is the opening of a tag, so without escaping the first
-    /// thing printed would be a parse error.
     /// </summary>
     public static void Rainbow(string text)
     {
@@ -55,33 +66,25 @@ public static class Banner
             return;
         }
 
-        var markup = new StringBuilder(text.Length * 20);
+        var line = new StringBuilder(text.Length * 12);
         var step = 0;
 
         foreach (var character in text)
         {
             if (char.IsWhiteSpace(character))
             {
-                markup.Append(character);
+                line.Append(character);
                 continue;
             }
 
-            markup.Append('[')
-                  .Append(Cycle[step++ % Cycle.Length])
-                  .Append(']')
-                  .Append(Markup.Escape(character.ToString()))
-                  .Append("[/]");
+            line.Append(Esc)
+                .Append('[')
+                .Append(Cycle[step++ % Cycle.Length])
+                .Append('m')
+                .Append(character)
+                .Append(Reset);
         }
 
-        try
-        {
-            AnsiConsole.MarkupLine(markup.ToString());
-        }
-        catch
-        {
-            // A console that will not take markup is not a reason to fail a mod load,
-            // and there is no logger to fall back to that would render this any better.
-            System.Console.WriteLine(text);
-        }
+        System.Console.WriteLine(line.ToString());
     }
 }

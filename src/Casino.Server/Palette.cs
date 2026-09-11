@@ -1,4 +1,4 @@
-using Spectre.Console;
+using SPTarkov.Server.Core.Models.Logging;
 
 namespace Casino.Server;
 
@@ -12,19 +12,22 @@ namespace Casino.Server;
 ///
 /// Console only. Colour never reaches `spt*.log`, which is worth knowing before
 /// wondering why it cannot be seen in the file afterwards.
+///
+/// Six colours rather than the mainline build's eight: Spectre.Console arrived with SPT
+/// 4.1, and 4.0's logger takes a `LogTextColor`, which is the eight ANSI foreground
+/// codes and a gray. Black, white and gray are no use in a rainbow on a console of
+/// unknown background, so the cycle is what is left.
 /// </summary>
 public static class Palette
 {
-    private static readonly Color[] Rainbow =
+    private static readonly LogTextColor[] Rainbow =
     [
-        Color.Red,
-        Color.Orange1,
-        Color.Yellow,
-        Color.Green,
-        Color.Aqua,
-        Color.DodgerBlue1,
-        Color.Purple,
-        Color.Magenta1,
+        LogTextColor.Red,
+        LogTextColor.Yellow,
+        LogTextColor.Green,
+        LogTextColor.Cyan,
+        LogTextColor.Blue,
+        LogTextColor.Magenta,
     ];
 
     private static int _next = -1;
@@ -38,6 +41,6 @@ public static class Palette
     /// in a server's lifetime, but a counter that is wrong only after a very long time
     /// is the worst kind to leave.
     /// </summary>
-    public static Color Next() =>
+    public static LogTextColor Next() =>
         Rainbow[(Interlocked.Increment(ref _next) & 0x7FFFFFFF) % Rainbow.Length];
 }

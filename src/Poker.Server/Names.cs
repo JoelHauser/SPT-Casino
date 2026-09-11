@@ -1,5 +1,5 @@
 using SPTarkov.DI.Annotations;
-using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Server.Core.Servers;
 
 namespace Poker.Server;
 
@@ -15,8 +15,14 @@ namespace Poker.Server;
 /// which is not guaranteed to have the glyphs. A name that renders as boxes is
 /// worse than a numbered seat.
 /// </summary>
+/// <remarks>
+/// Takes the <c>DatabaseServer</c> rather than the bot table itself. 4.1 calls that
+/// table <c>BotTable</c> and registers it for injection; 4.0 calls it <c>Bots</c> and
+/// does not, so the only way to it is through the database. Read lazily either way,
+/// which is what <see cref="Pool"/> already did.
+/// </remarks>
 [Injectable]
-public class BotNames(BotTable bots) : INameSource
+public class BotNames(DatabaseServer database) : INameSource
 {
     /// <summary>
     /// Read once. The list does not change while the server is up, and filtering six
@@ -68,7 +74,7 @@ public class BotNames(BotTable bots) : INameSource
         // Types is nullable on the model, and a mod is in no position to promise the
         // bot database was loaded. Falling through to an empty pool costs the names
         // and nothing else.
-        var types = bots.Types;
+        var types = database.GetTables()?.Bots?.Types;
 
         foreach (var type in new[] { "usec", "bear" })
         {

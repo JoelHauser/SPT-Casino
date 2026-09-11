@@ -10,11 +10,20 @@ namespace Poker.Server;
 /// appears at all. A mod rejected by the SptVersion gate loads nothing and logs
 /// nothing, so silence at startup means the gate rather than a bug in the game code.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.PostLoad + 1)]
+[Injectable(TypePriority = OnLoadOrder.PostSptModLoader + 1)]
 public class Startup(PokerLog log) : IOnLoad
 {
-    public Task OnLoadAsync(CancellationToken cancellationToken)
+    public Task OnLoad()
     {
+        // Before the verbose check, and that is not a style choice: on 4.0 an
+        // item-event body is deserialized by a converter that throws on an action it
+        // has not been told about, so skipping this would make every hand fail on
+        // exactly the servers that have logging turned down.
+        Casino.Server.ItemEventActions.Register<PokerSitAction>(PokerActions.Sit);
+        Casino.Server.ItemEventActions.Register<PokerDealAction>(PokerActions.Deal);
+        Casino.Server.ItemEventActions.Register<PokerActAction>(PokerActions.Act);
+        Casino.Server.ItemEventActions.Register<PokerLeaveAction>(PokerActions.Leave);
+        Casino.Server.ItemEventActions.Register<PokerSyncAction>(PokerActions.Sync);
 
         // Silent unless asked. Casino.Server.Startup prints the one line the casino
         // needs at boot; everything below is a mod author's view of one table, and

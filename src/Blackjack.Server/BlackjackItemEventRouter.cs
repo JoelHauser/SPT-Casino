@@ -1,6 +1,8 @@
 ﻿using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
-using SPTarkov.Server.Core.DI.Routing;
+using SPTarkov.Server.Core.Models.Common;
+using SPTarkov.Server.Core.Models.Eft.Common;
+using SPTarkov.Server.Core.Models.Eft.Common.Request;
 using SPTarkov.Server.Core.Models.Eft.ItemEvent;
 
 namespace Blackjack.Server;
@@ -31,24 +33,37 @@ public static class BlackjackActions
 /// The static routes in <see cref="BlackjackRouter"/> stay alongside this. They are
 /// how the mod is tested with curl and no game attached, and they discard the change
 /// record because nothing is listening for it.
+///
+/// **4.0 shape.** A router names the actions it answers to and switches on them
+/// itself; the 4.1 form -- a list of `ItemRouteAction&lt;T&gt;` handed to a base
+/// constructor -- does not exist here. Nor does its type argument, which is how 4.1
+/// knew what to deserialize a body into, so that is declared once at startup through
+/// <see cref="Casino.Server.ItemEventActions"/>. The casts below are what SPT's own
+/// routers do, and they hold only because of those registrations.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.Routers)]
+[Injectable(TypePriority = OnLoadOrder.PostDBModLoader)]
 public sealed class BlackjackItemEventRouter(BlackjackItemEventCallbacks callbacks)
-    : ItemEventRouter([
-        new ItemRouteAction<BlackjackDealAction>(
-            BlackjackActions.Deal,
-            async (url, pmcData, body, sessionId, output, cancellationToken) =>
-                await callbacks.Deal(body, sessionId, output)),
-
-        new ItemRouteAction<BlackjackPlayAction>(
-            BlackjackActions.Play,
-            async (url, pmcData, body, sessionId, output, cancellationToken) =>
-                await callbacks.Play(body, sessionId, output)),
-
-        new ItemRouteAction<BlackjackSyncAction>(
-            BlackjackActions.Sync,
-            (url, pmcData, body, sessionId, output, cancellationToken) =>
-                new ValueTask<ItemEventRouterResponse>(callbacks.Sync(sessionId, output))),
-    ])
+    : ItemEventRouterDefinition
 {
+    protected override List<HandledRoute> GetHandledRoutes() =>
+    [
+        new(BlackjackActions.Deal, false),
+        new(BlackjackActions.Play, false),
+        new(BlackjackActions.Sync, false),
+    ];
+
+    protected override async ValueTask<ItemEventRouterResponse> HandleItemEventInternal(
+        string url,
+        PmcData pmcData,
+        BaseInteractionRequestData body,
+        MongoId sessionID,
+        ItemEventRouterResponse output) =>
+        url switch
+        {
+            BlackjackActions.Deal => await callbacks.Deal((BlackjackDealAction)body, sessionID, output),
+            BlackjackActions.Play => await callbacks.Play((BlackjackPlayAction)body, sessionID, output),
+            // Sync alone is synchronous -- it hands back the output it was given.
+            BlackjackActions.Sync => callbacks.Sync(sessionID, output),
+            _ => throw new Exception($"BlackjackItemEventRouter cannot handle route {url}"),
+        };
 }

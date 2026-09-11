@@ -16,44 +16,44 @@ namespace Roulette.Server;
 /// Two transports, one service -- a second copy of the flow is a second set of money
 /// bugs.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.Routers)]
+[Injectable(TypePriority = OnLoadOrder.PostDBModLoader)]
 public class RouletteRouter(JsonUtil jsonUtil, RouletteCallbacks callbacks)
     : StaticRouter(
         jsonUtil,
         [
             new RouteAction<PingRequest>(
                 "/roulette/ping",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Ping(info, sessionId)),
 
             new RouteAction<PlaceRequest>(
                 "/roulette/place",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Place(info, sessionId)),
 
             new RouteAction<RemoveRequest>(
                 "/roulette/remove",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Remove(info, sessionId)),
 
             new RouteAction<ClearRequest>(
                 "/roulette/clear",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Clear(info, sessionId)),
 
             new RouteAction<SpinRequest>(
                 "/roulette/spin",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Spin(info, sessionId)),
 
             new RouteAction<StateRequest>(
                 "/roulette/state",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.State(info, sessionId)),
 
             new RouteAction<ClearRequest>(
                 "/roulette/leave",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Leave(info, sessionId)),
         ])
 {

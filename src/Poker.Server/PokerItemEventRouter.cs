@@ -1,6 +1,9 @@
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
-using SPTarkov.Server.Core.DI.Routing;
+using SPTarkov.Server.Core.Models.Common;
+using SPTarkov.Server.Core.Models.Eft.Common;
+using SPTarkov.Server.Core.Models.Eft.Common.Request;
+using SPTarkov.Server.Core.Models.Eft.ItemEvent;
 
 namespace Poker.Server;
 
@@ -35,35 +38,37 @@ public static class PokerActions
 /// The static routes in <see cref="PokerRouter"/> stay alongside this. They are how
 /// the mod is exercised with a script and no game attached, and they discard the
 /// change record because nothing is listening for it.
+///
+/// **4.0 shape.** A router names the actions it answers to and switches on them
+/// itself, and what each body deserializes to is declared once at startup through
+/// <see cref="Casino.Server.ItemEventActions"/> rather than by a type argument here.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.Routers)]
+[Injectable(TypePriority = OnLoadOrder.PostDBModLoader)]
 public sealed class PokerItemEventRouter(PokerItemEventCallbacks callbacks)
-    : ItemEventRouter([
-        new ItemRouteAction<PokerSitAction>(
-            PokerActions.Sit,
-            async (url, pmcData, body, sessionId, output, cancellationToken) =>
-                await callbacks.Sit(body, sessionId, output)),
-
-        new ItemRouteAction<PokerDealAction>(
-            PokerActions.Deal,
-            async (url, pmcData, body, sessionId, output, cancellationToken) =>
-                await callbacks.Deal(body, sessionId, output)),
-
-        new ItemRouteAction<PokerActAction>(
-            PokerActions.Act,
-            async (url, pmcData, body, sessionId, output, cancellationToken) =>
-                await callbacks.Act(body, sessionId, output)),
-
-        new ItemRouteAction<PokerLeaveAction>(
-            PokerActions.Leave,
-            async (url, pmcData, body, sessionId, output, cancellationToken) =>
-                await callbacks.Leave(body, sessionId, output)),
-
-        new ItemRouteAction<PokerSyncAction>(
-            PokerActions.Sync,
-            (url, pmcData, body, sessionId, output, cancellationToken) =>
-                new ValueTask<SPTarkov.Server.Core.Models.Eft.ItemEvent.ItemEventRouterResponse>(
-                    callbacks.Sync(sessionId, output))),
-    ])
+    : ItemEventRouterDefinition
 {
+    protected override List<HandledRoute> GetHandledRoutes() =>
+    [
+        new(PokerActions.Sit, false),
+        new(PokerActions.Deal, false),
+        new(PokerActions.Act, false),
+        new(PokerActions.Leave, false),
+        new(PokerActions.Sync, false),
+    ];
+
+    protected override async ValueTask<ItemEventRouterResponse> HandleItemEventInternal(
+        string url,
+        PmcData pmcData,
+        BaseInteractionRequestData body,
+        MongoId sessionID,
+        ItemEventRouterResponse output) =>
+        url switch
+        {
+            PokerActions.Sit => await callbacks.Sit((PokerSitAction)body, sessionID, output),
+            PokerActions.Deal => await callbacks.Deal((PokerDealAction)body, sessionID, output),
+            PokerActions.Act => await callbacks.Act((PokerActAction)body, sessionID, output),
+            PokerActions.Leave => await callbacks.Leave((PokerLeaveAction)body, sessionID, output),
+            PokerActions.Sync => await callbacks.Sync(sessionID, output),
+            _ => throw new Exception($"PokerItemEventRouter cannot handle route {url}"),
+        };
 }

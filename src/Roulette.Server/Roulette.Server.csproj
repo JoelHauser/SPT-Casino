@@ -15,11 +15,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!--
-      NuGet tops out at 4.1.2 while the install is 4.1.3. Verified safe on Blackjack
-      across 36 types and 63 members: nothing this mod touches moved between them.
-    -->
-    <PackageReference Include="SPTarkov.Server.Core" Version="4.1.2">
+    <!-- 4.0.x backport: pinned to the exact server version this branch targets. -->
+    <PackageReference Include="SPTarkov.Server.Core" Version="4.0.13">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
     <ProjectReference Include="..\Roulette.Game\Roulette.Game.csproj" />

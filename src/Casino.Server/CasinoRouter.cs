@@ -1,7 +1,8 @@
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
-using SPTarkov.Server.Core.DI.Routing;
 using SPTarkov.Server.Core.Models.Common;
+using SPTarkov.Server.Core.Models.Eft.Common;
+using SPTarkov.Server.Core.Models.Eft.Common.Request;
 using SPTarkov.Server.Core.Models.Eft.ItemEvent;
 using SPTarkov.Server.Core.Routers;
 using SPTarkov.Server.Core.Utils;
@@ -29,19 +30,19 @@ public static class CasinoActions
 /// static paths, so the whole thing can be exercised against a running server with no
 /// game client attached -- the same property every table's router was written for.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.Routers)]
+[Injectable(TypePriority = OnLoadOrder.PostDBModLoader)]
 public class CasinoRouter(JsonUtil jsonUtil, CasinoCallbacks callbacks)
     : StaticRouter(
         jsonUtil,
         [
             new RouteAction<GiftStatusRequest>(
                 "/casino/gift/status",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.GiftStatus(info, sessionId)),
 
             new RouteAction<GiftClaimRequest>(
                 "/casino/gift/claim",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.GiftClaim(info, sessionId)),
         ]);
 
@@ -55,14 +56,27 @@ public class CasinoRouter(JsonUtil jsonUtil, CasinoCallbacks callbacks)
 /// straight afterwards to collect the profile changes, which is what makes the rouble
 /// count behind the menu move without a reload.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.Routers)]
+[Injectable(TypePriority = OnLoadOrder.PostDBModLoader)]
 public sealed class CasinoItemEventRouter(CasinoItemEventCallbacks callbacks)
-    : ItemEventRouter([
-        new ItemRouteAction<CasinoSyncAction>(
-            CasinoActions.Sync,
-            async (url, pmcData, body, sessionId, output, cancellationToken) =>
-                await callbacks.Sync(sessionId, output)),
-    ]);
+    : ItemEventRouterDefinition
+{
+    protected override List<HandledRoute> GetHandledRoutes() =>
+    [
+        new(CasinoActions.Sync, false),
+    ];
+
+    protected override async ValueTask<ItemEventRouterResponse> HandleItemEventInternal(
+        string url,
+        PmcData pmcData,
+        BaseInteractionRequestData body,
+        MongoId sessionID,
+        ItemEventRouterResponse output) =>
+        url switch
+        {
+            CasinoActions.Sync => await callbacks.Sync(sessionID, output),
+            _ => throw new Exception($"CasinoItemEventRouter cannot handle route {url}"),
+        };
+}
 
 /// <summary>
 /// Answers the sync action.

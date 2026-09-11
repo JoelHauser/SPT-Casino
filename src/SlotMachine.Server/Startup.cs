@@ -11,11 +11,17 @@ namespace SlotMachine.Server;
 /// the casino needs at boot, and four tables each printing a block was about
 /// twenty-five lines of somebody's console for a game they had not opened.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.PostLoad + 1)]
+[Injectable(TypePriority = OnLoadOrder.PostSptModLoader + 1)]
 public class Startup(SlotLog log) : IOnLoad
 {
-    public Task OnLoadAsync(CancellationToken cancellationToken)
+    public Task OnLoad()
     {
+        // Before the verbose check, and that is not a style choice: on 4.0 an
+        // item-event body is deserialized by a converter that throws on an action it
+        // has not been told about, so skipping this would make every pull fail on
+        // exactly the servers that have logging turned down.
+        Casino.Server.ItemEventActions.Register<SlotSyncAction>(SlotActions.Sync);
+
         if (!log.Verbose)
         {
             return Task.CompletedTask;

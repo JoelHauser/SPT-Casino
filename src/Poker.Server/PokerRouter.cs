@@ -15,39 +15,39 @@ namespace Poker.Server;
 /// starts moving these will be joined by item-event actions rather than replaced by
 /// them. Two transports, one service.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.Routers)]
+[Injectable(TypePriority = OnLoadOrder.PostDBModLoader)]
 public class PokerRouter(JsonUtil jsonUtil, PokerCallbacks callbacks)
     : StaticRouter(
         jsonUtil,
         [
             new RouteAction<PingRequest>(
                 "/poker/ping",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Ping(info, sessionId)),
 
             new RouteAction<SitRequest>(
                 "/poker/sit",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Sit(info, sessionId)),
 
             new RouteAction<DealRequest>(
                 "/poker/deal",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Deal(info, sessionId)),
 
             new RouteAction<ActRequest>(
                 "/poker/act",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Act(info, sessionId)),
 
             new RouteAction<StateRequest>(
                 "/poker/state",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.State(info, sessionId)),
 
             new RouteAction<LeaveRequest>(
                 "/poker/leave",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Leave(info, sessionId)),
         ])
 {

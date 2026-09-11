@@ -1,4 +1,4 @@
-using SPTarkov.Common.Models.Logging;
+using SPTarkov.Server.Core.Models.Utils;
 using SPTarkov.DI.Annotations;
 
 namespace Casino.Server;

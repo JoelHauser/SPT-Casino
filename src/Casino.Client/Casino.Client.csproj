@@ -19,7 +19,8 @@
     -->
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 
-    <SPTPath Condition="'$(SPTPath)' == ''">H:\SPT4.1.X</SPTPath>
+    <!-- 4.0.x-backport branch: default target is the 4.0.13 install, not the 4.1.x mainline one. -->
+    <SPTPath Condition="'$(SPTPath)' == ''">H:\SPT2026</SPTPath>
     <SPTPath Condition="'$(SPTPath)' != ''">$(SPTPath.TrimEnd(''))</SPTPath>
     <GameManaged>$(SPTPath)\EscapeFromTarkov_Data\Managed</GameManaged>
     <SptPlugins>$(SPTPath)\BepInEx\plugins\spt</SptPlugins>

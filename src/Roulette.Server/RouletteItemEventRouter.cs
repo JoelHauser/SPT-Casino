@@ -1,7 +1,8 @@
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
-using SPTarkov.Server.Core.DI.Routing;
 using SPTarkov.Server.Core.Models.Common;
+using SPTarkov.Server.Core.Models.Eft.Common;
+using SPTarkov.Server.Core.Models.Eft.Common.Request;
 using SPTarkov.Server.Core.Models.Eft.ItemEvent;
 using SPTarkov.Server.Core.Utils;
 
@@ -49,14 +50,27 @@ public static class RouletteActions
 /// the pending changes whether or not anything handled the action, but it worked by
 /// accident and said so in red every time.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.Routers)]
+[Injectable(TypePriority = OnLoadOrder.PostDBModLoader)]
 public sealed class RouletteItemEventRouter(RouletteItemEventCallbacks callbacks)
-    : ItemEventRouter([
-        new ItemRouteAction<RouletteSyncAction>(
-            RouletteActions.Sync,
-            async (url, pmcData, body, sessionId, output, cancellationToken) =>
-                await callbacks.Sync(sessionId, output)),
-    ]);
+    : ItemEventRouterDefinition
+{
+    protected override List<HandledRoute> GetHandledRoutes() =>
+    [
+        new(RouletteActions.Sync, false),
+    ];
+
+    protected override async ValueTask<ItemEventRouterResponse> HandleItemEventInternal(
+        string url,
+        PmcData pmcData,
+        BaseInteractionRequestData body,
+        MongoId sessionID,
+        ItemEventRouterResponse output) =>
+        url switch
+        {
+            RouletteActions.Sync => await callbacks.Sync(sessionID, output),
+            _ => throw new Exception($"RouletteItemEventRouter cannot handle route {url}"),
+        };
+}
 
 /// <summary>
 /// Answers the sync action.

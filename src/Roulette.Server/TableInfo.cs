@@ -21,5 +21,5 @@ internal static class TableInfo
     internal const string Version = "0.1.0";
 
     /// <summary>The SPT range the casino targets. See Casino.Server.ModMetadata.</summary>
-    internal const string SptVersion = "~4.1.3";
+    internal const string SptVersion = "~4.0.13";
 }

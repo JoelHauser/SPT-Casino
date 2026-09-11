@@ -13,23 +13,23 @@ namespace SlotMachine.Server;
 /// Plain static paths, so the whole thing can be exercised with a script against a
 /// running server and no game client attached.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.Routers)]
+[Injectable(TypePriority = OnLoadOrder.PostDBModLoader)]
 public class SlotRouter(JsonUtil jsonUtil, SlotCallbacks callbacks)
     : StaticRouter(
         jsonUtil,
         [
             new RouteAction<PingRequest>(
                 "/slots/ping",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Ping(info, sessionId)),
 
             new RouteAction<PullRequest>(
                 "/slots/pull",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Pull(info, sessionId)),
 
             new RouteAction<StatsRequest>(
                 "/slots/stats",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Stats(info, sessionId)),
         ]);

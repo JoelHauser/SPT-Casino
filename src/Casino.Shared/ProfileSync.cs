@@ -126,11 +126,28 @@ namespace Casino.Shared
         /// a session is what turned a silent no-op into a crash.
         ///
         /// Reflection keeps the name out of our metadata entirely. `TarkovApplication` is
-        /// a real name and so is `IClientSession`, so both ends can be written down; only
+        /// a real name and so is `IBackEndSession`, so both ends can be written down; only
         /// the middle had to be described rather than named. `GetMethod` walks base types,
         /// which is where this method is actually declared.
+        ///
+        /// ## The interface is not called the same thing on both game builds
+        ///
+        /// 4.1 ships EFT 0.16.9.5-40743, where the interface declaring
+        /// `SendOperationRightNow` is `EFT.IClientSession`. This branch builds against
+        /// 0.16.9.0-40087, which has no such type: there the same method is declared on
+        /// `IBackEndSession`, in the global namespace.
+        ///
+        /// **Mind the casing.** 0.16.9.5 also carries an `IBackendSession` -- lowercase
+        /// "end" -- which is a different type again. The one here is `IBackEndSession`,
+        /// and the two are a single keystroke apart, so a name that looks right is not
+        /// evidence of anything.
+        ///
+        /// Found the way this file's own history says to find things: by searching the
+        /// assembly for a member of the right shape -- the method name, which has
+        /// survived every rename so far -- rather than by assuming the type around it
+        /// kept its name.
         /// </summary>
-        private static IClientSession MainAppSession()
+        private static IBackEndSession MainAppSession()
         {
             var app = ClientAppUtils.GetMainApp();
 
@@ -142,7 +159,7 @@ namespace Casino.Shared
 
             return typeof(TarkovApplication)
                 .GetMethod("GetClientBackEndSession", BindingFlags.Public | BindingFlags.Instance)
-                ?.Invoke(app, null) as IClientSession;
+                ?.Invoke(app, null) as IBackEndSession;
         }
 
         private static bool _warned;

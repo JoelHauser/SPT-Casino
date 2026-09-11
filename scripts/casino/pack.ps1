@@ -22,7 +22,8 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$SPTPath = 'H:\SPT4.1.X',
+    # 4.0.x-backport branch: defaults to the 4.0.13 install, not the 4.1.x mainline one.
+    [string]$SPTPath = 'H:\SPT2026',
     [string]$InstallPath,
 
     # Writes releases/casino/SPT_CasinoV<version>.zip, laid out relative to the SPT
@@ -34,6 +35,21 @@ $ErrorActionPreference = 'Stop'
 
 # Two levels up: this sits in scripts/<mod>/.
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+
+# SPT's own installer has not called this folder the same thing across versions: 4.0.13
+# (H:\SPT2026) calls it "SPT", 4.1.x (H:\SPT4.1.X) calls it "SPT_Runtime". Same contents
+# either way -- SPT.Server.exe and user\mods sit directly under it -- so detect which
+# name this install actually uses instead of assuming the 4.1.x one.
+function Get-RuntimeFolder {
+    param([string]$InstallRoot)
+
+    foreach ($name in @('SPT_Runtime', 'SPT')) {
+        if (Test-Path (Join-Path $InstallRoot "$name\SPT.Server.exe")) { return $name }
+    }
+    throw "no SPT_Runtime\SPT.Server.exe or SPT\SPT.Server.exe under '$InstallRoot' -- unrecognized SPT install layout."
+}
+
+$runtimeFolder = Get-RuntimeFolder -InstallRoot $SPTPath
 
 $version = '1.2.61'
 
@@ -78,10 +94,10 @@ foreach ($game in @('Casino', 'Roulette', 'Poker', 'Blackjack', 'SlotMachine')) 
 $art = (Get-ChildItem $pluginDir -Recurse -File | Measure-Object).Count - 1
 Write-Host "Staged the plugin and $art art file(s)." -ForegroundColor Green
 
-# One server folder, holding every assembly. SPT_Runtime is part of the path inside the
-# zip rather than the folder you extract into: dropping that prefix produces something
-# that looks right and installs nothing.
-$modDir = Join-Path $stage 'SPT_Runtime\user\mods\Casino'
+# One server folder, holding every assembly. $runtimeFolder is part of the path inside
+# the zip rather than the folder you extract into: dropping that prefix produces
+# something that looks right and installs nothing.
+$modDir = Join-Path $stage "$runtimeFolder\user\mods\Casino"
 New-Item -ItemType Directory -Force -Path $modDir | Out-Null
 
 $wanted = @('Casino.Server.dll', 'Casino.Server.pdb')
@@ -161,10 +177,17 @@ if (-not $InstallPath) {
     return
 }
 
-# 4.1.x keeps the server under SPT_Runtime; the plugins sit at the install root.
 $target = $InstallPath
 if (-not (Test-Path (Join-Path $target 'BepInEx'))) {
     throw "no BepInEx folder under '$target' -- that is not an SPT install root."
+}
+
+# The zip was staged under $runtimeFolder (named for $SPTPath's layout). If the install
+# target uses the other name, copying would create a second, empty runtime folder next
+# to the real one and silently install nothing SPT ever loads.
+$installRuntimeFolder = Get-RuntimeFolder -InstallRoot $target
+if ($installRuntimeFolder -ne $runtimeFolder) {
+    throw "built for '$runtimeFolder' (from -SPTPath $SPTPath) but '$target' uses '$installRuntimeFolder' -- pass a -SPTPath with the same layout as -InstallPath."
 }
 
 # The old plugins have to go, or the bar gets four tabs and the input tree four
@@ -191,10 +214,10 @@ foreach ($old in $tables) {
 # Beside user/mods, never inside it: SPT walks every directory under mods and throws
 # "No Assemblies found in path" at Critical on one holding no assemblies. Parking the
 # old mods in there traded three folders for a stack trace on every boot.
-$retiredMods = Join-Path $target "SPT_Runtime\user\_replaced-by-SPT-Casino"
+$retiredMods = Join-Path $target "$runtimeFolder\user\_replaced-by-SPT-Casino"
 
 foreach ($old in $tables) {
-    $dir = Join-Path $target "SPT_Runtime\user\mods\$old"
+    $dir = Join-Path $target "$runtimeFolder\user\mods\$old"
     if (Test-Path $dir) {
         New-Item -ItemType Directory -Force -Path $retiredMods | Out-Null
         $to = Join-Path $retiredMods $old
@@ -275,8 +298,8 @@ Write-Host "Installed the plugin to $pluginDest" -ForegroundColor Green
 # A warning rather than an error, and the whole server half is skipped rather than
 # partly written: half an installed mod folder is a worse place to leave somebody than
 # an untouched one.
-$modStage = Join-Path $stage 'SPT_Runtime\user\mods\Casino'
-$modDest = Join-Path $target 'SPT_Runtime\user\mods\Casino'
+$modStage = Join-Path $stage "$runtimeFolder\user\mods\Casino"
+$modDest = Join-Path $target "$runtimeFolder\user\mods\Casino"
 $locked = @()
 
 foreach ($dll in Get-ChildItem $modDest -Filter *.dll -ErrorAction SilentlyContinue) {
@@ -298,7 +321,7 @@ if ($locked.Count -gt 0) {
 else {
     $modFiles = Sync-Installed -Stage $modStage -Installed $modDest
 
-    Copy-Item (Join-Path $stage 'SPT_Runtime') -Destination $target -Recurse -Force
+    Copy-Item (Join-Path $stage $runtimeFolder) -Destination $target -Recurse -Force
     Set-Content -Path (Join-Path $modDest $manifestName) -Value $modFiles -Encoding utf8
     Write-Host "Installed the server half to $modDest" -ForegroundColor Green
 }

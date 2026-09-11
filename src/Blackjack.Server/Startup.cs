@@ -11,11 +11,19 @@ namespace Blackjack.Server;
 /// appears at all. A mod rejected by the SptVersion gate loads nothing and logs
 /// nothing, so silence at startup means the gate, not a bug in the game code.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.PostLoad + 1)]
+[Injectable(TypePriority = OnLoadOrder.PostSptModLoader + 1)]
 public class Startup(BlackjackLog log, StatsStore stats) : IOnLoad
 {
-    public Task OnLoadAsync(CancellationToken cancellationToken)
+    public Task OnLoad()
     {
+        // Before the verbose check, and that is not a style choice: on 4.0 an
+        // item-event body is deserialized by a converter that throws on an action it
+        // has not been told about, so skipping this would make every deal and every
+        // move fail on exactly the servers that have logging turned down.
+        Casino.Server.ItemEventActions.Register<BlackjackDealAction>(BlackjackActions.Deal);
+        Casino.Server.ItemEventActions.Register<BlackjackPlayAction>(BlackjackActions.Play);
+        Casino.Server.ItemEventActions.Register<BlackjackSyncAction>(BlackjackActions.Sync);
+
         var rules = new Rules();
 
         // Silent unless asked. Casino.Server.Startup prints the one line the casino

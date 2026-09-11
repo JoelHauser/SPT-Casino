@@ -23,38 +23,43 @@ namespace Casino.Server;
 /// version numbers, in `TableInfo`, because those describe the table rather than the
 /// download.
 /// </summary>
-public record ModMetadata : IModMetadata
+public record ModMetadata : AbstractModMetadata
 {
     /// <summary>
     /// The same GUID the client plugin declares through <c>[BepInPlugin]</c>. Both
     /// halves now agree, which they did not while the server was three mods.
     /// </summary>
-    public string ModGuid { get; init; } = "com.mybutthasarash.sptcasino";
+    public override string ModGuid { get; init; } = "com.mybutthasarash.sptcasino";
 
-    public string Name { get; init; } = "SPT Casino";
+    public override string Name { get; init; } = "SPT Casino";
 
-    public string Author { get; init; } = "JoelHauser";
+    public override string Author { get; init; } = "JoelHauser";
 
-    public List<string>? Contributors { get; init; }
+    public override List<string>? Contributors { get; init; }
 
-    public SemanticVersioning.Version Version { get; init; } = new("1.2.61");
+    public override SemanticVersioning.Version Version { get; init; } = new("1.2.61");
 
     /// <summary>
-    /// Targets SPT 4.1.3. "~4.1.3" is >=4.1.3 &lt;4.2.0, so it also covers later 4.1
-    /// patches.
+    /// 4.0.x backport: targets SPT 4.0.13. "~4.0.13" is >=4.0.13 &lt;4.1.0, so it also
+    /// covers later 4.0 patches. The 4.1.x mainline build uses "~4.1.3" instead --
+    /// see the 4.0.x-backport branch note in CLAUDE.md.
     ///
     /// **A hard gate.** A mod outside the range loads nothing and logs nothing, so
     /// silence at startup means this line, not a bug in the game code.
     /// </summary>
-    public SemanticVersioning.Range SptVersion { get; init; } = new("~4.1.3");
+    public override SemanticVersioning.Range SptVersion { get; init; } = new("~4.0.13");
 
-    public List<string>? Incompatibilities { get; init; }
+    public override List<string>? Incompatibilities { get; init; }
 
-    public Dictionary<string, SemanticVersioning.Range>? ModDependencies { get; init; }
+    public override Dictionary<string, SemanticVersioning.Range>? ModDependencies { get; init; }
 
-    public string? Url { get; init; } = "https://github.com/JoelHauser/SPT-Casino";
+    public override string? Url { get; init; } = "https://github.com/JoelHauser/SPT-Casino";
 
-    public string License { get; init; } = "MIT";
+    public override string License { get; init; } = "MIT";
 
-    public bool HasPrepatcher { get; init; }
+    /// <summary>
+    /// 4.0.x has no <c>HasPrepatcher</c>; the nearest thing it asks about a mod is
+    /// whether it ships bundles. The casino ships neither, so this is false either way.
+    /// </summary>
+    public override bool? IsBundleMod { get; init; } = false;
 }

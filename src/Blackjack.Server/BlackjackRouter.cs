@@ -8,34 +8,34 @@ namespace Blackjack.Server;
 /// Registers the mod's HTTP surface. Routes are plain static paths, so they can be
 /// exercised with curl against a running server without the game client attached.
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.Routers)]
+[Injectable(TypePriority = OnLoadOrder.PostDBModLoader)]
 public class BlackjackRouter(JsonUtil jsonUtil, BlackjackCallbacks callbacks)
     : StaticRouter(
         jsonUtil,
         [
             new RouteAction<PingRequest>(
                 "/blackjack/ping",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Ping(info, sessionId)),
 
             new RouteAction<DealRequest>(
                 "/blackjack/deal",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Deal(info, sessionId)),
 
             new RouteAction<ActionRequest>(
                 "/blackjack/action",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Act(info, sessionId)),
 
             new RouteAction<StateRequest>(
                 "/blackjack/state",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.State(info, sessionId)),
 
             new RouteAction<StatsRequest>(
                 "/blackjack/stats",
-                async (url, info, sessionId, output, cancellationToken) =>
+                async (url, info, sessionId, output) =>
                     await callbacks.Stats(info, sessionId)),
         ])
 {

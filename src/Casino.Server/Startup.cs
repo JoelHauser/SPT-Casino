@@ -15,14 +15,20 @@ namespace Casino.Server;
 /// switch is on -- see any of them. Turn one on and its block comes back, underneath
 /// this.
 ///
-/// Ordered ahead of them on purpose: `PostLoad` against their `PostLoad + 1`, so the
-/// headline is above the detail rather than buried in the middle of it.
+/// Ordered ahead of them on purpose: `PostSptModLoader` against their
+/// `PostSptModLoader + 1`, so the headline is above the detail rather than buried in
+/// the middle of it. (4.1 spells the same last-of-all slot `PostLoad`.)
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.PostLoad)]
+[Injectable(TypePriority = OnLoadOrder.PostSptModLoader)]
 public class Startup : IOnLoad
 {
-    public Task OnLoadAsync(CancellationToken cancellationToken)
+    public Task OnLoad()
     {
+        // On 4.0 an item-event body is deserialized by a converter that throws on an
+        // action it has not been told about. Each table registers its own; this is the
+        // casino's one.
+        ItemEventActions.Register<CasinoSyncAction>(CasinoActions.Sync);
+
         var metadata = new ModMetadata();
 
         Banner.Rainbow($"[Casino] v{metadata.Version}");

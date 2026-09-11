@@ -1,7 +1,8 @@
 using System.Reflection;
-using SPTarkov.Common.Models.Logging;
+using SPTarkov.Server.Core.Models.Logging;
+using SPTarkov.Server.Core.Models.Utils;
 using SPTarkov.DI.Annotations;
-using SPTarkov.Server.Core.Helpers.Server;
+using SPTarkov.Server.Core.Helpers;
 using SPTarkov.Server.Core.Utils;
 
 namespace Roulette.Server;
@@ -63,7 +64,7 @@ public class RouletteLog : IRouletteLog
     /// The headline line, in the casino's gold.
     ///
     /// `ISptLogger` has `LogWithColor(data, textColor, backgroundColor, ex)` taking a
-    /// `Spectre.Console.Color`, which is what the mods with colour in their startup
+    /// `LogTextColor`, which on 4.0 is the eight ANSI foreground codes and a gray --
     /// block are using. It comes through the SPT package already, so there is nothing
     /// to reference.
     ///
@@ -73,14 +74,14 @@ public class RouletteLog : IRouletteLog
     public void Success(string message) => _logger.Success($"{Prefix} {message}");
 
     /// <summary>
-    /// Something the reader has to see, in orange.
+    /// Something the reader has to see, in yellow.
     ///
     /// Kept for the handful of lines that say real money moves. Those were the same
     /// grey as the route list, which is the wrong weight for the one thing in the block
     /// somebody could be surprised by later.
     /// </summary>
     public void Notice(string message) =>
-        _logger.LogWithColor($"{Prefix} {message}", Spectre.Console.Color.Orange1);
+        _logger.LogWithColor($"{Prefix} {message}", LogTextColor.Yellow);
 
     /// <summary>
     /// A startup line, in the next colour along.

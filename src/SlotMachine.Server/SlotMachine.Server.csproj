@@ -13,7 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SPTarkov.Server.Core" Version="4.1.2">
+    <PackageReference Include="SPTarkov.Server.Core" Version="4.0.13">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
     <ProjectReference Include="..\SlotMachine.Game\SlotMachine.Game.csproj" />
