@@ -198,6 +198,66 @@ panels it needs from those projects directly and is unaffected, so the plugin, t
 and all 504 tests still build. Check a pristine checkout before blaming a change for
 those nine.
 
+## This branch is the 4.0.x backport
+
+`4.0.x-backport` targets **SPT 4.0.13**, installed at `H:\SPT2026`. `main` targets
+4.1.x at `H:\SPT4.1.X`. Do not merge this branch into `main`: nearly every change
+on it is a 4.1 API rewritten for 4.0, and merging would break the mainline.
+
+```
+$env:PATH = "C:\Users\Hoel\.dotnet;$env:PATH"   # 10.0.400; the one on PATH is 8.0 only
+& 'H:\SPTMods\SPT-Casino\scripts\casino\pack.ps1' -SPTPath 'H:\SPT2026' -InstallPath 'H:\SPT2026'
+```
+
+**The two that actually stopped the server, and neither said so.**
+
+- **4.0.13 runs on .NET 9, 4.1 on .NET 10.** Read it out of
+  `SPT.Server.runtimeconfig.json` (`"tfm": "net9.0"`), and the NuGet package says the
+  same thing by shipping `lib/net9.0`. Every assembly that lands in
+  `user/mods/Casino` -- the five `.Server` and four `.Game` projects -- must target
+  `net9.0`. A net10 assembly cannot be loaded by a net9 host, and what that looks
+  like is **a server that exits during startup having written no log at all**, since
+  it dies before the logger's first flush. `ModDllLoader.LoadAllMods` catches the
+  per-mod exception and `Console.WriteLine`s it, so the only copy of the message is
+  on a console that closes with the window.
+- **An unregistered item-event action throws.** See `ItemEventActions`.
+
+**Getting the error out of a server that dies on boot.** `SPT.Server.exe` calls
+`SetConsoleOutputMode` before anything else and throws `Unable to get console mode`
+the moment stdout is redirected, so it cannot be piped, teed or captured -- the
+"crash" a redirect produces is the redirect. Run it under a console that outlives
+it and read the scrollback:
+
+```
+Start-Process cmd.exe -ArgumentList '/k','"H:\SPT2026\SPT\SPT.Server.exe"' -WorkingDirectory 'H:\SPT2026\SPT'
+```
+
+Quote the full path -- this box will not resolve a bare `SPT.Server.exe` out of the
+working directory. Once it boots, `user/logs/spt/spt<DATE>.log` has everything.
+
+**Exercising it without the game.** The server listens on **https** (a self-signed
+`https://127.0.0.1:6969`, so `curl -k`) and **request bodies are zlib-compressed**.
+A plain-JSON body fails inside SPT's own inflater with "The archive entry was
+compressed using an unsupported compression method" before any mod code runs, which
+reads like a mod bug and is not one. A route that answers 200 with an empty body is
+usually this. Compare against a nonsense URL: an unregistered route 404s.
+
+```
+python -c "import zlib; open('body.z','wb').write(zlib.compress(b'{}'))"
+curl -sk -X POST https://127.0.0.1:6969/blackjack/ping --data-binary @body.z \
+     -H "Cookie: PHPSESSID=<a real profile id from SPT/user/profiles>"
+```
+
+Only Slots' ping needs a **real** profile -- it reaches `EventOutputHolder.GetOutput`,
+and a made-up session id fails with "no profile found". The other three answer
+without one. Never call `/casino/gift/claim` while poking at a real profile: it pays
+a million roubles and records that it did.
+
+**Verified on 4.0.13 as of 2026-09-11**: the mod loads (`ModValidator` logs it),
+all four tables answer their ping with correct limits and balances off a real
+profile, and `/casino/gift/status` reports the gift pending. Not yet verified
+in-game -- no client session has been run.
+
 ## The SPT install on this box is not `H:\SPT4.1.X`
 
 Every `.csproj`'s default `SPTPath` is `H:\SPT4.1.X`, and Blackjack's alone falls back
