@@ -10,16 +10,14 @@ differently. A five-furlong dash is decided by speed and a two-mile marathon by 
 so the card turns over as the trip gets longer rather than being the same race at a
 different length.
 
-LABS LIGHTNING wins about one race in six over five furlongs, and one in forty over two
-miles. SCAV LUCK is its mirror image. DOLLAR SIGN is good everywhere and favourite at
-the mile. LEFT BEHIND is bad everywhere, which a card needs -- the longest prices on
-every board involve it.
+Some of them are sprinters and some of them stay; the board tells you which, and the
+form is there to be read rather than handed over.
 
-| Course | | Favourite | Longest price |
-|---|---|---|---|
-| **THE DASH** | 5 furlongs | GRAY GHOST | 1,259 to one |
-| **THE MILE** | 8 furlongs | DOLLAR SIGN | 611 to one |
-| **THE MARATHON** | 2 miles | NIGHT RAIDER | 758 to one |
+| Course | | Longest price |
+|---|---|---|
+| **THE DASH** | 5 furlongs | 1,259 to one |
+| **THE MILE** | 8 furlongs | 611 to one |
+| **THE MARATHON** | 2 miles | 758 to one |
 
 Five bets: **WIN**, **PLACE**, **SHOW**, **EXACTA** and **QUINELLA**. A slip takes up to
 108 of them at once and they are settled independently, so backing a horse to win *and*
