@@ -13,7 +13,7 @@ different length.
 Some of them are sprinters and some of them stay; the board tells you which, and the
 form is there to be read rather than handed over.
 
-| Course | | Longest price |
+| Course | Distance | Longest price |
 |---|---|---|
 | **THE DASH** | 5 furlongs | 1,259 to one |
 | **THE MILE** | 8 furlongs | 611 to one |

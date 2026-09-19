@@ -106,7 +106,7 @@ Eight runners, **three distances**, and the same horses at all of them -- which 
 
 LABS LIGHTNING wins about one race in six over five furlongs. Over two miles it wins one in forty. SCAV LUCK is the exact reverse. DOLLAR SIGN is the class horse and is never worse than third choice anywhere.
 
-| Course | | Favourite |
+| Course | Distance | Favourite |
 |---|---|---|
 | **THE DASH** | 5 furlongs | GRAY GHOST |
 | **THE MILE** | 8 furlongs | DOLLAR SIGN |
