@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -61,13 +61,22 @@ namespace HorseRacing.Client
         // --- horizontal: the board on the left, the slip on the right --------------
         private const float Margin = 26f;
         private const float BoardWidth = 890f;
-        private const float SlipWidth = 540f;
+        private const float SlipWidth = 560f;
 
         // Columns inside the board, as offsets from its left edge.
+        //
+        // The prices used to end at 842 with the slip starting 112 further right, which
+        // left a tall empty channel down the middle of the panel. They are wider now
+        // and the slip is 20 wider, closing it to 28.
         private const float ColName = 4f;
-        private const float ColChance = 306f;
-        private const float ColFirstPrice = 400f;
-        private const float PriceWidth = 142f;
+
+        /// <summary>The saddlecloth number, in a column of its own. See RenderBoard.</summary>
+        private const float ColNumber = 4f;
+        private const float NumberWidth = 24f;
+
+        private const float ColChance = 296f;
+        private const float ColFirstPrice = 384f;
+        private const float PriceWidth = 160f;
         private const float PriceGap = 8f;
 
         /// <summary>
@@ -403,10 +412,12 @@ namespace HorseRacing.Client
             _status = Text("Status", frame, string.Empty, 16f, Ink, TextAlignmentOptions.Left);
             TopLeft(_status.rectTransform, Margin + 4f, StatusTop, 900f, 24f);
 
+            // Full height of the control row so it centres against the buttons beside
+            // it rather than floating four units above them.
             var stakeLabel = Text(
                 "StakeLabel", frame, "STAKE PER BET", 13f,
                 new Color(Ink.r, Ink.g, Ink.b, 0.5f), TextAlignmentOptions.Left);
-            TopLeft(stakeLabel.rectTransform, Margin + 4f, ControlsTop + 12f, 150f, 18f);
+            TopLeft(stakeLabel.rectTransform, Margin + 4f, ControlsTop, 150f, 34f);
 
             var down = MakeButton("StakeDown", frame, "-", 38f, 34f, () => StepStakeBy(-1));
             TopLeft(down, Margin + 154f, ControlsTop);
@@ -481,9 +492,19 @@ namespace HorseRacing.Client
 
                 row++;
 
+                // **The number and the name are two labels, not one string.**
+                // The game's font does not have tabular digits -- a "1" is narrower
+                // than a "2" -- so "1  GRAY GHOST" and "2  DOLLAR SIGN" in a single
+                // left-aligned label start their names at different x. Over eight rows
+                // that reads as a wobbly column, which is what it was reported as.
+                var num = Text($"Num{number}", _boardHolder,
+                    number.ToString(), 16f, new Color(Ink.r, Ink.g, Ink.b, 0.55f),
+                    TextAlignmentOptions.Left);
+                TopLeft(num.rectTransform, ColNumber, y, NumberWidth, RowHeight - 3f);
+
                 var label = Text($"Runner{number}", _boardHolder,
-                    $"{number}  {name}", 16f, Ink, TextAlignmentOptions.Left);
-                TopLeft(label.rectTransform, ColName, y, 300f, RowHeight - 3f);
+                    name, 16f, Ink, TextAlignmentOptions.Left);
+                TopLeft(label.rectTransform, ColNumber + NumberWidth + 6f, y, 250f, RowHeight - 3f);
 
                 var form = Text($"Form{number}", _boardHolder,
                     $"{chance:P1}", 13f, new Color(Ink.r, Ink.g, Ink.b, 0.40f), TextAlignmentOptions.Left);
@@ -683,9 +704,13 @@ namespace HorseRacing.Client
             var rect = New($"Stepper{caption}", parent);
             TopLeft(rect, x, 0f, StepperWidth, RowHeight - 3f);
 
+            // Every box in this row is the full height of the row and TMP centres
+            // vertically inside it, so the caption, the value and the two buttons all
+            // sit on one line. They were previously given their own heights and offsets
+            // and ended up a few units apart from each other.
             var label = Text("Caption", rect, caption, 13f,
                 new Color(Ink.r, Ink.g, Ink.b, 0.5f), TextAlignmentOptions.Left);
-            TopLeft(label.rectTransform, 0f, 4f, 26f, 18f);
+            TopLeft(label.rectTransform, 0f, 0f, 26f, RowHeight - 3f);
 
             var down = MakeButton($"{caption}Down", rect, "-", 24f, 24f, () => set(value - 1));
             TopLeft(down, 28f, 0f);
@@ -695,7 +720,7 @@ namespace HorseRacing.Client
             // small twice: once because the box itself was 100, and once because the
             // exacta button was drawn over the right-hand end of it.
             var shown = Text("Value", rect, $"{value}  {RunnerName(value)}", 14f, Ink, TextAlignmentOptions.Center);
-            TopLeft(shown.rectTransform, 56f, 1f, 150f, 22f);
+            TopLeft(shown.rectTransform, 56f, 0f, 150f, RowHeight - 3f);
 
             var up = MakeButton($"{caption}Up", rect, "+", 24f, 24f, () => set(value + 1));
             TopLeft(up, 210f, 0f);

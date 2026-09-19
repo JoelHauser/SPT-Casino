@@ -10,6 +10,23 @@ and believes it.
 
 ## Current state
 
+**2026-09-19, ninth pass. Columns.**
+
+- **The saddlecloth number is its own label now, on the board and on the track.** It was
+  part of the name string -- `$"{number}  {name}"` -- and this font has no tabular
+  digits, so a "1" is narrower than a "2" and GRAY GHOST started a couple of units left
+  of DOLLAR SIGN. Over eight rows that reads as a column that will not sit straight.
+  Two labels, the number in a fixed 24-wide box, and it cannot happen.
+- **The empty channel down the middle is closed.** Prices ran out at 842 with the slip
+  starting 112 further right. The three price columns are 160 wide instead of 142 and
+  the slip is 20 wider, which leaves 28.
+- **STAKE PER BET sat four units above its own buttons**, and the pair steppers had
+  their caption, value and two buttons each given a different height and offset. Every
+  box in those rows is now the full height of the row, and TMP centres inside it.
+- The on-track distance caption is gone. It was crammed into the 22-unit furlong strip
+  and clipped by the top border, and the course tab and the blurb underneath the title
+  both already say the distance -- it was a third copy that did not fit.
+
 **2026-09-19, eighth pass. Hover, and two washes.**
 
 - **Buttons light up under the cursor**, via the new `Casino.Shared.Hover`. Unity's

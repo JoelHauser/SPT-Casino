@@ -244,7 +244,6 @@ namespace HorseRacing.Client
                 BuildLane(parent, lane, runners[lane].Key, runners[lane].Value, font);
             }
 
-            BuildTitle(parent, furlongs, font);
         }
 
         /// <summary>
@@ -318,19 +317,37 @@ namespace HorseRacing.Client
             var top = -(lane * LaneHeight) - FurlongStrip;
 
 
+            // Number and name in separate boxes, for the reason the board does the
+            // same: this font has no tabular digits, so a single "1  GRAY GHOST" label
+            // starts its name further left than "2  DOLLAR SIGN" does.
+            var numberBox = New($"Num{number}", parent);
+            numberBox.anchorMin = new Vector2(0f, 1f);
+            numberBox.anchorMax = new Vector2(0f, 1f);
+            numberBox.pivot = new Vector2(0f, 1f);
+            numberBox.anchoredPosition = new Vector2(16f, top - 4f);
+            numberBox.sizeDelta = new Vector2(18f, LaneHeight - 10f);
+
+            var numberText = numberBox.gameObject.AddComponent<TextMeshProUGUI>();
+            numberText.font = font;
+            numberText.fontSize = 13f;
+            numberText.color = Faint;
+            numberText.alignment = TextAlignmentOptions.Left;
+            numberText.text = number.ToString();
+            numberText.raycastTarget = false;
+
             var label = New($"Name{number}", parent);
             label.anchorMin = new Vector2(0f, 1f);
             label.anchorMax = new Vector2(0f, 1f);
             label.pivot = new Vector2(0f, 1f);
-            label.anchoredPosition = new Vector2(16f, top - 4f);
-            label.sizeDelta = new Vector2(220f, LaneHeight - 10f);
+            label.anchoredPosition = new Vector2(38f, top - 4f);
+            label.sizeDelta = new Vector2(200f, LaneHeight - 10f);
 
             var text = label.gameObject.AddComponent<TextMeshProUGUI>();
             text.font = font;
             text.fontSize = 13f;
             text.color = Faint;
             text.alignment = TextAlignmentOptions.Left;
-            text.text = $"{number}  {name}";
+            text.text = name;
             text.raycastTarget = false;
 
             var place = New($"Place{number}", parent);
@@ -418,32 +435,6 @@ namespace HorseRacing.Client
                 new Color(0.07f, 0.07f, 0.07f, 1f),
                 new Color(0.95f, 0.95f, 0.93f, 1f));
             image.raycastTarget = false;
-        }
-
-        /// <summary>
-        /// The distance, written on the turf under the stalls.
-        ///
-        /// The tab above the track already says which course this is, but the tab is
-        /// 500 units away from the horses and the thing being watched is down here.
-        /// </summary>
-        private static void BuildTitle(RectTransform parent, int furlongs, TMP_FontAsset font)
-        {
-            var title = New("Distance", parent);
-            title.anchorMin = new Vector2(0f, 1f);
-            title.anchorMax = new Vector2(0f, 1f);
-            title.pivot = new Vector2(0f, 1f);
-            title.anchoredPosition = new Vector2(16f, -2f);
-            title.sizeDelta = new Vector2(220f, 18f);
-
-            var text = title.gameObject.AddComponent<TextMeshProUGUI>();
-            text.font = font;
-            text.fontSize = 11f;
-            text.color = new Color(Ink.r, Ink.g, Ink.b, 0.30f);
-            text.alignment = TextAlignmentOptions.Left;
-            text.text = furlongs % 8 == 0
-                ? $"{furlongs / 8} MILE{(furlongs == 8 ? string.Empty : "S")}  ({furlongs}f)"
-                : $"{furlongs} FURLONGS";
-            text.raycastTarget = false;
         }
 
         /// <summary>How far a runner actually travels, from the stalls to the post.</summary>
