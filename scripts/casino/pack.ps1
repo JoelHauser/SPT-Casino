@@ -41,7 +41,7 @@ $version = '1.2.61'
 # three-part version because BepInEx expects one, and the release is named the way it
 # is published.
 $release = '1.2.61'
-$tables = @('Blackjack', 'Poker', 'Roulette', 'SlotMachine')
+$tables = @('Blackjack', 'Poker', 'Roulette', 'SlotMachine', 'HorseRacing')
 $plugin = Join-Path $root 'src\Casino.Client\Casino.Client.csproj'
 $stage = Join-Path $root 'dist\casino'
 
@@ -103,7 +103,7 @@ foreach ($name in $wanted) {
 # Named for the table's own config file rather than derived from the folder: the
 # slot machine's routes are /slots/*, so its config is slots.config.json and a
 # derived slotmachine.config.json would be a file nothing reads.
-$configs = @{ Blackjack = 'blackjack'; Poker = 'poker'; Roulette = 'roulette'; SlotMachine = 'slots' }
+$configs = @{ Blackjack = 'blackjack'; Poker = 'poker'; Roulette = 'roulette'; SlotMachine = 'slots'; HorseRacing = 'horseracing' }
 foreach ($table in $tables) {
     $config = Join-Path $root ("src\{0}.Server\{1}.config.json" -f $table, $configs[$table])
     if (Test-Path $config) { Copy-Item $config -Destination $modDir -Force }

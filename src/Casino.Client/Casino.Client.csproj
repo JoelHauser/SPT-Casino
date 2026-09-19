@@ -70,6 +70,11 @@
     <Compile Include="..\SlotMachine.Client\ReelView.cs"  Link="Games\SlotMachine\ReelView.cs" />
     <Compile Include="..\SlotMachine.Client\SlotApi.cs"   Link="Games\SlotMachine\SlotApi.cs" />
     <Compile Include="..\SlotMachine.Client\ItemArt.cs"  Link="Games\SlotMachine\ItemArt.cs" />
+
+    <Compile Include="..\HorseRacing.Client\RacePanel.cs"       Link="Games\HorseRacing\RacePanel.cs" />
+    <Compile Include="..\HorseRacing.Client\RacePanelChrome.cs" Link="Games\HorseRacing\RacePanelChrome.cs" />
+    <Compile Include="..\HorseRacing.Client\TrackView.cs"       Link="Games\HorseRacing\TrackView.cs" />
+    <Compile Include="..\HorseRacing.Client\RaceApi.cs"         Link="Games\HorseRacing\RaceApi.cs" />
   </ItemGroup>
 
   <ItemGroup>

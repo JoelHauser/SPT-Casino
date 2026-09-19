@@ -72,6 +72,8 @@ namespace Casino.Client
             Blackjack.Client.BlackjackClientPlugin.Log = Logger;
             SlotMachine.Client.SlotClientPlugin.Instance = this;
             SlotMachine.Client.SlotClientPlugin.Log = Logger;
+            HorseRacing.Client.RaceClientPlugin.Instance = this;
+            HorseRacing.Client.RaceClientPlugin.Log = Logger;
 
             ShowTaskBarTab = Config.Bind(
                 "Menu",
@@ -115,6 +117,17 @@ namespace Casino.Client
                 + "dollars or euros) because it pays up to a thousand times the stake, and "
                 + "a capped win is still 50,000,000. Turn this on to bet as much as you "
                 + "like. The minimum stake is unaffected.");
+
+            HorseRacing.Client.RaceClientPlugin.NoStakeCap = Config.Bind(
+                "Horse Racing",
+                "No maximum slip total",
+                false,
+                "Off by default. A slip is capped at 2,000,000 roubles (or 20,000 dollars "
+                + "or euros) in total, across every bet on it. Unlike the other tables' "
+                + "limits this one is arithmetic rather than caution -- the longest price "
+                + "on the card pays over 750 for one, and a bigger slip would overflow the "
+                + "payout -- so turning this on lifts the limit to that bound and no "
+                + "further. The minimum stake is unaffected.");
 
             Blackjack.Client.BlackjackClientPlugin.EnforceTableMaximum = Config.Bind(
                 "Blackjack",

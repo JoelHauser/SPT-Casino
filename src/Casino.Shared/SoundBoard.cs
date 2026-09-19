@@ -54,6 +54,15 @@ namespace Casino.Shared
 
         /// <summary>JACKPOT -- multiple &gt;= 100.</summary>
         SlotJackpot,
+
+        /// <summary>The stalls opening. Fires once, on the frame the runners actually start moving -- see TrackView.Run.</summary>
+        RaceOff,
+
+        /// <summary>The winner crossing the line. The leader reaching the post, not the callback that follows it.</summary>
+        RaceFinish,
+
+        /// <summary>The slip paid something. Fires alongside the payout line, after the finish.</summary>
+        RaceWin,
     }
 
     /// <summary>
@@ -101,6 +110,9 @@ namespace Casino.Shared
             [Cue.SlotBigWin] = "slot-win-big",
             [Cue.SlotHugeWin] = "slot-win-huge",
             [Cue.SlotJackpot] = "slot-win-jackpot",
+            [Cue.RaceOff] = "race-off",
+            [Cue.RaceFinish] = "race-finish",
+            [Cue.RaceWin] = "race-win",
         };
 
         // Loaded once per cue and kept -- a card deals dozens of times a session,

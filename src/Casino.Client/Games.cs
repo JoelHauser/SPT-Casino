@@ -86,6 +86,15 @@ namespace Casino.Client
                 () => SlotMachine.Client.SlotPanel.IsOpen,
                 SlotMachine.Client.SlotPanel.Open,
                 SlotMachine.Client.SlotPanel.Close),
+
+            new Table(
+                "HORSE RACING",
+                "tile-horseracing.png",
+                'U',
+                "Eight runners, five ways to back them.",
+                () => HorseRacing.Client.RacePanel.IsOpen,
+                HorseRacing.Client.RacePanel.Open,
+                HorseRacing.Client.RacePanel.Close),
         };
 
         /// <summary>The table the player is at, or null if they are in the lobby.</summary>

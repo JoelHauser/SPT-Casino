@@ -57,6 +57,27 @@ namespace SlotMachine.Client
     }
 }
 
+namespace HorseRacing.Client
+{
+    internal static class RaceClientPlugin
+    {
+        internal static BaseUnityPlugin Instance;
+
+        internal static ManualLogSource Log;
+
+        /// <summary>
+        /// Whether the slip's maximum total is off. Bound by
+        /// <see cref="Casino.Client.CasinoPlugin"/> and settable from the F12 menu.
+        ///
+        /// Unlike the other tables' equivalents this does not lift the ceiling very
+        /// far: horse racing's maximum is the width of an int rather than the house
+        /// being careful, so the server raises it to the arithmetic bound and no
+        /// further. See HorseRacing.Server.WalletInfo.AllowsSlip.
+        /// </summary>
+        internal static ConfigEntry<bool> NoStakeCap;
+    }
+}
+
 namespace Blackjack.Client
 {
     internal static class BlackjackClientPlugin

@@ -25,6 +25,13 @@ silent, not broken; the table plays correctly either way.
   slot-win-huge.wav            HUGE WIN    (multiple >= 20)
   slot-win-jackpot.wav         JACKPOT     (multiple >= 100)
 
+  race-off.wav               the stalls opening -- fires on the frame the
+                              runners actually start moving, not when the slip
+                              was sent
+  race-finish.wav            the winner crossing the line
+  race-win.wav               the slip paid something, played with the payout
+                              line just after the finish
+
 Both extensions are checked for every name -- a .wav is tried first, then .ogg.
 Only one is needed.
 
@@ -37,4 +44,5 @@ sound plays when the human player bets, not when a seat-mate does -- that needs
 diffing server state the way dealt cards are, which chips do not do yet), and
 Blackjack's Double/Split (both take more money mid-hand; only the initial bet
 plays a sound today). Roulette's Lift (taking a chip back off the felt) has no
-cue either. All are reasonable next additions, not oversights being hidden.
+cue either, and Horse Racing plays nothing when a bet is added to or taken off
+the slip -- only chip-place would fit and the slip has no felt to land on. All are reasonable next additions, not oversights being hidden.

@@ -362,6 +362,33 @@ namespace Casino.Shared
         /// stem, and every stem drawn for it was buried inside the lobes and invisible.
         /// The lobes are scaled about their own centre and lifted first.
         /// </summary>
+        /// <summary>
+        /// A ring open at the bottom, with the heels drawn down past the opening.
+        ///
+        /// The two heels are what makes it read as a horseshoe rather than as a broken
+        /// letter C: an arc alone, at 160 pixels, is a shape nobody names correctly.
+        /// </summary>
+        private static bool Horseshoe(float x, float y)
+        {
+            const float outer = 0.86f;
+            const float inner = 0.52f;
+            const float opening = -0.26f;
+
+            var radius = Mathf.Sqrt((x * x) + (y * y));
+
+            if (radius <= outer && radius >= inner && y >= opening)
+            {
+                return true;
+            }
+
+            // The heels: the arc's own width, carried straight down from where the ring
+            // was cut off.
+            var centre = (outer + inner) / 2f;
+            var half = (outer - inner) / 2f;
+
+            return y < opening && y >= -0.86f && Mathf.Abs(Mathf.Abs(x) - centre) <= half;
+        }
+
         private static bool Inside(char suit, float x, float y)
         {
             switch (char.ToUpperInvariant(suit))
@@ -378,6 +405,15 @@ namespace Casino.Shared
 
                 case 'C':
                     return Club(x, y) || Stem(x, y, 0f, 0.07f, 0.41f, -0.95f);
+
+                case 'U':
+                    // A horseshoe, for the racing table. Not a card suit, and added
+                    // because the four that are were already spoken for: Blackjack has
+                    // the diamond, Poker the spade, Roulette the heart and Slots the
+                    // club. A fifth tile falling back to a second heart would read as a
+                    // duplicate of roulette, and the default below draws nothing at all
+                    // -- which ICasinoGame.Pip exists precisely to avoid.
+                    return Horseshoe(x, y);
 
                 default:
                     return false;
