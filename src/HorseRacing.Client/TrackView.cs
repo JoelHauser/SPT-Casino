@@ -66,6 +66,25 @@ namespace HorseRacing.Client
         /// <summary>How wide the checkered finish line is. Two 6px squares across.</summary>
         private const int PostWidth = 12;
 
+        /// <summary>
+        /// How far past the line a runner carries before pulling up.
+        ///
+        /// 26 puts a runner's trailing edge 15 clear of the post's leading edge, so the
+        /// checkered line stays fully visible behind the field -- which is what went
+        /// wrong when they stopped centred on it and covered it up.
+        /// </summary>
+        private const float RunOn = 26f;
+
+        /// <summary>
+        /// How long that takes, from the moment a runner crosses.
+        ///
+        /// Each runner starts its own run-on when it crosses, so they all cover the
+        /// same extra ground and end level -- the field bunches up after the post the
+        /// way it really does when they pull up, and arrives in a column without
+        /// anything being snapped into place.
+        /// </summary>
+        private const float RunOnSeconds = 0.9f;
+
         /// <summary>Where a runner stands before the stalls open.</summary>
         private const float Start = 250f;
 
@@ -506,6 +525,10 @@ namespace HorseRacing.Client
             }
 
             var lastHome = _duration * (1f + ((order.Count - 1) * PlaceGap));
+
+            // The last runner crosses at lastHome and then still has its own run-on to
+            // complete, so the animation outlives the race itself.
+            var allPulledUp = lastHome + RunOnSeconds;
             var travel = Travel(_track);
 
             SoundBoard.Play(Cue.RaceOff);
@@ -513,7 +536,7 @@ namespace HorseRacing.Client
             var elapsed = 0f;
             var called = false;
 
-            while (elapsed < lastHome)
+            while (elapsed < allPulledUp)
             {
                 // Unscaled: the menu is not necessarily running at a normal timescale,
                 // and a race that stalls with it would hang the panel open. The same
@@ -538,8 +561,16 @@ namespace HorseRacing.Client
 
                     var progress = Pace(Warp(number, elapsed, finish));
 
+                    // Past the post, still going. Progress is capped at the line
+                    // because that is what the finishing order is defined against --
+                    // see Warp -- so the run-on is a separate term that only starts
+                    // once this runner has actually crossed.
+                    var after = Mathf.Clamp01((elapsed - finish) / RunOnSeconds);
+                    var pullUp = 1f - ((1f - after) * (1f - after));
+
                     runner.anchoredPosition = new Vector2(
-                        Start + (progress * travel), runner.anchoredPosition.y);
+                        Start + (progress * travel) + (RunOn * pullUp),
+                        runner.anchoredPosition.y);
                 }
 
                 // The winner passing the post, which is the moment worth hearing --
@@ -592,15 +623,19 @@ namespace HorseRacing.Client
         /// tenth of the visible track, is not that -- it is eight horses stopped in
         /// eight different places.
         ///
-        /// So the field ends in a column **on** the line rather than past it, and the
-        /// order is read from the placings beside each lane -- which is what that
-        /// column is for and is unambiguous in a way that comparing eight x-positions
-        /// by eye never was.
+        /// So the field ends in a column, and the order is read from the placings
+        /// beside each lane -- which is what that column is for, and is unambiguous in
+        /// a way that comparing eight x-positions by eye never was.
         ///
-        /// On the line rather than twenty beyond it because beyond it looks like the
-        /// race carried on after the result: a runner whose centre is at the post has
-        /// plainly just finished there. The runners are built after the line so they
-        /// sit in front of it.
+        /// **The column sits past the line, not on it.** Stopping centred on the post
+        /// was tried and the eight runners covered the checkered line up almost
+        /// entirely; and a horse parked exactly on the line does not look like one that
+        /// has just run through it. They now carry 26 past and pull up there, which
+        /// leaves the line clear behind them.
+        ///
+        /// This only tidies up after the run-on in <see cref="Gallop"/> rather than
+        /// moving anybody: by the time it is called every runner has already covered
+        /// the same ground past the post, so it is setting them to where they are.
         /// </summary>
         private static void Finish(float travel)
         {
@@ -609,7 +644,7 @@ namespace HorseRacing.Client
                 if (runner != null)
                 {
                     runner.anchoredPosition = new Vector2(
-                        Start + travel, runner.anchoredPosition.y);
+                        Start + travel + RunOn, runner.anchoredPosition.y);
                 }
             }
         }

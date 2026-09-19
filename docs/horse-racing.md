@@ -10,6 +10,23 @@ and believes it.
 
 ## Current state
 
+**2026-09-19, seventh pass. They run through the line.**
+
+The field stopped centred on the post and covered the checkered line almost entirely,
+and a horse parked exactly on the line does not look like one that has just run through
+it. Each runner now carries 26 past and decelerates to a stop over nine tenths of a
+second, starting its own run-on the moment it crosses.
+
+Because every runner covers the same extra ground from its own crossing, they arrive
+level -- verified at a spread of 0.000 px across the field -- so the finish is a column
+without anything being snapped into place, and the field bunches up after the post the
+way it does when they pull up. The line stays visible behind them with 9 px to spare.
+
+**Progress is still capped at the line**, and the run-on is a separate term that only
+starts once a runner has crossed. That matters: the finishing order is defined against
+progress reaching 1.0, so anything that moved a runner further would otherwise be
+something that could reorder them.
+
 **2026-09-19, sixth pass. Both lines, and the draw order.**
 
 - **The runners are built last, so nothing is painted over them.** Unity draws siblings
@@ -118,6 +135,26 @@ looks like from the inside.
 Observed win rates match the stated chances to within about a tenth of a percentage
 point at every runner of every course, which is the check that the board is telling the
 truth rather than merely being self-consistent.
+
+### The percentages never change
+
+**A horse's speed and stamina are constants in `Field.Runners` and nothing anywhere can
+write to them.** There is no form, no fatigue, no aging and no streak: the card is
+identical on a profile's thousandth race and its first, and identical between profiles.
+`PlayerStats.WinsByRunner` records what has actually happened, and is read by nobody --
+it is a record, not an input.
+
+That is a deliberate choice rather than an omission, and the reason is that the prices
+have to be exactly computable at the moment a bet is placed. A drifting rating makes
+every board a function of history, which means either the player is betting into odds
+that moved since they were quoted, or the odds shown are stale -- and it quietly
+destroys the one thing the three courses were built to give, which is form worth
+learning. A sprinter that is only *sometimes* a sprinter is not a form guide.
+
+**If drifting form is ever wanted**, the honest shape is a separate per-profile stable
+with its own ratings, recomputed between meetings and never mid-slip, with the board
+re-fetched on every open. That is a real feature rather than a tweak, and it would want
+`docs` of its own.
 
 
 
