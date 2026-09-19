@@ -1081,9 +1081,11 @@ namespace SlotMachine.Client
             _spinLabel.rectTransform.offsetMin = Vector2.zero;
             _spinLabel.rectTransform.offsetMax = Vector2.zero;
 
-            SetSpinEnabled(true);
-
             button.gameObject.AddComponent<Button>().onClick.AddListener(() => Pull());
+
+            // After the Button exists. SetSpinEnabled re-lights it on every change,
+            // because the face is red when it is ready and grey when it is not.
+            SetSpinEnabled(true);
         }
 
         /// <summary>
@@ -1096,8 +1098,7 @@ namespace SlotMachine.Client
         {
             if (_spinFace != null)
             {
-                _spinFace.sprite = Textures.RoundedBox(80, on ? SpinRed : SpinDead, Edge, 4);
-                _spinFace.type = Image.Type.Sliced;
+                Casino.Shared.Hover.Rounded(_spinFace, 80, on ? SpinRed : SpinDead, Edge, Gold, 4);
             }
 
             if (_spinLabel != null)
@@ -1130,9 +1131,9 @@ namespace SlotMachine.Client
             _autoLabel.rectTransform.offsetMax = Vector2.zero;
             _autoLabel.color = Ink;
 
-            SetAutoRunning(false);
-
             button.gameObject.AddComponent<Button>().onClick.AddListener(() => ToggleAuto());
+
+            SetAutoRunning(false);
         }
 
         /// <summary>
@@ -1145,8 +1146,7 @@ namespace SlotMachine.Client
         {
             if (_autoFace != null)
             {
-                _autoFace.sprite = Textures.RoundedBox(8, on ? AutoGreenOn : AutoGreen, Edge, 3);
-                _autoFace.type = Image.Type.Sliced;
+                Casino.Shared.Hover.Rounded(_autoFace, 8, on ? AutoGreenOn : AutoGreen, Edge, Gold, 3);
             }
 
             if (_autoLabel != null)
@@ -1217,8 +1217,6 @@ namespace SlotMachine.Client
                 reelsY - (SpinSize * 0.5f) - AutoGap - AutoHeight - SpeedGap - (SpeedHeight * 0.5f));
 
             var image = button.GetComponent<Image>();
-            image.sprite = Textures.RoundedBox(6, ButtonFace, Edge, 2);
-            image.type = Image.Type.Sliced;
 
             _speedLabel = NewText("SpeedLabel", button, string.Empty, 17f);
             _speedLabel.rectTransform.anchorMin = Vector2.zero;
@@ -1230,6 +1228,7 @@ namespace SlotMachine.Client
             RenderSpeed();
 
             button.gameObject.AddComponent<Button>().onClick.AddListener(CycleSpeed);
+            Casino.Shared.Hover.Rounded(image, 6, ButtonFace, Edge, Gold);
         }
 
         private static void CycleSpeed()
@@ -1456,8 +1455,6 @@ namespace SlotMachine.Client
             box.sizeDelta = new Vector2(width, 46f);
 
             var image = box.GetComponent<Image>();
-            image.sprite = Textures.RoundedBox(6, ButtonFace, Edge, 2);
-            image.type = Image.Type.Sliced;
 
             var text = NewText("Label", box, label, 19f);
             text.rectTransform.anchorMin = Vector2.zero;
@@ -1467,6 +1464,7 @@ namespace SlotMachine.Client
             text.color = Ink;
 
             box.gameObject.AddComponent<Button>().onClick.AddListener(() => action());
+            Casino.Shared.Hover.Rounded(image, 6, ButtonFace, Edge, Gold);
         }
 
         // ------------------------------------------------------------------- stats
@@ -1767,8 +1765,6 @@ namespace SlotMachine.Client
             wallet.sizeDelta = new Vector2(170f, 46f);
 
             var walletImage = wallet.GetComponent<Image>();
-            walletImage.sprite = Textures.RoundedBox(6, ButtonFace, Edge, 2);
-            walletImage.type = Image.Type.Sliced;
 
             _walletLabel = NewText("WalletLabel", wallet, string.Empty, 18f);
             _walletLabel.rectTransform.anchorMin = Vector2.zero;
@@ -1778,6 +1774,7 @@ namespace SlotMachine.Client
             _walletLabel.color = Ink;
 
             wallet.gameObject.AddComponent<Button>().onClick.AddListener(() => NextWallet());
+            Casino.Shared.Hover.Rounded(walletImage, 6, ButtonFace, Edge, Gold);
         }
 
         /// <summary>

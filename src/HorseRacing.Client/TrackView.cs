@@ -214,6 +214,28 @@ namespace HorseRacing.Client
             // the top of the horses standing at it -- which is what "they stop directly
             // under the finish line" was describing. The runners are the thing being
             // looked at; nothing on this track is allowed in front of them.
+            // Every other lane gets a faint wash. The mown stripes run the other way,
+            // so without this there is nothing separating one runner's lane from the
+            // next, and eight discs on one field of green is hard to read across.
+            //
+            // **Before the two lines**, not inside BuildLane with everything else. It
+            // is a full-width band, so building it later would lay a 13% black wash
+            // over the start and finish lines on every other lane and leave both of
+            // them banded.
+            for (var lane = 1; lane < runners.Count; lane += 2)
+            {
+                var wash = New($"Lane{lane}", parent);
+                wash.anchorMin = new Vector2(0f, 1f);
+                wash.anchorMax = new Vector2(1f, 1f);
+                wash.pivot = new Vector2(0.5f, 1f);
+                wash.anchoredPosition = new Vector2(0f, -(lane * LaneHeight) - FurlongStrip);
+                wash.sizeDelta = new Vector2(-14f, LaneHeight);
+
+                var shade = wash.gameObject.AddComponent<Image>();
+                shade.color = new Color(0f, 0f, 0f, 0.13f);
+                shade.raycastTarget = false;
+            }
+
             BuildStalls(parent);
             BuildPost(parent);
 
@@ -221,6 +243,8 @@ namespace HorseRacing.Client
             {
                 BuildLane(parent, lane, runners[lane].Key, runners[lane].Value, font);
             }
+
+            BuildTitle(parent, furlongs, font);
         }
 
         /// <summary>
@@ -292,6 +316,7 @@ namespace HorseRacing.Client
         {
             // Below the furlong strip along the top.
             var top = -(lane * LaneHeight) - FurlongStrip;
+
 
             var label = New($"Name{number}", parent);
             label.anchorMin = new Vector2(0f, 1f);
@@ -393,6 +418,32 @@ namespace HorseRacing.Client
                 new Color(0.07f, 0.07f, 0.07f, 1f),
                 new Color(0.95f, 0.95f, 0.93f, 1f));
             image.raycastTarget = false;
+        }
+
+        /// <summary>
+        /// The distance, written on the turf under the stalls.
+        ///
+        /// The tab above the track already says which course this is, but the tab is
+        /// 500 units away from the horses and the thing being watched is down here.
+        /// </summary>
+        private static void BuildTitle(RectTransform parent, int furlongs, TMP_FontAsset font)
+        {
+            var title = New("Distance", parent);
+            title.anchorMin = new Vector2(0f, 1f);
+            title.anchorMax = new Vector2(0f, 1f);
+            title.pivot = new Vector2(0f, 1f);
+            title.anchoredPosition = new Vector2(16f, -2f);
+            title.sizeDelta = new Vector2(220f, 18f);
+
+            var text = title.gameObject.AddComponent<TextMeshProUGUI>();
+            text.font = font;
+            text.fontSize = 11f;
+            text.color = new Color(Ink.r, Ink.g, Ink.b, 0.30f);
+            text.alignment = TextAlignmentOptions.Left;
+            text.text = furlongs % 8 == 0
+                ? $"{furlongs / 8} MILE{(furlongs == 8 ? string.Empty : "S")}  ({furlongs}f)"
+                : $"{furlongs} FURLONGS";
+            text.raycastTarget = false;
         }
 
         /// <summary>How far a runner actually travels, from the stalls to the post.</summary>

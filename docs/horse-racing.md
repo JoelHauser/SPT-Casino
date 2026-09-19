@@ -10,6 +10,26 @@ and believes it.
 
 ## Current state
 
+**2026-09-19, eighth pass. Hover, and two washes.**
+
+- **Buttons light up under the cursor**, via the new `Casino.Shared.Hover`. Unity's
+  default transition is a colour tint, which multiplies the whole graphic -- on a sliced
+  sprite with a gold edge that dims the edge too, so the button gets *duller* on hover.
+  Every table that does this properly swaps the sprite instead. Blackjack worked it out
+  first and has a private copy; rather than write a third, the shared one is what Horse
+  Racing and Slots now use. **Blackjack's is deliberately untouched** -- it is a shipped
+  money table, its version works, and folding it in buys nothing visible.
+- **The slot machine had no hover at all** on any of its six buttons. It does now,
+  including SPIN and AUTO, whose faces change with state and so are re-lit on each
+  change rather than once at build.
+- Alternating washes down the board rows and across the track lanes. Eight rows of three
+  prices is a lot of numbers in a grid and the eye loses which row it is on; on the track
+  the mown stripes run the other way, so there was nothing separating one runner's lane
+  from the next.
+- The lane washes are built **before** the start and finish lines. They are full-width
+  bands, so building them with the rest of the lane would have laid a 13% black wash
+  across both lines on every other lane and left them visibly banded.
+
 **2026-09-19, seventh pass. They run through the line.**
 
 The field stopped centred on the post and covered the checkered line almost entirely,

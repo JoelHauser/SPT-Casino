@@ -287,14 +287,6 @@ namespace HorseRacing.Client
                 TopLeft(rect, x, 0f, 260f, TabsHeight);
 
                 var image = rect.gameObject.AddComponent<Image>();
-                image.sprite = Textures.ButtonFace(
-                    6,
-                    on ? Gold : Slate,
-                    on ? new Color(Gold.r * 0.78f, Gold.g * 0.78f, Gold.b * 0.78f, 1f)
-                       : new Color(0.09f, 0.10f, 0.09f, 1f),
-                    on ? Gold : new Color(0f, 0f, 0f, 0.45f),
-                    on ? 2 : 1);
-                image.type = Image.Type.Sliced;
 
                 var label = Text(
                     "Label", rect, $"{name}   {distance}", 15f,
@@ -304,8 +296,17 @@ namespace HorseRacing.Client
                 label.fontStyle = on ? FontStyles.Bold : FontStyles.Normal;
 
                 var button = rect.gameObject.AddComponent<Button>();
-                button.targetGraphic = image;
                 button.onClick.AddListener(() => SwitchCourse(index));
+
+                Hover.Faced(
+                    image,
+                    6,
+                    on ? Gold : Slate,
+                    on ? new Color(Gold.r * 0.78f, Gold.g * 0.78f, Gold.b * 0.78f, 1f)
+                       : new Color(0.09f, 0.10f, 0.09f, 1f),
+                    on ? Gold : new Color(0f, 0f, 0f, 0.45f),
+                    on ? new Color(1f, 0.93f, 0.72f, 1f) : Gold,
+                    on ? 2 : 1);
 
                 x += 272f;
             }
@@ -456,12 +457,29 @@ namespace HorseRacing.Client
             }
 
             var y = 0f;
+            var row = 0;
 
             foreach (var runner in runners)
             {
                 var number = runner.Value<int?>("Number") ?? 0;
                 var name = runner.Value<string>("Name") ?? string.Empty;
                 var chance = runner.Value<double?>("Chance") ?? 0d;
+
+                // Every other row gets a faint wash. Eight rows of three prices each is
+                // a lot of numbers in a grid, and the eye loses which row it is on
+                // somewhere around the fifth -- which matters here because picking the
+                // wrong row is picking the wrong horse.
+                if (row % 2 == 1)
+                {
+                    var stripe = New($"Stripe{number}", _boardHolder);
+                    TopLeft(stripe, 0f, y - 1f, BoardWidth, RowHeight);
+
+                    var wash = stripe.gameObject.AddComponent<Image>();
+                    wash.color = new Color(1f, 1f, 1f, 0.028f);
+                    wash.raycastTarget = false;
+                }
+
+                row++;
 
                 var label = Text($"Runner{number}", _boardHolder,
                     $"{number}  {name}", 16f, Ink, TextAlignmentOptions.Left);
@@ -629,13 +647,6 @@ namespace HorseRacing.Client
             TopLeft(rect, x, y, width, RowHeight - 3f);
 
             var image = rect.gameObject.AddComponent<Image>();
-            image.sprite = Textures.ButtonFace(
-                6,
-                on ? Gold : Slate,
-                on ? new Color(Gold.r * 0.8f, Gold.g * 0.8f, Gold.b * 0.8f, 1f) : new Color(0.10f, 0.11f, 0.10f, 1f),
-                on ? Gold : new Color(0f, 0f, 0f, 0.4f),
-                1);
-            image.type = Image.Type.Sliced;
 
             // The pair spots say what they are; the three single-runner columns are
             // already labelled by the header above them and would only repeat it.
@@ -648,8 +659,20 @@ namespace HorseRacing.Client
             Stretch(label.rectTransform);
 
             var button = rect.gameObject.AddComponent<Button>();
-            button.targetGraphic = image;
             button.onClick.AddListener(() => Toggle(kind, first, second));
+
+            // A spot already on the slip is gold, so it lights to a paler gold rather
+            // than to the accent -- an unselected spot turning gold on hover and a
+            // selected one staying gold would make the two states indistinguishable
+            // for as long as the cursor is over them.
+            Hover.Faced(
+                image,
+                6,
+                on ? Gold : Slate,
+                on ? new Color(Gold.r * 0.8f, Gold.g * 0.8f, Gold.b * 0.8f, 1f) : new Color(0.10f, 0.11f, 0.10f, 1f),
+                on ? Gold : new Color(0f, 0f, 0f, 0.4f),
+                on ? new Color(1f, 0.93f, 0.72f, 1f) : Gold,
+                1);
 
             return rect;
         }
@@ -728,15 +751,15 @@ namespace HorseRacing.Client
             rect.sizeDelta = new Vector2(width, height);
 
             var image = rect.gameObject.AddComponent<Image>();
-            image.sprite = Textures.ButtonFace(6, Slate, new Color(0.09f, 0.10f, 0.09f, 1f), Gold, 1);
-            image.type = Image.Type.Sliced;
 
             var label = Text("Label", rect, caption, 16f, Ink, TextAlignmentOptions.Center);
             Stretch(label.rectTransform);
 
             var button = rect.gameObject.AddComponent<Button>();
-            button.targetGraphic = image;
             button.onClick.AddListener(() => onClick());
+
+            // After the Button exists, so the swap has something to wire onto.
+            Hover.Faced(image, 6, Slate, new Color(0.09f, 0.10f, 0.09f, 1f), Gold, Gold, 1);
 
             return rect;
         }
