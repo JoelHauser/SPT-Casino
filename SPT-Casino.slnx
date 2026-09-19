@@ -32,6 +32,14 @@
     <Project Path="src/SlotMachine.Server/SlotMachine.Server.csproj" />
     <Project Path="tests/SlotMachine.Server.Tests/SlotMachine.Server.Tests.csproj" />
   </Folder>
+  <Folder Name="/HorseRacing/">
+    <!--
+      The fifth table. Eight runners, five bet kinds, and a board priced by
+      enumeration rather than simulation: every probability on it is exact.
+    -->
+    <Project Path="src/HorseRacing.Game/HorseRacing.Game.csproj" />
+    <Project Path="tests/HorseRacing.Game.Tests/HorseRacing.Game.Tests.csproj" />
+  </Folder>
   <Folder Name="/Blackjack/">
     <Project Path="src/Blackjack.Game/Blackjack.Game.csproj" />
     <Project Path="src/Blackjack.Server/Blackjack.Server.csproj" />
