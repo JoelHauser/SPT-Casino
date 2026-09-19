@@ -199,6 +199,55 @@ namespace Casino.Shared
         /// <summary>
         /// An outlined circle, for the betting spot painted on the cloth.
         /// </summary>
+        /// <summary>
+        /// A checkered rectangle, drawn at exactly the size asked for.
+        ///
+        /// Baked at full size rather than tiled from a small sprite. Unity's tiled
+        /// Image mode repeats according to the sprite's pixels-per-unit against the
+        /// canvas scale, which is one more thing to get wrong on a scaled canvas for no
+        /// benefit -- a finish line is a couple of thousand pixels in total and is
+        /// generated once per course.
+        ///
+        /// Point-filtered, because a checker is the one thing here that wants hard
+        /// edges: bilinear turns a six-pixel square into a grey smudge.
+        /// </summary>
+        /// <param name="width">In pixels. The whole strip.</param>
+        /// <param name="height">In pixels. The whole strip.</param>
+        /// <param name="square">The side of one square.</param>
+        internal static Sprite Checker(int width, int height, int square, Color a, Color b)
+        {
+            width = Mathf.Max(1, width);
+            height = Mathf.Max(1, height);
+            square = Mathf.Max(1, square);
+
+            var key = $"checker:{width}:{height}:{square}:{a}:{b}";
+            if (Cache.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            var texture = NewTexture(width, height);
+            texture.filterMode = FilterMode.Point;
+
+            var pixels = new Color[width * height];
+
+            for (var y = 0; y < height; y++)
+            {
+                for (var x = 0; x < width; x++)
+                {
+                    var dark = (((x / square) + (y / square)) & 1) == 0;
+                    pixels[(y * width) + x] = dark ? a : b;
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+
+            var sprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+            Cache[key] = sprite;
+            return sprite;
+        }
+
         internal static Sprite Ring(Color colour, float thickness = 0.045f)
         {
             var key = $"ring:{colour}:{thickness}";

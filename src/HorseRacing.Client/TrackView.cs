@@ -63,11 +63,21 @@ namespace HorseRacing.Client
         /// <summary>The band along the top that the furlong markers live in.</summary>
         private const float FurlongStrip = 22f;
 
+        /// <summary>How wide the checkered finish line is. Two 6px squares across.</summary>
+        private const int PostWidth = 12;
+
         /// <summary>Where a runner stands before the stalls open.</summary>
         private const float Start = 250f;
 
-        /// <summary>How far in from the right edge the post stands.</summary>
-        private const float FinishInset = 76f;
+        /// <summary>
+        /// How far in from the right edge the post stands.
+        ///
+        /// **120, and it is the placings column that sets it.** The field ends 20 past
+        /// the line, so a runner's rightmost point lands at <c>FinishInset - 31</c> from
+        /// the right edge -- and the placings occupy 14 to 70 there. At the old 76 the
+        /// horses were drawn straight on top of the text.
+        /// </summary>
+        private const float FinishInset = 120f;
 
         private static readonly Color Rail = new Color(0.86f, 0.87f, 0.84f, 0.85f);
         private static readonly Color Turf = new Color(0.114f, 0.180f, 0.118f, 1f);
@@ -311,30 +321,39 @@ namespace HorseRacing.Client
         }
 
         /// <summary>
-        /// The finishing post: one line, straight down every lane.
+        /// The finish line: a checkered strip from the top of the track to the bottom.
         ///
-        /// Sized from the lanes rather than from the holder. The first version
-        /// stretched to the holder and then trimmed 28 units to clear the furlong
-        /// strip, which left it starting below the top rail and stopping short of the
-        /// bottom one -- a line that plainly did not cross the whole track, and was
-        /// reported as such.
+        /// **Full height, edge to edge.** It has been trimmed twice -- first to clear
+        /// the furlong strip, then to fit the lanes -- and both times it ended up a
+        /// line that visibly did not cross the whole track, which is the one thing a
+        /// finish line has to do. A post is a physical thing standing across the
+        /// course; it crosses the markers too.
         ///
-        /// Its pivot is centred horizontally so that the line sits exactly where a
-        /// runner's centre lands at the end of its travel. A right-hand pivot put it
-        /// one and a half pixels past them, which is invisible until a photo finish is
-        /// the thing being looked at.
+        /// Checkered rather than a red stick, because a coloured vertical line in the
+        /// middle of a racetrack reads as a barrier or a divider. Black and white
+        /// squares read as one thing only.
+        ///
+        /// Its pivot is centred horizontally so the line sits exactly where a runner's
+        /// centre lands at the end of its travel.
         /// </summary>
         private static void BuildPost(RectTransform parent)
         {
+            var height = Mathf.Max(40, Mathf.RoundToInt(parent.rect.height) - 8);
+
             var post = New("Post", parent);
             post.anchorMin = new Vector2(1f, 1f);
             post.anchorMax = new Vector2(1f, 1f);
             post.pivot = new Vector2(0.5f, 1f);
-            post.anchoredPosition = new Vector2(-FinishInset, -(FurlongStrip - 4f));
-            post.sizeDelta = new Vector2(4f, (Lanes * LaneHeight) + 8f);
+            post.anchoredPosition = new Vector2(-FinishInset, -4f);
+            post.sizeDelta = new Vector2(PostWidth, height);
 
             var image = post.gameObject.AddComponent<Image>();
-            image.color = Post;
+            image.sprite = Textures.Checker(
+                PostWidth,
+                height,
+                6,
+                new Color(0.07f, 0.07f, 0.07f, 1f),
+                new Color(0.95f, 0.95f, 0.93f, 1f));
             image.raycastTarget = false;
         }
 
@@ -530,7 +549,7 @@ namespace HorseRacing.Client
                 yield return null;
             }
 
-            Finish(order, travel);
+            Finish(travel);
 
             _running = null;
             onDone?.Invoke();
@@ -540,31 +559,33 @@ namespace HorseRacing.Client
         /// Everybody home, whatever the frame timing did -- strung out in finishing
         /// order rather than stacked on the line.
         ///
-        /// Snapping them all to the same x was the first version, and it drew eight
-        /// discs in a column on the post: correct, and it threw away the one thing the
-        /// picture is for.
+        /// **Everybody past the line, all at the same point.**
         ///
-        /// The second version put the winner on the line and set every other place back
-        /// nine pixels each, which spread the field over sixty-three pixels and read as
-        /// **seven horses that never finished**. Real ones do not stop on the line, they
-        /// cross it and pull up; so the field now straddles the post -- the winner a
-        /// little past it, the last of them a little short -- over a total of thirty-five
-        /// pixels rather than sixty-three.
+        /// Staggering by finishing position was tried twice and reported wrong both
+        /// times. Nine pixels a place spread the field over sixty-three and read as
+        /// seven horses that never finished; five pixels straddling the post read as a
+        /// diagonal scatter across it, because the lanes run in saddlecloth order and
+        /// the finishing order does not, so the stagger draws a zigzag rather than a
+        /// line.
         ///
-        /// Presentation only. The order here is taken from the same array the
-        /// settlement used, so it cannot disagree with what was paid.
+        /// A photo finish is a real thing, but it needs the runners close enough
+        /// together to be one photograph. Eight discs in fixed lanes, spread over a
+        /// tenth of the visible track, is not that -- it is eight horses stopped in
+        /// eight different places.
+        ///
+        /// So the field ends in a column just past the line, which is what a field that
+        /// has crossed looks like, and **the order is read from the placings beside
+        /// each lane** -- which is what that column is for and is unambiguous in a way
+        /// that comparing eight x-positions by eye never was.
         /// </summary>
-        private static void Finish(IReadOnlyList<int> order, float travel)
+        private static void Finish(float travel)
         {
-            for (var place = 0; place < order.Count; place++)
+            foreach (var runner in _runners)
             {
-                var index = order[place] - 1;
-
-                if (index >= 0 && index < _runners.Count && _runners[index] != null)
+                if (runner != null)
                 {
-                    _runners[index].anchoredPosition = new Vector2(
-                        Start + travel + 16f - (place * 5f),
-                        _runners[index].anchoredPosition.y);
+                    runner.anchoredPosition = new Vector2(
+                        Start + travel + 20f, runner.anchoredPosition.y);
                 }
             }
         }

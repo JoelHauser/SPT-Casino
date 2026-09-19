@@ -10,6 +10,23 @@ and believes it.
 
 ## Current state
 
+**2026-09-19, fifth pass. The finish, third attempt.**
+
+- **The field no longer staggers at the post.** Spreading it by finishing position was
+  tried at nine pixels a place and at five, and reported wrong both times. The reason it
+  cannot work here: the lanes run in saddlecloth order and the finishing order does not,
+  so a stagger draws a zigzag across the line rather than a photo finish. Everybody now
+  stops in a column twenty past the line, and the order is read from the placings beside
+  each lane -- which is what that column is for.
+- **The finish line is checkered and spans the full height of the track.** It had been
+  trimmed twice, once to clear the furlong strip and once to fit the lanes, and both
+  times looked like a line that did not cross the course. A red vertical stick also
+  reads as a barrier; black and white squares read as one thing only.
+- `FinishInset` moved from 76 to 120, because at 76 the field ended on top of the
+  placings text. **Found by rendering the geometry to a PNG and looking at it**, which
+  is worth doing again -- it is the only way anything in this file gets seen before a
+  player sees it.
+
 **2026-09-19, fourth pass. The race itself, from a screenshot.**
 
 Four things, all found by looking at it rather than by any test:
