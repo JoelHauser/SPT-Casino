@@ -195,13 +195,12 @@ namespace HorseRacing.Client
         /// <summary>
         /// Draws the course currently selected, replacing whatever was there.
         ///
-        /// The shape can change -- the dash is a straight and the other two are ovals --
-        /// so this rebuilds rather than repositions.
+        /// Every course is a straight; what differs is how many furlong markers it
+        /// carries and how long the field takes to cover them.
         ///
-        /// **A layout pass is forced first**, because the oval is laid out from the
+        /// **A layout pass is forced first**, because the markers are spaced from the
         /// holder's own rect and a RectTransform that has not been through one reports
-        /// a size of zero. A zero-radius oval draws eight horses in a heap at the
-        /// centre and nothing about it looks like a layout problem.
+        /// a width of zero.
         /// </summary>
         private static void BuildTrackForCourse()
         {
@@ -231,15 +230,9 @@ namespace HorseRacing.Client
 
             LayoutRebuilder.ForceRebuildLayoutImmediate(_trackHolder);
 
-            var shape = string.Equals(
-                course.Value<string>("Shape"), "Oval", StringComparison.OrdinalIgnoreCase)
-                ? Shape.Oval
-                : Shape.Straight;
-
             TrackView.Build(
                 _trackHolder,
-                shape,
-                course.Value<int?>("Laps") ?? 1,
+                course.Value<int?>("Furlongs") ?? 5,
                 (float)(course.Value<double?>("RunSeconds") ?? 6d),
                 runners,
                 _font);
@@ -451,7 +444,13 @@ namespace HorseRacing.Client
                 UnityEngine.Object.Destroy(child.gameObject);
             }
 
-            if (_card?["Runners"] is not JArray runners)
+            // **The selected course's runners, not a top-level list.** This read
+            // was left on `_card["Runners"]` when the courses were introduced and the
+            // server stopped sending that key, so it matched nothing, returned here,
+            // and drew an empty board -- which is what "I can't even bet" looked like.
+            // Nothing threw and nothing logged, because an empty board is a perfectly
+            // valid thing to draw.
+            if (Course?["Runners"] is not JArray runners)
             {
                 return;
             }
@@ -537,7 +536,7 @@ namespace HorseRacing.Client
 
         private static int Wrap(int runner)
         {
-            var count = (_card?["Runners"] as JArray)?.Count ?? 8;
+            var count = (Course?["Runners"] as JArray)?.Count ?? 8;
 
             if (runner < 1)
             {

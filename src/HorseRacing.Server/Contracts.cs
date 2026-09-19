@@ -14,8 +14,8 @@ namespace HorseRacing.Server;
 /// go over as integers unless every property carrying one is attributed. Four sibling
 /// tables were caught by that; sending strings sidesteps it.
 ///
-/// That applies to <see cref="SlipEntry.Kind"/> and to the course shape, both of which
-/// are enums everywhere except here.
+/// That applies to <see cref="SlipEntry.Kind"/>, which is an enum everywhere except
+/// here.
 /// </summary>
 public record PingRequest : IRequestData;
 
@@ -123,10 +123,11 @@ public record CourseView
 
     public string Blurb { get; init; } = string.Empty;
 
-    /// <summary>"Straight" or "Oval". The client draws from this.</summary>
-    public string Shape { get; init; } = string.Empty;
-
-    public int Laps { get; init; }
+    /// <summary>
+    /// How long the race is, in furlongs. The client draws a marker per furlong, which
+    /// is what makes one course look longer than another.
+    /// </summary>
+    public int Furlongs { get; init; }
 
     /// <summary>How long the race takes on screen, in seconds.</summary>
     public double RunSeconds { get; init; }

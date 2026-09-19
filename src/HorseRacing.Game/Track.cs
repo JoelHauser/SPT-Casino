@@ -1,15 +1,5 @@
 namespace HorseRacing.Game;
 
-/// <summary>How a course is laid out, which is the only thing the client draws from.</summary>
-public enum TrackShape
-{
-    /// <summary>A straight sprint, run left to right. No bends.</summary>
-    Straight,
-
-    /// <summary>A circuit. See <see cref="Track.Laps"/> for how many times round.</summary>
-    Oval,
-}
-
 /// <summary>
 /// One course, and the card it produces.
 ///
@@ -42,8 +32,18 @@ public enum TrackShape
 /// <param name="Name">As printed above the track.</param>
 /// <param name="Distance">"5 furlongs", "2 miles". For the player, not the code.</param>
 /// <param name="Blurb">One line on what kind of race it is.</param>
-/// <param name="Shape">Straight or oval. The client draws from this.</param>
-/// <param name="Laps">Times round. Always 1 for a straight.</param>
+/// <param name="Furlongs">
+/// How long the race is, in furlongs -- eight to a mile.
+///
+/// **Every course is run straight, left to right**, and this is what makes them look
+/// different from one another: the client draws a marker per furlong, so a two-mile
+/// race is visibly more than three times the five-furlong dash rather than the same
+/// picture with a different label.
+///
+/// An oval was tried first and looked wrong. Flattened to fit a panel far wider than
+/// it is tall, a circuit reads as a stadium, and the runners bunch on the bends where
+/// they are hardest to tell apart.
+/// </param>
 /// <param name="SpeedWeight">How much a point of speed is worth here.</param>
 /// <param name="StaminaWeight">How much a point of stamina is worth here.</param>
 /// <param name="Threshold">Taken off every score before it becomes a weight.</param>
@@ -70,8 +70,7 @@ public sealed record Track(
     string Name,
     string Distance,
     string Blurb,
-    TrackShape Shape,
-    int Laps,
+    int Furlongs,
     int SpeedWeight,
     int StaminaWeight,
     int Threshold,
@@ -132,9 +131,8 @@ public static class Tracks
         "dash",
         "THE DASH",
         "5 furlongs",
-        "Straight, no bends. Pure speed -- a stayer has no time to get going.",
-        TrackShape.Straight,
-        Laps: 1,
+        "Pure speed. Over five furlongs a stayer has no time to get going.",
+        Furlongs: 5,
         SpeedWeight: 3,
         StaminaWeight: 1,
         Threshold: 24,
@@ -149,9 +147,8 @@ public static class Tracks
         "mile",
         "THE MILE",
         "8 furlongs",
-        "One lap. Speed and stamina matter about equally -- the all-rounder's race.",
-        TrackShape.Oval,
-        Laps: 1,
+        "Speed and stamina matter about equally. The all-rounder's race.",
+        Furlongs: 8,
         SpeedWeight: 5,
         StaminaWeight: 4,
         Threshold: 58,
@@ -166,9 +163,8 @@ public static class Tracks
         "marathon",
         "THE MARATHON",
         "2 miles",
-        "Two laps. Stamina decides it -- the sprinters are walking by the end.",
-        TrackShape.Oval,
-        Laps: 2,
+        "Stamina decides it. The sprinters are walking by the end.",
+        Furlongs: 16,
         SpeedWeight: 1,
         StaminaWeight: 3,
         Threshold: 22,

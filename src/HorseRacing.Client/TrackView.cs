@@ -8,15 +8,8 @@ using UnityEngine.UI;
 
 namespace HorseRacing.Client
 {
-    /// <summary>How a course is drawn. Mirrors <c>HorseRacing.Game.TrackShape</c>.</summary>
-    internal enum Shape
-    {
-        Straight,
-        Oval,
-    }
-
     /// <summary>
-    /// The course: eight runners, drawn either along a straight or around an oval.
+    /// The course: eight lanes seen from the side, run left to right.
     ///
     /// ## The one thing this must never get wrong
     ///
@@ -34,17 +27,20 @@ namespace HorseRacing.Client
     /// change that -- see <see cref="Jostle"/>, which is multiplied by a term that is
     /// zero at the line.
     ///
-    /// ## Two shapes, one set of rules
+    /// ## Every course is a straight, and there used to be an oval
     ///
-    /// **The shape changes only where a runner is drawn, never how fast it gets
-    /// there.** <see cref="Gallop"/> computes one number per runner per frame -- how
-    /// far round it is, from 0 to 1 -- and hands it to whichever placement the course
-    /// uses. The straight maps it along a line; the oval maps it to an angle, times the
-    /// number of laps.
+    /// The mile and the marathon were drawn as one and two laps of an oval. It looked
+    /// wrong and was dropped: the track holder is about 1470 wide and 270 tall, so a
+    /// circuit has to be flattened to roughly two and a half to one before it fits,
+    /// which reads as a running stadium rather than a racecourse -- and the runners
+    /// bunch together on the bends, which is exactly where eight coloured discs are
+    /// hardest to tell apart.
     ///
-    /// That split is deliberate, and it is what keeps the guarantee above true at both
-    /// shapes: there is exactly one piece of code that decides who is in front, and it
-    /// does not know what the course looks like.
+    /// **A longer race is now a longer run rather than a different shape.** The
+    /// distance is carried by the furlong markers along the top -- five ticks for the
+    /// dash and sixteen for the marathon -- and by the clock, since the marathon takes
+    /// nearly twice as long to run. Both come from the server with the rest of the
+    /// course.
     /// </summary>
     internal static class TrackView
     {
@@ -58,13 +54,18 @@ namespace HorseRacing.Client
         /// </summary>
         private const float PlaceGap = 0.018f;
 
-        private const float LaneHeight = 32f;
-        private const float HorseSize = 24f;
+        private const float LaneHeight = 30f;
+        private const float HorseSize = 22f;
+
+        /// <summary>Where a runner stands before the stalls open.</summary>
+        private const float Start = 250f;
+
+        /// <summary>How far in from the right edge the post stands.</summary>
+        private const float FinishInset = 76f;
 
         private static readonly Color Rail = new Color(0.86f, 0.87f, 0.84f, 0.85f);
         private static readonly Color Turf = new Color(0.114f, 0.180f, 0.118f, 1f);
         private static readonly Color TurfMown = new Color(0.137f, 0.212f, 0.141f, 1f);
-        private static readonly Color Infield = new Color(0.086f, 0.141f, 0.094f, 1f);
         private static readonly Color Post = new Color(0.86f, 0.24f, 0.24f, 0.95f);
         private static readonly Color Ink = new Color(0.88f, 0.86f, 0.80f, 1f);
         private static readonly Color Faint = new Color(0.88f, 0.86f, 0.80f, 0.35f);
@@ -72,7 +73,7 @@ namespace HorseRacing.Client
         /// <summary>
         /// The silks, one per saddlecloth number.
         ///
-        /// Eight colours that stay apart from each other at 24 pixels and on a dark
+        /// Eight colours that stay apart from each other at 22 pixels and on a dark
         /// green background. Not generated from a hue wheel: an even spread puts two of
         /// them in the greens, which is precisely where the turf is.
         /// </summary>
@@ -89,19 +90,11 @@ namespace HorseRacing.Client
         };
 
         private static RectTransform _track;
-        private static Shape _shape = Shape.Straight;
-        private static int _laps = 1;
         private static float _duration = 6f;
 
         private static readonly List<RectTransform> _runners = new List<RectTransform>();
         private static readonly List<TextMeshProUGUI> _places = new List<TextMeshProUGUI>();
-        private static TextMeshProUGUI _lapLabel;
         private static Coroutine _running;
-
-        /// <summary>Lane geometry for the oval, worked out once at build time.</summary>
-        private static float _ovalRadiusX;
-        private static float _ovalRadiusY;
-        private static float _laneStep;
 
         /// <summary>
         /// Whether a race is on.
@@ -116,10 +109,14 @@ namespace HorseRacing.Client
         /// Builds a course. Called whenever the player switches track, so it clears
         /// whatever was there first.
         /// </summary>
+        /// <param name="parent">The holder the course fills.</param>
+        /// <param name="furlongs">How long the race is. One marker each.</param>
+        /// <param name="runSeconds">How long the field takes to cover it.</param>
+        /// <param name="runners">Saddlecloth number and name, in card order.</param>
+        /// <param name="font">The panel's font, so the course does not load its own.</param>
         internal static void Build(
             RectTransform parent,
-            Shape shape,
-            int laps,
+            int furlongs,
             float runSeconds,
             IReadOnlyList<KeyValuePair<int, string>> runners,
             TMP_FontAsset font)
@@ -127,40 +124,16 @@ namespace HorseRacing.Client
             Reset();
 
             _track = parent;
-            _shape = shape;
-            _laps = Mathf.Max(1, laps);
             _duration = Mathf.Max(1f, runSeconds);
 
             _runners.Clear();
             _places.Clear();
-            _names.Clear();
-            _lapLabel = null;
-
-            foreach (var runner in runners)
-            {
-                _names[runner.Key] = runner.Value;
-            }
 
             foreach (Transform child in parent)
             {
                 UnityEngine.Object.Destroy(child.gameObject);
             }
 
-            if (shape == Shape.Oval)
-            {
-                BuildOval(parent, runners, font);
-            }
-            else
-            {
-                BuildStraight(parent, runners, font);
-            }
-        }
-
-        // ------------------------------------------------------------------ straight
-
-        private static void BuildStraight(
-            RectTransform parent, IReadOnlyList<KeyValuePair<int, string>> runners, TMP_FontAsset font)
-        {
             var turf = New("Turf", parent);
             Stretch(turf);
             var turfImage = turf.gameObject.AddComponent<Image>();
@@ -199,6 +172,8 @@ namespace HorseRacing.Client
                 image.raycastTarget = false;
             }
 
+            BuildFurlongMarkers(parent, furlongs, font);
+
             for (var lane = 0; lane < runners.Count; lane++)
             {
                 BuildLane(parent, lane, runners[lane].Key, runners[lane].Value, font);
@@ -208,10 +183,75 @@ namespace HorseRacing.Client
             BuildPost(parent);
         }
 
+        /// <summary>
+        /// A marker per furlong, counting down to the post the way a real course does.
+        ///
+        /// **This is what carries the distance.** Every course is the same number of
+        /// pixels long, so without these a two-mile marathon and a five-furlong dash
+        /// would be the same picture at a different speed. Five ticks against sixteen
+        /// says which is which at a glance.
+        ///
+        /// Numbers are drawn on every marker when there is room and on every other one
+        /// when there is not, since sixteen labels across the same span as five is the
+        /// point at which they start touching.
+        /// </summary>
+        private static void BuildFurlongMarkers(RectTransform parent, int furlongs, TMP_FontAsset font)
+        {
+            if (furlongs <= 0)
+            {
+                return;
+            }
+
+            var travel = Travel(parent);
+            var everyOther = furlongs > 10;
+
+            // The post is the last marker and already has a line of its own, so the
+            // ticks drawn here are the ones *before* it.
+            for (var i = 1; i <= furlongs; i++)
+            {
+                var atFinish = i == furlongs;
+                var x = Start + (travel * (i / (float)furlongs));
+
+                var tick = New($"Furlong{i}", parent);
+                tick.anchorMin = new Vector2(0f, 1f);
+                tick.anchorMax = new Vector2(0f, 1f);
+                tick.pivot = new Vector2(0.5f, 1f);
+                tick.anchoredPosition = new Vector2(x, -3f);
+                tick.sizeDelta = new Vector2(1f, atFinish ? 0f : 7f);
+
+                var image = tick.gameObject.AddComponent<Image>();
+                image.color = new Color(Rail.r, Rail.g, Rail.b, 0.35f);
+                image.raycastTarget = false;
+
+                var remaining = furlongs - i;
+
+                if (atFinish || (everyOther && remaining % 2 != 0))
+                {
+                    continue;
+                }
+
+                var label = New($"FurlongLabel{i}", parent);
+                label.anchorMin = new Vector2(0f, 1f);
+                label.anchorMax = new Vector2(0f, 1f);
+                label.pivot = new Vector2(0.5f, 1f);
+                label.anchoredPosition = new Vector2(x, -10f);
+                label.sizeDelta = new Vector2(34f, 14f);
+
+                var text = label.gameObject.AddComponent<TextMeshProUGUI>();
+                text.font = font;
+                text.fontSize = 10f;
+                text.color = new Color(Ink.r, Ink.g, Ink.b, 0.30f);
+                text.alignment = TextAlignmentOptions.Center;
+                text.text = remaining == 0 ? string.Empty : $"{remaining}f";
+                text.raycastTarget = false;
+            }
+        }
+
         private static void BuildLane(
             RectTransform parent, int lane, int number, string name, TMP_FontAsset font)
         {
-            var top = -(lane * LaneHeight) - 10f;
+            // Below the furlong strip along the top.
+            var top = -(lane * LaneHeight) - 22f;
 
             var label = New($"Name{number}", parent);
             label.anchorMin = new Vector2(0f, 1f);
@@ -246,18 +286,18 @@ namespace HorseRacing.Client
             _places.Add(placeText);
 
             _runners.Add(MakeHorse(parent, number, font, new Vector2(
-                StraightStart, top - ((LaneHeight - HorseSize) / 2f))));
+                Start, top - ((LaneHeight - HorseSize) / 2f))));
         }
 
-        /// <summary>The starting stalls, which is what the left edge of a sprint is.</summary>
+        /// <summary>The starting stalls, which is what the left edge of a race is.</summary>
         private static void BuildStalls(RectTransform parent)
         {
             var stalls = New("Stalls", parent);
             stalls.anchorMin = new Vector2(0f, 0f);
             stalls.anchorMax = new Vector2(0f, 1f);
             stalls.pivot = new Vector2(0f, 0.5f);
-            stalls.anchoredPosition = new Vector2(StraightStart - (HorseSize * 0.5f) - 8f, 0f);
-            stalls.sizeDelta = new Vector2(5f, -16f);
+            stalls.anchoredPosition = new Vector2(Start - (HorseSize * 0.5f) - 8f, -8f);
+            stalls.sizeDelta = new Vector2(5f, -32f);
 
             var image = stalls.gameObject.AddComponent<Image>();
             image.color = new Color(Rail.r, Rail.g, Rail.b, 0.5f);
@@ -270,188 +310,25 @@ namespace HorseRacing.Client
             post.anchorMin = new Vector2(1f, 0f);
             post.anchorMax = new Vector2(1f, 1f);
             post.pivot = new Vector2(1f, 0.5f);
-            post.anchoredPosition = new Vector2(-FinishInset, 0f);
-            post.sizeDelta = new Vector2(3f, -12f);
+            post.anchoredPosition = new Vector2(-FinishInset, -8f);
+            post.sizeDelta = new Vector2(3f, -28f);
 
             var image = post.gameObject.AddComponent<Image>();
             image.color = Post;
             image.raycastTarget = false;
         }
 
-        /// <summary>Where a runner stands before the stalls open.</summary>
-        private static float StraightStart => 250f;
-
-        /// <summary>How far in from the right edge the post stands.</summary>
-        private static float FinishInset => 76f;
-
-        // ---------------------------------------------------------------------- oval
-
-        private static void BuildOval(
-            RectTransform parent, IReadOnlyList<KeyValuePair<int, string>> runners, TMP_FontAsset font)
-        {
-            // Laid out from the holder's own rect, which the panel forces a layout pass
-            // on before calling this -- a freshly-created RectTransform reports zero.
-            var width = parent.rect.width;
-            var height = parent.rect.height;
-
-            _ovalRadiusY = (height * 0.5f) - 14f;
-
-            // **Capped against the height, not stretched to the width.** The holder is
-            // most of a 1520-wide panel and only about 270 tall, so filling it would
-            // give a six-to-one sliver that reads as a stadium rather than a racecourse
-            // -- and would squash the runners flat on the bends, where they are most
-            // bunched. Real courses are nearer two to one; 2.6 is as flat as this still
-            // looks right.
-            _ovalRadiusX = Mathf.Min((width * 0.5f) - 30f, _ovalRadiusY * 2.6f);
-
-            _laneStep = (_ovalRadiusY * 0.26f) / Mathf.Max(1, runners.Count);
-
-            // The running surface: a wide annulus, which is exactly what Ring draws.
-            var surface = New("Surface", parent);
-            Centre(surface, _ovalRadiusX * 2f, _ovalRadiusY * 2f);
-            var surfaceImage = surface.gameObject.AddComponent<Image>();
-            surfaceImage.sprite = Textures.Ring(Turf, 0.22f);
-            surfaceImage.raycastTarget = false;
-
-            var infield = New("Infield", parent);
-            Centre(infield, _ovalRadiusX * 2f * 0.56f, _ovalRadiusY * 2f * 0.56f);
-            var infieldImage = infield.gameObject.AddComponent<Image>();
-            infieldImage.sprite = Textures.Ring(Infield, 0.5f);
-            infieldImage.raycastTarget = false;
-
-            // Outer and inner rails.
-            var outerRail = New("OuterRail", parent);
-            Centre(outerRail, _ovalRadiusX * 2f, _ovalRadiusY * 2f);
-            var outerImage = outerRail.gameObject.AddComponent<Image>();
-            outerImage.sprite = Textures.Ring(Rail, 0.007f);
-            outerImage.raycastTarget = false;
-
-            var innerRail = New("InnerRail", parent);
-            Centre(innerRail, _ovalRadiusX * 2f * 0.56f, _ovalRadiusY * 2f * 0.56f);
-            var innerImage = innerRail.gameObject.AddComponent<Image>();
-            innerImage.sprite = Textures.Ring(Rail, 0.012f);
-            innerImage.raycastTarget = false;
-
-            // The post, on the right-hand straight where the runners start and finish.
-            var post = New("Post", parent);
-            Centre(post, 3f, _ovalRadiusY * 0.44f);
-            post.anchoredPosition = new Vector2(_ovalRadiusX * 0.78f, 0f);
-            var postImage = post.gameObject.AddComponent<Image>();
-            postImage.color = Post;
-            postImage.raycastTarget = false;
-
-            // The placings, in a column to the left of the course.
-            //
-            // Not in the infield, which is where they went first: eight rows do not fit
-            // inside an infield only 130 units tall, and capping the oval's width above
-            // leaves a wide empty margin beside it that wants using. A straight has
-            // lanes to write each runner's place beside; an oval has none, so it gets a
-            // results board instead.
-            var boardX = -(_ovalRadiusX + 150f);
-            var boardTop = (runners.Count - 1) * 9f;
-
-            var heading = New("PlacingsHeading", parent);
-            Centre(heading, 220f, 18f);
-            heading.anchoredPosition = new Vector2(boardX, boardTop + 26f);
-
-            var headingText = heading.gameObject.AddComponent<TextMeshProUGUI>();
-            headingText.font = font;
-            headingText.fontSize = 12f;
-            headingText.color = Faint;
-            headingText.alignment = TextAlignmentOptions.Left;
-            headingText.text = "FINISH";
-            headingText.raycastTarget = false;
-
-            for (var i = 0; i < runners.Count; i++)
-            {
-                var row = New($"Place{runners[i].Key}", parent);
-                Centre(row, 220f, 18f);
-                row.anchoredPosition = new Vector2(boardX, boardTop - (i * 18f));
-
-                var text = row.gameObject.AddComponent<TextMeshProUGUI>();
-                text.font = font;
-                text.fontSize = 13f;
-                text.color = Ink;
-                text.alignment = TextAlignmentOptions.Left;
-                text.text = string.Empty;
-                text.raycastTarget = false;
-                _places.Add(text);
-
-                _runners.Add(MakeHorse(parent, runners[i].Key, font, Vector2.zero));
-            }
-
-            if (_laps > 1)
-            {
-                var lap = New("Lap", parent);
-                Centre(lap, 240f, 22f);
-                lap.anchoredPosition = Vector2.zero;
-
-                _lapLabel = lap.gameObject.AddComponent<TextMeshProUGUI>();
-                _lapLabel.font = font;
-                _lapLabel.fontSize = 15f;
-                _lapLabel.fontStyle = FontStyles.Bold;
-                _lapLabel.color = Faint;
-                _lapLabel.alignment = TextAlignmentOptions.Center;
-                _lapLabel.text = $"LAP 1 OF {_laps}";
-                _lapLabel.raycastTarget = false;
-            }
-
-            // Everyone to the start before the first frame, so a freshly-built oval
-            // does not show eight horses piled at the centre.
-            for (var lane = 0; lane < _runners.Count; lane++)
-            {
-                _runners[lane].anchoredPosition = OvalPoint(lane, 0f);
-            }
-        }
-
-        /// <summary>
-        /// Where a runner sits when it is <paramref name="progress"/> of the way round.
-        ///
-        /// Angle zero is the post, and the field runs anticlockwise from it. Each lane
-        /// sits a little further in than the one outside it, which is what stops eight
-        /// discs overlapping into one on the bends.
-        /// </summary>
-        private static Vector2 OvalPoint(int lane, float progress)
-        {
-            // The middle of the running surface, then stepped inwards per lane.
-            var inset = lane * _laneStep;
-            var rx = (_ovalRadiusX * 0.78f) - inset;
-            var ry = (_ovalRadiusY * 0.78f) - inset;
-
-            var angle = progress * _laps * 2f * Mathf.PI;
-
-            return new Vector2(Mathf.Cos(angle) * rx, Mathf.Sin(angle) * ry);
-        }
-
-        private static void Centre(RectTransform rect, float width, float height)
-        {
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(width, height);
-        }
-
-        // ------------------------------------------------------------------ the horse
+        /// <summary>How far a runner actually travels, from the stalls to the post.</summary>
+        private static float Travel(RectTransform holder) =>
+            Mathf.Max(80f, holder.rect.width - FinishInset - Start);
 
         private static RectTransform MakeHorse(
             RectTransform parent, int number, TMP_FontAsset font, Vector2 at)
         {
             var horse = New($"Horse{number}", parent);
-
-            if (_shape == Shape.Oval)
-            {
-                horse.anchorMin = new Vector2(0.5f, 0.5f);
-                horse.anchorMax = new Vector2(0.5f, 0.5f);
-                horse.pivot = new Vector2(0.5f, 0.5f);
-            }
-            else
-            {
-                horse.anchorMin = new Vector2(0f, 1f);
-                horse.anchorMax = new Vector2(0f, 1f);
-                horse.pivot = new Vector2(0.5f, 1f);
-            }
-
+            horse.anchorMin = new Vector2(0f, 1f);
+            horse.anchorMax = new Vector2(0f, 1f);
+            horse.pivot = new Vector2(0.5f, 1f);
             horse.anchoredPosition = at;
             horse.sizeDelta = new Vector2(HorseSize, HorseSize);
 
@@ -514,7 +391,7 @@ namespace HorseRacing.Client
         }
 
         /// <summary>
-        /// Abandons any running race and puts the field back to the start.
+        /// Abandons any running race and puts the field back behind the stalls.
         ///
         /// For the panel to call, never for <see cref="Gallop"/> -- it stops the
         /// coroutine, and a coroutine that stops itself here would take the rest of its
@@ -534,21 +411,17 @@ namespace HorseRacing.Client
         }
 
         /// <summary>
-        /// Puts the field at the start and clears the placings, and touches nothing
-        /// else. Safe from inside the race itself.
+        /// Puts the field behind the stalls and clears the placings, and touches
+        /// nothing else. Safe from inside the race itself.
         /// </summary>
         private static void Rewind()
         {
-            for (var lane = 0; lane < _runners.Count; lane++)
+            foreach (var runner in _runners)
             {
-                if (_runners[lane] == null)
+                if (runner != null)
                 {
-                    continue;
+                    runner.anchoredPosition = new Vector2(Start, runner.anchoredPosition.y);
                 }
-
-                _runners[lane].anchoredPosition = _shape == Shape.Oval
-                    ? OvalPoint(lane, 0f)
-                    : new Vector2(StraightStart, _runners[lane].anchoredPosition.y);
             }
 
             foreach (var place in _places)
@@ -557,11 +430,6 @@ namespace HorseRacing.Client
                 {
                     place.text = string.Empty;
                 }
-            }
-
-            if (_lapLabel != null)
-            {
-                _lapLabel.text = $"LAP 1 OF {_laps}";
             }
         }
 
@@ -580,7 +448,7 @@ namespace HorseRacing.Client
             }
 
             var lastHome = _duration * (1f + ((order.Count - 1) * PlaceGap));
-            var travel = Mathf.Max(80f, _track.rect.width - FinishInset - StraightStart);
+            var travel = Travel(_track);
 
             SoundBoard.Play(Cue.RaceOff);
 
@@ -613,17 +481,8 @@ namespace HorseRacing.Client
                     var u = Mathf.Clamp01(elapsed / finish);
                     var progress = Mathf.Clamp01(Pace(u) + Jostle(number, elapsed, u));
 
-                    runner.anchoredPosition = _shape == Shape.Oval
-                        ? OvalPoint(lane, progress)
-                        : new Vector2(StraightStart + (progress * travel), runner.anchoredPosition.y);
-                }
-
-                if (_lapLabel != null)
-                {
-                    // The leader's lap, which is the one a commentator would call.
-                    var leader = Mathf.Clamp01(Pace(Mathf.Clamp01(elapsed / finishAt[order[0]])));
-                    var lap = Mathf.Clamp(Mathf.FloorToInt(leader * _laps) + 1, 1, _laps);
-                    _lapLabel.text = $"LAP {lap} OF {_laps}";
+                    runner.anchoredPosition = new Vector2(
+                        Start + (progress * travel), runner.anchoredPosition.y);
                 }
 
                 // The winner passing the post, which is the moment worth hearing --
@@ -638,22 +497,14 @@ namespace HorseRacing.Client
                 // the end, because that is the order the eye already watched happen.
                 for (var place = 0; place < order.Count; place++)
                 {
-                    // A straight writes into the finisher's own lane; the oval's board
-                    // is ordered by finishing position, so it writes into the row for
-                    // that position instead.
-                    var index = _shape == Shape.Oval ? place : order[place] - 1;
+                    var index = order[place] - 1;
 
                     if (index >= 0 && index < _places.Count
                         && _places[index] != null
                         && _places[index].text.Length == 0
                         && elapsed >= finishAt[order[place]])
                     {
-                        // On the oval the board is a results list, so each line has
-                        // to name its runner; on the straight the line already sits in
-                        // that runner's own lane.
-                        _places[index].text = _shape == Shape.Oval
-                            ? $"{Ordinal(place + 1),-5} {order[place]}  {NameOf(order[place])}"
-                            : Ordinal(place + 1);
+                        _places[index].text = Ordinal(place + 1);
                     }
                 }
 
@@ -670,11 +521,11 @@ namespace HorseRacing.Client
         /// Everybody home, whatever the frame timing did -- strung out in finishing
         /// order rather than stacked on the line.
         ///
-        /// Snapping them all to the same point was the first version, and it drew eight
+        /// Snapping them all to the same x was the first version, and it drew eight
         /// discs in a column on the post: correct, and it threw away the one thing the
         /// picture is for. The winner now sits on the line and each place behind it is
         /// set back a little, so the frozen frame says who won without the player
-        /// reading the placings beside it.
+        /// reading the placings column beside it.
         ///
         /// Presentation only. The order here is taken from the same array the
         /// settlement used, so it cannot disagree with what was paid.
@@ -685,23 +536,10 @@ namespace HorseRacing.Client
             {
                 var index = order[place] - 1;
 
-                if (index < 0 || index >= _runners.Count || _runners[index] == null)
-                {
-                    continue;
-                }
-
-                if (_shape == Shape.Oval)
-                {
-                    // A whole number of laps is back at the post, so the trailing
-                    // places are backed off by a fraction of a lap rather than by
-                    // pixels -- which on a bend would otherwise push them off the turf.
-                    _runners[index].anchoredPosition =
-                        OvalPoint(index, 1f - (place * 0.012f / _laps));
-                }
-                else
+                if (index >= 0 && index < _runners.Count && _runners[index] != null)
                 {
                     _runners[index].anchoredPosition = new Vector2(
-                        StraightStart + travel - (place * 9f),
+                        Start + travel - (place * 9f),
                         _runners[index].anchoredPosition.y);
                 }
             }
@@ -736,12 +574,6 @@ namespace HorseRacing.Client
 
             return swing * fade;
         }
-
-        /// <summary>Runner names, kept so the oval's results board can print them.</summary>
-        private static readonly Dictionary<int, string> _names = new Dictionary<int, string>();
-
-        private static string NameOf(int number) =>
-            _names.TryGetValue(number, out var name) ? name : string.Empty;
 
         private static string Ordinal(int place) => place switch
         {

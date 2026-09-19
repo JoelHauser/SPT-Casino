@@ -10,6 +10,18 @@ and believes it.
 
 ## Current state
 
+**2026-09-19, third pass. Betting fixed, and the oval dropped for a straight.**
+
+The second pass shipped a table nobody could bet at. `RenderBoard` was still reading
+`_card["Runners"]` after the courses moved that key inside `Courses[i]`, so it matched
+nothing, returned early and drew an empty board. **Nothing threw and nothing logged** --
+an empty board is a perfectly valid thing to draw -- and the only symptom was a player
+saying they could not bet. `CourseTests.ThePingCarriesEveryKeyThePanelReads` now pins
+every key the panel reads and asserts the two that moved are gone from the top level, so
+a stale read is a missing property rather than a silent null.
+
+The ovals looked wrong and are gone. See "One shape, and there used to be two".
+
 **2026-09-19, second pass. Three courses, and the panel relaid out.** The first
 version had one course and a layout that overlapped itself; both are fixed. The engine
 and money path have been played through the live server but **not yet through a game
@@ -227,23 +239,25 @@ the casino.** No such file has ever existed for it, and a lookup for one could o
 find somebody else's money. `Casino.Server.LegacyData` is not called from here, and that
 is not an oversight.
 
-## The two track renderers
+## One shape, and there used to be two
 
-`TrackView` draws either a straight (the dash) or an oval (the mile and the marathon,
-the latter twice round).
+**Every course is a straight, run left to right.** The mile and the marathon were first
+drawn as one and two laps of an oval, and it was dropped after being looked at.
 
-**The shape changes only where a runner is drawn, never how fast it gets there.**
-`Gallop` computes one number per runner per frame -- how far round it is, 0 to 1 -- and
-hands it to whichever placement the course uses. That split is what keeps the guarantee
-below true at both shapes: there is exactly one piece of code that decides who is in
-front, and it does not know what the course looks like.
+The reason is the panel's proportions. The track holder is about 1470 wide and 268 tall,
+so a circuit has to be flattened to roughly two and a half to one before it fits -- which
+reads as a running stadium rather than a racecourse -- and the runners bunch together on
+the bends, which is exactly where eight coloured discs are hardest to tell apart. It also
+needed a results board off to one side, because an oval has no lanes to write each
+runner's placing beside.
 
-The oval's aspect is **capped at 2.6:1 against its height, not stretched to the panel's
-width**. The holder is 1468 x 268, so filling it would give a six-to-one sliver that
-reads as a stadium and squashes the runners flat on the bends, where they are most
-bunched. Capping it leaves a wide margin on the left, which is where the results board
-went -- an oval has no lanes to write each runner's placing beside, and eight rows do not
-fit in an infield 130 units tall.
+**A longer race is a longer run, not a different shape.** The distance is carried by
+furlong markers along the top, counting down to the post the way a real course does:
+five ticks for the dash and sixteen for the marathon. Without them every course would be
+the same picture at a different speed, since the straight is the same number of pixels
+whatever the race. The clock agrees with them -- the marathon takes nearly twice as long
+as the dash -- and `TrackTests` asserts both orderings, so a course cannot be listed as
+longer while running shorter.
 
 **The ordering is arithmetic, not arrangement.** Each runner is given a finishing time
 strictly ordered by its finishing position, and its progress is its own elapsed fraction
@@ -319,10 +333,9 @@ Specifically unverified:
 
 - The panel at any real resolution. The band table is verified to have no overlaps and
   60 units of bottom margin, but that arithmetic has still never met a screen.
-- **Whether the oval reads as a racecourse.** It is drawn from `Textures.Ring` at a
-  large thickness, which is an annulus and ought to look like a track; it has never been
-  seen. The two-lap marathon in particular has never been watched.
-- Whether the mown stripes and rails on the straight help or just add noise.
+- Whether the mown stripes, rails, stalls and furlong markers help or just add noise.
+- Whether sixteen furlong markers across the same span as five reads as "longer" or
+  just as "busier".
 - Whether three course tabs at 260 units each are the right size.
 - Whether the item-event sync actually round-trips in a running game. The two strings
   themselves **do** agree -- `RacePanel.SyncAction` and `RaceActions.Sync` were both

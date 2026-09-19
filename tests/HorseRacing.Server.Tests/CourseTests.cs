@@ -132,7 +132,7 @@ public class CourseTests
             Assert.Equal(Field.Count, course.Runners.Count);
             Assert.Equal(new RaceRules().MaxBets, course.Board.Count);
             Assert.Equal(track!.MaxSlip, course.MaxSlip);
-            Assert.False(string.IsNullOrWhiteSpace(course.Shape));
+            Assert.True(course.Furlongs > 0);
 
             // The chances it quotes are that course's, not some other course's.
             foreach (var runner in course.Runners)
@@ -239,6 +239,56 @@ public class CourseTests
         {
             Assert.True(settled.Returned >= 0, "a settlement came back negative, which is an overflow.");
         }
+    }
+
+    /// <summary>
+    /// **Every JSON key the panel reads, pinned to the response types.**
+    ///
+    /// This exists because of a bug it would have caught. When the courses were added,
+    /// `Runners` and `Board` moved from the top of the ping into each course -- and one
+    /// read in `RacePanelChrome.RenderBoard` was left on the old top-level key. It
+    /// matched nothing, returned early, and drew an empty board. Nothing threw and
+    /// nothing logged, because an empty board is a perfectly valid thing to draw; the
+    /// only symptom was a player saying they could not bet.
+    ///
+    /// The client is Unity code with no tests of its own, so this is the closest a test
+    /// can get: it cannot prove the panel reads the right key, but it does prove the key
+    /// exists and, for the two that moved, that the old ones are **gone** -- so a stale
+    /// read is a missing property rather than a silent null.
+    /// </summary>
+    [Fact]
+    public void ThePingCarriesEveryKeyThePanelReads()
+    {
+        foreach (var key in new[] { "Balances", "Limits", "Takeout", "MaxBets", "Courses" })
+        {
+            Assert.True(
+                typeof(PingResponse).GetProperty(key) is not null,
+                $"the panel reads PingResponse.{key}, which does not exist.");
+        }
+
+        foreach (var key in new[]
+                 { "Id", "Name", "Distance", "Blurb", "Furlongs", "RunSeconds", "MaxSlip", "Runners", "Board" })
+        {
+            Assert.True(
+                typeof(CourseView).GetProperty(key) is not null,
+                $"the panel reads CourseView.{key}, which does not exist.");
+        }
+
+        foreach (var key in new[] { "Number", "Name", "Speed", "Stamina", "Chance" })
+        {
+            Assert.True(typeof(RunnerView).GetProperty(key) is not null, $"RunnerView.{key} is missing.");
+        }
+
+        foreach (var key in new[] { "Kind", "First", "Second", "Price" })
+        {
+            Assert.True(typeof(PriceView).GetProperty(key) is not null, $"PriceView.{key} is missing.");
+        }
+
+        // The two that moved into a course. If either is ever put back at the top, a
+        // panel reading the wrong one silently renders nothing -- so they must stay
+        // gone rather than exist in both places.
+        Assert.Null(typeof(PingResponse).GetProperty("Runners"));
+        Assert.Null(typeof(PingResponse).GetProperty("Board"));
     }
 
     private static (RaceService Service, FakeBank Bank, FakeProfiles Profiles, FakeEscrow Escrow) Table()

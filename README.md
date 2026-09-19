@@ -9,7 +9,7 @@ lobby; the lobby has five tables.
 | **Poker** | No-limit hold'em against bots, seated under names drawn from the game's own PMC nickname list. |
 | **Roulette** | A single-zero European wheel that actually spins, and a full betting cloth to play it from. |
 | **Slots** | Five reels and 243 ways, spinning the item icons out of your own install. AUTO and SPEED keep it moving without a click every time. Takes roubles, dollars or euros. |
-| **Horse Racing** | Eight runners over three courses -- a five-furlong dash, a mile, and a two-mile marathon. The same horses run all three, and the form changes with the distance: a sprinter that wins one race in six over five furlongs wins one in forty over two miles. Back one to win, place or show, or pick the first two for an exacta. Every price is exact and the house takes 6%. Roubles, dollars or euros. |
+| **Horse Racing** | Eight runners over three distances -- a five-furlong dash, a mile, and a two-mile marathon. The same horses run all three and the form changes with the trip: a sprinter that wins one race in six over five furlongs wins one in forty over two miles. Back one to win, place or show, or pick the first two for an exacta. Every price is exact and the house takes 6%. Roubles, dollars or euros. |
 
 **It plays for real money out of your stash -- never your gear.** A stake leaves the
 moment you commit it and winnings are paid straight back in, and it only ever comes
@@ -76,8 +76,9 @@ there:
 **Horse Racing is new and has not been played in-game yet.** The money side is covered
 by tests the same way every other table is -- stakes, payouts and the house edge are all
 checked, and the race you watch is guaranteed to finish in the order you are paid for.
-What has not been looked at on a real screen is how it draws: the oval courses in
-particular have never been watched. Anything that looks wrong is worth reporting.
+What has not been settled is how it looks. Anything that reads wrong is worth
+reporting -- the first build had a board you could not click and the second had ovals
+that looked like running tracks, and both were found that way.
 
 **Sound is wired in but silent for now.** Every action -- dealing, chips landing, the
 wheel and reels spinning, the win banner -- already fires its own cue; no audio files

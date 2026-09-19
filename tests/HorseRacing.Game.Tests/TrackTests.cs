@@ -203,14 +203,22 @@ public class TrackTests
 
         foreach (var track in Tracks.All)
         {
-            Assert.True(track.Laps >= 1, $"{track.Name} runs {track.Laps} laps.");
+            Assert.True(track.Furlongs > 0, $"{track.Name} is {track.Furlongs} furlongs.");
             Assert.True(track.RunSeconds > 0f);
+        }
 
-            // A straight is run once by definition -- there is nothing to go round.
-            if (track.Shape == TrackShape.Straight)
-            {
-                Assert.Equal(1, track.Laps);
-            }
+        // Listed shortest first, and a longer race takes longer to watch. The panel
+        // relies on both: the tabs are drawn in list order, and the furlong markers
+        // only read as distance if the clock agrees with them.
+        for (var i = 1; i < Tracks.All.Count; i++)
+        {
+            Assert.True(
+                Tracks.All[i].Furlongs > Tracks.All[i - 1].Furlongs,
+                "the courses are listed shortest first.");
+
+            Assert.True(
+                Tracks.All[i].RunSeconds > Tracks.All[i - 1].RunSeconds,
+                "a longer race must take longer on screen than a shorter one.");
         }
     }
 }

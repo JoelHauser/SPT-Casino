@@ -35,7 +35,7 @@ public class Startup(RaceLog log) : IOnLoad
             var favourite = Field.Runners.OrderByDescending(track.WeightOf).First();
 
             log.Banner(
-                $"  {track.Name} ({track.Distance}, {track.Laps} lap(s)) -- favourite {favourite.Name} at "
+                $"  {track.Name} ({track.Distance}) -- favourite {favourite.Name} at "
                 + $"{Odds.BoardPrice(track, BetKind.Win, favourite.Number):F2}, "
                 + $"slip max {track.MaxSlip:N0}");
         }

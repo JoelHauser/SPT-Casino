@@ -87,8 +87,7 @@ public class RaceService(
         Name = track.Name,
         Distance = track.Distance,
         Blurb = track.Blurb,
-        Shape = track.Shape.ToString(),
-        Laps = track.Laps,
+        Furlongs = track.Furlongs,
         RunSeconds = track.RunSeconds,
         MaxSlip = track.MaxSlip,
 
