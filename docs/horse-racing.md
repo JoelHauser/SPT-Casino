@@ -232,10 +232,11 @@ Specifically unverified:
 - Whether the board and the slip actually fit side by side without overlapping at the
   hardcoded offsets in `RacePanelChrome`.
 - Whether the race reads as a race.
-- The item-event sync. `RacePanel.SyncAction` is the string `"RacesSync"` and
-  `RaceActions.Sync` is the same string; **nothing checks that they agree**, and a
-  mismatch is a sync that is silently never answered, so the stash would go stale with no
-  error anywhere.
+- Whether the item-event sync actually round-trips in a running game. The two strings
+  themselves **do** agree -- `RacePanel.SyncAction` and `RaceActions.Sync` were both
+  read out of the source on 2026-09-19 and are both `"RacesSync"` -- but **nothing
+  enforces that**, and a future edit to one is a sync that is silently never answered, so
+  the stash would go stale with no error anywhere.
 
 Per `docs/slots.md` and the client-debugging notes: if something looks wrong in-game,
 rule out a stale build from the BepInEx logs *first*, and ask what the player actually

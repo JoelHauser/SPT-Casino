@@ -202,13 +202,20 @@ fails with CS1566.
 **`.slnx` files are XML, so a `--` inside a comment is a parse error.** This has broken
 the build twice; both times the comment was written in this repo's own house style.
 
-**Three projects in the solution do not build, and did not before the gift either.**
+**Three projects in the solution used to fail to build, and on 2026-09-19 they did not.**
 `Blackjack.Client`, `Poker.Client` and `Roulette.Client` -- the retired standalone
-plugins kept as an editing surface and never shipped -- fail with nine CS0122 errors
-about `HideoutGameWorld`, `NarrateGameWorld` and `InputNodeAbstract.TranslateInput` being
-inaccessible, out of `TaskBarTab.cs` and `EscapePatch.cs`. `Casino.Client` compiles the
-panels it needs from those projects directly and is unaffected, so the plugin, the server
-and all 504 tests still build. Check a pristine checkout before blaming a change for
+plugins kept as an editing surface and never shipped -- were recorded here as failing
+with nine CS0122 errors about `HideoutGameWorld`, `NarrateGameWorld` and
+`InputNodeAbstract.TranslateInput` being inaccessible, out of `TaskBarTab.cs` and
+`EscapePatch.cs`. **Built one at a time against `H:\SPT4.1.X`, all three now compile
+clean**, and so does the whole solution. Those symbols are game types, so their
+accessibility is a property of the `Assembly-CSharp.dll` being built against rather than
+of this repo -- which is why the claim went stale without anything here changing, and why
+it is worth re-checking rather than believing either version of this paragraph.
+
+`Casino.Client` compiles the panels it needs from those projects directly and is
+unaffected either way, so the plugin, the server and all 562 tests build regardless.
+Check a pristine checkout before blaming a change for
 those nine.
 
 ## Where the SPT install is depends on the box, so always pass `-p:SPTPath`
