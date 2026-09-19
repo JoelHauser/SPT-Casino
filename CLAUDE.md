@@ -18,7 +18,7 @@ all three; everything specific lives next door and is much longer:
 | Poker | `docs/poker.md` | Plays for roubles. Shipped at 1.0.0 |
 | Roulette | `docs/roulette.md` | Plays for roubles as of 2026-09-05. Never released |
 | Slots | `docs/slots.md` | Roubles, dollars or euros. Played, never released |
-| Horse Racing | `docs/horse-racing.md` | Three courses. Roubles, dollars or euros. **Never played** |
+| Horse Racing | `docs/horse-racing.md` | Three courses. Roubles, dollars or euros. Played; shipped in 1.3.0 |
 
 `docs/blackjack-readme.md` is Blackjack's public README, kept because it was the
 repo's front page before the merge.

@@ -10,7 +10,11 @@ internal static class TableInfo
 {
     internal const string Name = "Horse Racing";
 
-    internal const string Version = "0.1.0";
+    /// <summary>
+    /// The table's own version, which is not the casino's. It shipped at 1.0.0 in
+    /// casino 1.3.0 -- see the root CLAUDE.md, "One folder, seven assemblies".
+    /// </summary>
+    internal const string Version = "1.0.0";
 
     /// <summary>The SPT range the casino targets. See Casino.Server.ModMetadata.</summary>
     internal const string SptVersion = "~4.1.3";

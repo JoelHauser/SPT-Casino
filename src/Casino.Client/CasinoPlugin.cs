@@ -1,4 +1,4 @@
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
@@ -28,7 +28,7 @@ namespace Casino.Client
     {
         public const string PluginGuid = "com.mybutthasarash.sptcasino";
         public const string PluginName = "SPT Casino";
-        public const string PluginVersion = "1.2.61";
+        public const string PluginVersion = "1.3.0";
 
         internal static ManualLogSource Log;
 

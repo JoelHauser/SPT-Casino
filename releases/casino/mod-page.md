@@ -8,7 +8,7 @@ There is no unlock, no hideout requirement and no quest. Install it, and a **CAS
 
 The bar is on every screen outside a raid, so the tables open from the hideout, the flea market or a trader screen without backing out of them first.
 
-**This is a place, not a feature.** The lobby is built to grow: each table is a tile, and new games get added as tiles rather than as new mods with new tabs. Blackjack, hold'em, a single-zero wheel and a slot machine are open so far, and more will arrive in this mod rather than beside it.
+**This is a place, not a feature.** The lobby is built to grow: each table is a tile, and new games get added as tiles rather than as new mods with new tabs. Blackjack, hold'em, a single-zero wheel, a slot machine and a racecourse are open so far, and more will arrive in this mod rather than beside it.
 
 ![SPT Casino](https://i.imgur.com/HPJ7e19.png)
 
@@ -100,6 +100,40 @@ Stake roubles, dollars or euros.
 
 The machine pays up to a thousand times the stake by default. **F12 → Slots → No maximum stake** lifts that ceiling entirely, the same way Blackjack's table maximum works — the cap is the house being careful on your behalf, and you can tell it not to be.
 
+### Horse Racing
+
+Eight runners, **three distances**, and the same horses at all of them -- which is the whole point of it. Every horse has a speed and a stamina, and a five-furlong dash weights one while a two-mile marathon weights the other. So the card turns over as the trip gets longer.
+
+LABS LIGHTNING wins about one race in six over five furlongs. Over two miles it wins one in forty. SCAV LUCK is the exact reverse. DOLLAR SIGN is the class horse and is never worse than third choice anywhere.
+
+| Course | | Favourite |
+|---|---|---|
+| **THE DASH** | 5 furlongs | GRAY GHOST |
+| **THE MILE** | 8 furlongs | DOLLAR SIGN |
+| **THE MARATHON** | 2 miles | NIGHT RAIDER |
+
+Five ways to back one:
+
+- **WIN** -- first past the post
+- **PLACE** -- first or second
+- **SHOW** -- first, second or third
+- **EXACTA** -- the first two, in order
+- **QUINELLA** -- the first two, either way round
+
+A slip takes up to 108 bets at once and they are all settled independently, so backing a horse to win *and* to place pays both when it comes in.
+
+**6.00% to the house on every bet at every course** -- computed from the card, not measured by running it. Every price on the board is exact, and the odds are the same whether you back the favourite or the outsider: the price already contains everything the form tells you. What the form buys you is a choice about variance, not an edge.
+
+Stake roubles, dollars or euros.
+
+| Currency | Minimum per bet | Maximum per slip |
+|---|---|---|
+| Roubles | 10,000 | 1,500,000 (dash) / 2,000,000 |
+| Dollars | 100 | 20,000 |
+| Euros | 100 | 20,000 |
+
+The dash has a lower ceiling than the other two, and that is arithmetic rather than caution: it has the widest spread of any card, so it has the longest price -- over 1,250 to one on the right exacta -- and a bigger slip than that could not be paid out correctly.
+
 ## Installing
 
 Extract into your SPT folder — the one that holds `SPT_Runtime` — and start the server. It installs as one folder on each side: `BepInEx/plugins/Casino` and `SPT_Runtime/user/mods/Casino`.
@@ -120,7 +154,7 @@ Escape leaves a table and brings you back to the lobby. Escape again closes the 
 
 ## What is coming
 
-More tables. Slots just proved the lobby means it: a tile and a panel, not another mod and another tab. If there is a game you want at it, say so.
+More tables. The lobby now runs to two rows and wraps every four tiles, which is the arrangement from here on. If there is a game you want at it, say so.
 
 ## Requirements
 

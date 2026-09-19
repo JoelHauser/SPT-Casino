@@ -73,12 +73,11 @@ there:
 
 ## Known issues
 
-**Horse Racing is new and has not been played in-game yet.** The money side is covered
-by tests the same way every other table is -- stakes, payouts and the house edge are all
-checked, and the race you watch is guaranteed to finish in the order you are paid for.
-What has not been settled is how it looks. Anything that reads wrong is worth
-reporting -- the first build had a board you could not click and the second had ovals
-that looked like running tracks, and both were found that way.
+**Horse Racing is new.** It has been played and the money side is covered by tests the
+same way every other table is -- stakes, payouts and the house edge are all checked, and
+the race you watch is guaranteed to finish in the order you are paid for. It has had far
+less time in front of people than the other four, so anything that reads wrong is worth
+reporting.
 
 **Sound is wired in but silent for now.** Every action -- dealing, chips landing, the
 wheel and reels spinning, the win banner -- already fires its own cue; no audio files
