@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>HorseRacing.Server</RootNamespace>
+    <AssemblyName>HorseRacing.Server</AssemblyName>
+
+    <Version>1.0.0</Version>
+
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SPTarkov.Server.Core" Version="4.1.2">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\HorseRacing.Game\HorseRacing.Game.csproj" />
+    <ProjectReference Include="..\Casino.Server\Casino.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="horseracing.config.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

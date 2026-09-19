@@ -39,6 +39,8 @@
     -->
     <Project Path="src/HorseRacing.Game/HorseRacing.Game.csproj" />
     <Project Path="tests/HorseRacing.Game.Tests/HorseRacing.Game.Tests.csproj" />
+    <Project Path="src/HorseRacing.Server/HorseRacing.Server.csproj" />
+    <Project Path="tests/HorseRacing.Server.Tests/HorseRacing.Server.Tests.csproj" />
   </Folder>
   <Folder Name="/Blackjack/">
     <Project Path="src/Blackjack.Game/Blackjack.Game.csproj" />
