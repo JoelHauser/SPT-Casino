@@ -1,11 +1,11 @@
 # SPT-Casino -- working notes for Claude
 
-**SPT Casino** is one mod: a single task-bar tab that opens a lobby, and four tables
-behind it -- **Blackjack**, **Poker**, **Roulette** and **Slots**. It was three
-separate mods until 2026-09-05, and the seams are still visible on purpose.
+**SPT Casino** is one mod: a single task-bar tab that opens a lobby, and five tables
+behind it -- **Blackjack**, **Poker**, **Roulette**, **Slots** and **Horse Racing**. It
+was three separate mods until 2026-09-05, and the seams are still visible on purpose.
 
 **One folder each side.** `BepInEx/plugins/Casino` and `SPT_Runtime/user/mods/Casino`.
-The server folder holds nine assemblies -- a metadata one plus a `.Server` and a
+The server folder holds eleven assemblies -- a metadata one plus a `.Server` and a
 `.Game` per table -- and SPT is perfectly happy with that. See "One folder, seven
 assemblies", which was written when there were seven and is true of any number.
 
@@ -18,6 +18,7 @@ all three; everything specific lives next door and is much longer:
 | Poker | `docs/poker.md` | Plays for roubles. Shipped at 1.0.0 |
 | Roulette | `docs/roulette.md` | Plays for roubles as of 2026-09-05. Never released |
 | Slots | `docs/slots.md` | Roubles, dollars or euros. Played, never released |
+| Horse Racing | `docs/horse-racing.md` | Roubles, dollars or euros. **Never played** |
 
 `docs/blackjack-readme.md` is Blackjack's public README, kept because it was the
 repo's front page before the merge.
@@ -41,7 +42,7 @@ scripts/<table>/          the per-table server pack and smoke scripts
 docs/<table>.md           that table's working notes
 ```
 
-**`Casino.Client` compiles the three tables in rather than owning them.** The panels
+**`Casino.Client` compiles the tables in rather than owning them.** The panels
 are listed as `<Compile Include="..\Roulette.Client\...">` in its project file and are
 edited where they live. Not a line of them changed at the merge, which was possible
 only because no panel ever referenced the task bar, the menu icon or the escape key.
@@ -55,10 +56,17 @@ patches on one method is the likeliest way an upgrade goes wrong.
 
 ### Adding a table
 
-Write the panel, implement `ICasinoGame` in `Games.cs` (three properties, three
-methods: Name, Pip, Blurb, IsOpen, Open, Close), and add a line to `Games.All`. No
-second tab, no second GUID, no second plugin. The lobby and the escape key pick it up
-without being told.
+Write the panel, implement `ICasinoGame` in `Games.cs` (Name, Icon, Pip, Blurb,
+IsOpen, Open, Close), and add a line to `Games.All`. No second tab, no second GUID, no
+second plugin. The lobby and the escape key pick it up without being told.
+
+Horse Racing was the first table added this way rather than merged in, on 2026-09-19,
+and the full list of what it touched is: its own three projects, four `<Compile Include>`
+lines in `Casino.Client.csproj`, one entry in `Games.All`, a shim in `Shims.cs`, two
+`Config.Bind` calls in `CasinoPlugin`, and two entries in `pack.ps1` (`$tables` and
+`$configs` -- **both**, and forgetting the second is a build that packs and then throws).
+It needed no `.Client.csproj` of its own: the other four have one only because they used
+to be standalone plugins.
 
 ### The layers, which matter more than they look
 
@@ -160,16 +168,21 @@ has no cue. All are listed in the manifest too.
 
 ## `dotnet` on this box
 
-**Corrected 2026-09-09.** This section used to say that the `dotnet` first on PATH
-carried only the 8.0.423 SDK, so every .NET 10 project here died on NETSDK1045, and that
-the real SDK was user-local under a `C:\Users\Hoel\.dotnet`. Neither is true on this
-machine now: `dotnet --list-sdks` from the one on PATH reports **10.0.202**, there is no
-`C:\Users\Hoel` on the box at all, and the whole solution builds and tests off it with
-nothing prepended.
+**This section describes more than one machine, and has been wrong on each of them in
+turn. Run `dotnet --list-sdks` before believing any of it.**
+
+Checked again 2026-09-19 on the box where `H:\SPT4.1.X` lives: the `dotnet` first on
+PATH is `C:\Program Files\dotnet` and carries **8.0.423 and 10.0.401**, so the .NET 10
+projects build with nothing prepended. There *is* a `C:\Users\Hoel\.dotnet` here
+(10.0.400), contrary to what this section said on 2026-09-09, but it is not needed.
+
+The 2026-09-09 note said the PATH SDK was 10.0.202 and that no `C:\Users\Hoel` existed.
+That was a different machine. Both readings were correct where they were taken, which is
+exactly why this section keeps going stale.
 
 ```
 dotnet build SPT-Casino.slnx -p:SPTPath=C:\HUH
-dotnet test  SPT-Casino.slnx -p:SPTPath=C:\HUH   # 504 tests
+dotnet test  SPT-Casino.slnx -p:SPTPath=C:\HUH   # 562 tests
 scripts/casino/pack.ps1 -SPTPath C:\HUH
 ```
 
@@ -198,24 +211,26 @@ panels it needs from those projects directly and is unaffected, so the plugin, t
 and all 504 tests still build. Check a pristine checkout before blaming a change for
 those nine.
 
-## The SPT install on this box is not `H:\SPT4.1.X`
+## Where the SPT install is depends on the box, so always pass `-p:SPTPath`
 
 Every `.csproj`'s default `SPTPath` is `H:\SPT4.1.X`, and Blackjack's alone falls back
-to `C:\HUH` if that path doesn't exist. On this machine that fallback is not a
-coincidence to skip past: there is no `H:` drive at all, only `C:` and a `K:` that is a
-disconnected work share (`\\bls-adfs\Common`, unrelated to any of this), and the real
-install lives at `C:\HUH`. Pass it explicitly for anything that touches a `.Client`
-project or `pack.ps1`:
+to `C:\HUH` if that path doesn't exist.
+
+**Checked 2026-09-19 on the box where this branch is developed: `H:\SPT4.1.X` (4.1.x)
+and `H:\SPT2026` (4.0.13) both exist, and `C:\HUH` does not.** An earlier version of
+this section said the opposite -- no `H:` drive at all and the real install at `C:\HUH`
+-- which was true of a different machine and is the reason `C:\HUH` still appears
+throughout this file. Treat every `C:\HUH` here as "whatever `--list-sdks`-style check
+says is true of your box".
 
 ```
-dotnet build src/Casino.Client/Casino.Client.csproj -c Release -p:SPTPath=C:\HUH
-scripts/casino/pack.ps1 -SPTPath C:\HUH
+dotnet build src/Casino.Client/Casino.Client.csproj -c Release -p:SPTPath=H:\SPT4.1.X
+scripts/casino/pack.ps1 -SPTPath H:\SPT4.1.X
 ```
 
-`Casino.Client.csproj` itself doesn't carry the `C:\HUH` fallback the way Blackjack's
-does, so the plain `dotnet build SPT-Casino.slnx` this file and the README both show
-elsewhere will fail to find the install on this box specifically unless `-p:SPTPath`
-is added.
+Pass it explicitly for anything that touches a `.Client` project or `pack.ps1`, whichever
+box you are on: `Casino.Client.csproj` carries no fallback at all, so it fails to find the
+install rather than guessing.
 
 ## When the obfuscator empties a name instead of just moving it
 

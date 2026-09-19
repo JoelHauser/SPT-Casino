@@ -1,7 +1,7 @@
 # SPT Casino
 
 A casino for [SPT](https://sp-tarkov.com) 4.1.x. One tab on the menu bar opens a
-lobby; the lobby has four tables.
+lobby; the lobby has five tables.
 
 | | |
 | --- | --- |
@@ -9,6 +9,7 @@ lobby; the lobby has four tables.
 | **Poker** | No-limit hold'em against bots, seated under names drawn from the game's own PMC nickname list. |
 | **Roulette** | A single-zero European wheel that actually spins, and a full betting cloth to play it from. |
 | **Slots** | Five reels and 243 ways, spinning the item icons out of your own install. AUTO and SPEED keep it moving without a click every time. Takes roubles, dollars or euros. |
+| **Horse Racing** | Eight runners over a side-on track. Back one to win, to place or to show, or pick the first two in order for an exacta. Every price on the board is exact, and the house takes 6% of each. Takes roubles, dollars or euros. |
 
 **It plays for real money out of your stash -- never your gear.** A stake leaves the
 moment you commit it and winnings are paid straight back in, and it only ever comes
@@ -35,7 +36,7 @@ a bug: the server declares `~4.1.3` and loads nothing outside it.
 
 Each table can be made talkative on its own, with `VerboseLogging` in its config file
 beside the mod -- `blackjack.config.json`, `poker.config.json`, `roulette.config.json`,
-`slots.config.json`.
+`slots.config.json`, `horseracing.config.json`.
 
 ## Playing
 
@@ -68,8 +69,15 @@ there:
 | Poker | **Buy-in** | What sitting down costs. Five seats, always. |
 | Blackjack | **Enforce the table maximum** | Refuse a wager over the limit instead of trimming it. |
 | Slots | **No maximum stake** | Bet as much as you like. The minimum still applies. |
+| Horse Racing | **No maximum slip total** | Lifts the cap on what a whole slip may cost. It does not lift far: the limit here is arithmetic rather than caution, since the longest price pays over 750 for one. |
 
 ## Known issues
+
+**Horse Racing is new and has not been played yet.** The money side is covered by tests
+the same way every other table is -- stakes, payouts and the house edge are all checked,
+and the race you watch is guaranteed to finish in the order you are paid for. What has
+not been looked at on a real screen is the layout: if the board and the slip overlap at
+your resolution, that is why, and it is worth reporting.
 
 **Sound is wired in but silent for now.** Every action -- dealing, chips landing, the
 wheel and reels spinning, the win banner -- already fires its own cue; no audio files
