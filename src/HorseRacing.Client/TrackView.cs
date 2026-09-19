@@ -46,9 +46,9 @@ namespace HorseRacing.Client
         /// </summary>
         private const float PlaceGap = 0.018f;
 
-        private const float LaneHeight = 46f;
+        private const float LaneHeight = 34f;
 
-        private const float HorseSize = 34f;
+        private const float HorseSize = 26f;
 
         private static readonly Color Rail = new Color(0.16f, 0.17f, 0.15f, 1f);
         private static readonly Color Turf = new Color(0.10f, 0.14f, 0.10f, 1f);
@@ -58,7 +58,7 @@ namespace HorseRacing.Client
         /// <summary>
         /// The silks, one per saddlecloth number.
         ///
-        /// Eight colours that stay apart from each other at 34 pixels and on a dark
+        /// Eight colours that stay apart from each other at 26 pixels and on a dark
         /// green background. Not generated from a hue wheel: an even spread puts two
         /// of them in the greens, which is precisely where the turf is.
         /// </summary>
@@ -150,7 +150,7 @@ namespace HorseRacing.Client
 
             var text = label.gameObject.AddComponent<TextMeshProUGUI>();
             text.font = font;
-            text.fontSize = 15f;
+            text.fontSize = 13f;
             text.color = new Color(Ink.r, Ink.g, Ink.b, 0.55f);
             text.alignment = TextAlignmentOptions.Left;
             text.text = $"{number}  {name}";
@@ -166,7 +166,7 @@ namespace HorseRacing.Client
 
             var placeText = place.gameObject.AddComponent<TextMeshProUGUI>();
             placeText.font = font;
-            placeText.fontSize = 17f;
+            placeText.fontSize = 15f;
             placeText.fontStyle = FontStyles.Bold;
             placeText.color = Ink;
             placeText.alignment = TextAlignmentOptions.Right;
@@ -189,7 +189,7 @@ namespace HorseRacing.Client
 
             var clothText = cloth.gameObject.AddComponent<TextMeshProUGUI>();
             clothText.font = font;
-            clothText.fontSize = 20f;
+            clothText.fontSize = 15f;
             clothText.fontStyle = FontStyles.Bold;
 
             // Dark text on the pale silks, pale on the dark ones. Worked out from the
@@ -372,12 +372,25 @@ namespace HorseRacing.Client
                 yield return null;
             }
 
-            // Everybody home, exactly on the line, whatever the frame timing did.
-            foreach (var runner in _runners)
+            // Everybody home, whatever the frame timing did -- but strung out in
+            // finishing order rather than stacked on the line.
+            //
+            // Snapping them all to the same x was the first version, and it drew eight
+            // discs in a vertical column on the post: correct, and it threw away the
+            // one thing the picture is for. The winner now sits on the line and each
+            // place behind it is set back a little, so the frozen frame says who won
+            // without the player reading the 1st/2nd/3rd column beside it.
+            //
+            // Presentation only. The order here is taken from the same array the
+            // settlement used, so it cannot disagree with what was paid.
+            for (var place = 0; place < order.Count; place++)
             {
-                if (runner != null)
+                var index = order[place] - 1;
+
+                if (index >= 0 && index < _runners.Count && _runners[index] != null)
                 {
-                    runner.anchoredPosition = new Vector2(Start + travel, runner.anchoredPosition.y);
+                    _runners[index].anchoredPosition = new Vector2(
+                        Start + travel - (place * 9f), _runners[index].anchoredPosition.y);
                 }
             }
 

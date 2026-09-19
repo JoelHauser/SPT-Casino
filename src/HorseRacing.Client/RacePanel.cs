@@ -59,6 +59,7 @@ namespace HorseRacing.Client
 
         private static RectTransform _trackHolder;
         private static RectTransform _boardHolder;
+        private static RectTransform _pairsHolder;
         private static RectTransform _slipHolder;
         private static TextMeshProUGUI _balance;
         private static TextMeshProUGUI _status;

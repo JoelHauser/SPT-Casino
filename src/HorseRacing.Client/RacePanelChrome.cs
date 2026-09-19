@@ -18,12 +18,50 @@ namespace HorseRacing.Client
     /// answers "what happens to the money", the other "where does the button go", and a
     /// single fifteen-hundred-line file makes the first question expensive to answer.
     /// Same class, two files -- nothing here is reachable from outside the panel.
+    ///
+    /// ## Everything is placed from the band table, and nothing from its neighbour
+    ///
+    /// The first version of this file positioned the pair-bet row relative to *where
+    /// the runner loop happened to finish*, and the status and result lines relative to
+    /// the bottom of the frame. Two coordinate systems growing towards each other: with
+    /// eight runners they overlapped by 18 pixels and the word NOTHING was drawn
+    /// through the EXACTA/QUINELLA selector.
+    ///
+    /// So every element now takes its vertical position from a named constant below,
+    /// measured down from the top of the frame, and never from the element before it.
+    /// Adding a ninth runner moves nothing except the rows themselves -- it makes the
+    /// board overflow its own band, which is visible and local, rather than silently
+    /// shunting a control into a label three bands away.
     /// </summary>
     internal static partial class RacePanel
     {
         private const float FrameWidth = 1520f;
         private const float FrameHeight = 900f;
-        private const float TrackHeight = 384f;
+
+        // --- the band table. Distance down from the top edge of the frame. ---------
+        private const float TrackTop = 86f;
+        private const float TrackHeight = 288f;
+
+        private const float ColumnHeaderTop = 392f;
+        private const float RowsTop = 418f;
+        private const float RowHeight = 27f;
+
+        private const float PairsTop = 644f;
+        private const float ResultTop = 722f;
+        private const float StatusTop = 760f;
+        private const float ControlsTop = 796f;
+
+        // --- horizontal: the board on the left, the slip on the right --------------
+        private const float Margin = 26f;
+        private const float BoardWidth = 890f;
+        private const float SlipWidth = 540f;
+
+        // Columns inside the board, as offsets from its left edge.
+        private const float ColName = 4f;
+        private const float ColChance = 306f;
+        private const float ColFirstPrice = 400f;
+        private const float PriceWidth = 142f;
+        private const float PriceGap = 8f;
 
         /// <summary>
         /// Builds the panel. Called once; every later open is a SetActive and a fade.
@@ -46,7 +84,18 @@ namespace HorseRacing.Client
             canvas.sortingOrder = 30000;
 
             _root.AddComponent<GraphicRaycaster>();
-            _root.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+
+            // Matched to Roulette's and Slots' scaler rather than left at
+            // ConstantPixelSize, which is what this was first written with. Constant
+            // pixels means a 1520x900 panel stays 1520x900 actual pixels, so on a 1440p
+            // or 4K monitor it shrinks into the middle of the screen while every other
+            // table scales up around it. Matching height against a 1080 reference makes
+            // the whole casino behave the same way on every display.
+            var scaler = _root.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 1f;
 
             var backdrop = New("Backdrop", _root.transform);
             Stretch(backdrop);
@@ -69,6 +118,7 @@ namespace HorseRacing.Client
             BuildTrack(frame);
             BuildBoard(frame);
             BuildSlip(frame);
+            BuildPairs(frame);
             BuildControls(frame);
 
             RenderBoard();
@@ -80,11 +130,7 @@ namespace HorseRacing.Client
         private static void BuildHeader(RectTransform frame)
         {
             var title = Text("Title", frame, "HORSE RACING", 30f, Gold, TextAlignmentOptions.Left);
-            title.rectTransform.anchorMin = new Vector2(0f, 1f);
-            title.rectTransform.anchorMax = new Vector2(0f, 1f);
-            title.rectTransform.pivot = new Vector2(0f, 1f);
-            title.rectTransform.anchoredPosition = new Vector2(26f, -18f);
-            title.rectTransform.sizeDelta = new Vector2(420f, 40f);
+            TopLeft(title.rectTransform, Margin, 18f, 420f, 40f);
             title.fontStyle = FontStyles.Bold;
 
             // The takeout, stated on the table. It comes from the server with the rest
@@ -100,24 +146,13 @@ namespace HorseRacing.Client
                 15f,
                 new Color(Ink.r, Ink.g, Ink.b, 0.55f),
                 TextAlignmentOptions.Left);
-            blurb.rectTransform.anchorMin = new Vector2(0f, 1f);
-            blurb.rectTransform.anchorMax = new Vector2(0f, 1f);
-            blurb.rectTransform.pivot = new Vector2(0f, 1f);
-            blurb.rectTransform.anchoredPosition = new Vector2(28f, -54f);
-            blurb.rectTransform.sizeDelta = new Vector2(760f, 22f);
+            TopLeft(blurb.rectTransform, Margin + 2f, 60f, 760f, 22f);
 
             var close = MakeButton("Close", frame, "CLOSE", 110f, 36f, Close);
-            close.anchorMin = new Vector2(1f, 1f);
-            close.anchorMax = new Vector2(1f, 1f);
-            close.pivot = new Vector2(1f, 1f);
-            close.anchoredPosition = new Vector2(-26f, -18f);
+            TopRight(close, Margin, 18f);
 
             _balance = Text("Balance", frame, string.Empty, 20f, Ink, TextAlignmentOptions.Right);
-            _balance.rectTransform.anchorMin = new Vector2(1f, 1f);
-            _balance.rectTransform.anchorMax = new Vector2(1f, 1f);
-            _balance.rectTransform.pivot = new Vector2(1f, 1f);
-            _balance.rectTransform.anchoredPosition = new Vector2(-148f, -20f);
-            _balance.rectTransform.sizeDelta = new Vector2(280f, 32f);
+            TopRight(_balance.rectTransform, Margin + 126f, 22f, 300f, 32f);
         }
 
         private static void BuildTrack(RectTransform frame)
@@ -126,8 +161,8 @@ namespace HorseRacing.Client
             _trackHolder.anchorMin = new Vector2(0f, 1f);
             _trackHolder.anchorMax = new Vector2(1f, 1f);
             _trackHolder.pivot = new Vector2(0.5f, 1f);
-            _trackHolder.anchoredPosition = new Vector2(0f, -84f);
-            _trackHolder.sizeDelta = new Vector2(-52f, TrackHeight);
+            _trackHolder.anchoredPosition = new Vector2(0f, -TrackTop);
+            _trackHolder.sizeDelta = new Vector2(-(Margin * 2f), TrackHeight);
 
             var runners = new List<KeyValuePair<int, string>>();
 
@@ -146,49 +181,46 @@ namespace HorseRacing.Client
 
         private static void BuildBoard(RectTransform frame)
         {
-            var header = Text(
-                "BoardHeader",
-                frame,
-                "RUNNER                                   WIN        PLACE       SHOW",
-                14f,
-                new Color(Ink.r, Ink.g, Ink.b, 0.45f),
-                TextAlignmentOptions.Left);
-            header.rectTransform.anchorMin = new Vector2(0f, 1f);
-            header.rectTransform.anchorMax = new Vector2(0f, 1f);
-            header.rectTransform.pivot = new Vector2(0f, 1f);
-            header.rectTransform.anchoredPosition = new Vector2(30f, -(84f + TrackHeight) - 6f);
-            header.rectTransform.sizeDelta = new Vector2(880f, 20f);
+            var faint = new Color(Ink.r, Ink.g, Ink.b, 0.42f);
+
+            var runner = Text("HeaderRunner", frame, "RUNNER", 13f, faint, TextAlignmentOptions.Left);
+            TopLeft(runner.rectTransform, Margin + ColName, ColumnHeaderTop, 300f, 20f);
+
+            var form = Text("HeaderForm", frame, "FORM", 13f, faint, TextAlignmentOptions.Left);
+            TopLeft(form.rectTransform, Margin + ColChance, ColumnHeaderTop, 80f, 20f);
+
+            // Positioned over the columns they label rather than spaced out inside one
+            // string. The single-string version lined up in a monospace preview and
+            // then sat a hundred pixels left of its own buttons in the game's
+            // proportional font, which is what it looked like in the first screenshot.
+            var kinds = new[] { "WIN", "PLACE", "SHOW" };
+
+            for (var i = 0; i < kinds.Length; i++)
+            {
+                var label = Text("Header" + kinds[i], frame, kinds[i], 13f, faint, TextAlignmentOptions.Center);
+                TopLeft(
+                    label.rectTransform,
+                    Margin + ColFirstPrice + (i * (PriceWidth + PriceGap)),
+                    ColumnHeaderTop,
+                    PriceWidth,
+                    20f);
+            }
 
             _boardHolder = New("Board", frame);
-            _boardHolder.anchorMin = new Vector2(0f, 1f);
-            _boardHolder.anchorMax = new Vector2(0f, 1f);
-            _boardHolder.pivot = new Vector2(0f, 1f);
-            _boardHolder.anchoredPosition = new Vector2(26f, -(84f + TrackHeight) - 28f);
-            _boardHolder.sizeDelta = new Vector2(890f, 300f);
+            TopLeft(_boardHolder, Margin, RowsTop, BoardWidth, RowHeight * 8f);
         }
 
         private static void BuildSlip(RectTransform frame)
         {
-            var header = Text("SlipHeader", frame, "YOUR SLIP", 16f, Gold, TextAlignmentOptions.Left);
-            header.rectTransform.anchorMin = new Vector2(1f, 1f);
-            header.rectTransform.anchorMax = new Vector2(1f, 1f);
-            header.rectTransform.pivot = new Vector2(1f, 1f);
-            header.rectTransform.anchoredPosition = new Vector2(-330f, -(84f + TrackHeight) - 6f);
-            header.rectTransform.sizeDelta = new Vector2(240f, 22f);
+            var header = Text("SlipHeader", frame, "YOUR SLIP", 15f, Gold, TextAlignmentOptions.Left);
+            TopRight(header.rectTransform, Margin + SlipWidth - 200f, ColumnHeaderTop, 200f, 20f);
             header.fontStyle = FontStyles.Bold;
 
-            var clear = MakeButton("ClearSlip", frame, "CLEAR", 90f, 26f, ClearSlip);
-            clear.anchorMin = new Vector2(1f, 1f);
-            clear.anchorMax = new Vector2(1f, 1f);
-            clear.pivot = new Vector2(1f, 1f);
-            clear.anchoredPosition = new Vector2(-26f, -(84f + TrackHeight) - 4f);
+            var clear = MakeButton("ClearSlip", frame, "CLEAR", 90f, 24f, ClearSlip);
+            TopRight(clear, Margin, ColumnHeaderTop - 3f);
 
             var back = New("SlipBack", frame);
-            back.anchorMin = new Vector2(1f, 1f);
-            back.anchorMax = new Vector2(1f, 1f);
-            back.pivot = new Vector2(1f, 1f);
-            back.anchoredPosition = new Vector2(-26f, -(84f + TrackHeight) - 32f);
-            back.sizeDelta = new Vector2(560f, 250f);
+            TopRight(back, Margin, RowsTop, SlipWidth, PairsTop - RowsTop - 14f);
 
             var backImage = back.gameObject.AddComponent<Image>();
             backImage.sprite = Textures.RoundedBox(10, Slate, new Color(0f, 0f, 0f, 0.5f), 1);
@@ -198,70 +230,65 @@ namespace HorseRacing.Client
             _slipHolder.anchorMin = new Vector2(0f, 1f);
             _slipHolder.anchorMax = new Vector2(1f, 1f);
             _slipHolder.pivot = new Vector2(0.5f, 1f);
-            _slipHolder.anchoredPosition = new Vector2(0f, -8f);
-            _slipHolder.sizeDelta = new Vector2(-16f, 234f);
+            _slipHolder.anchoredPosition = new Vector2(0f, -10f);
+            _slipHolder.sizeDelta = new Vector2(-18f, PairsTop - RowsTop - 40f);
 
-            _slipTotal = Text("SlipTotal", frame, string.Empty, 17f, Ink, TextAlignmentOptions.Right);
-            _slipTotal.rectTransform.anchorMin = new Vector2(1f, 1f);
-            _slipTotal.rectTransform.anchorMax = new Vector2(1f, 1f);
-            _slipTotal.rectTransform.pivot = new Vector2(1f, 1f);
-            _slipTotal.rectTransform.anchoredPosition = new Vector2(-30f, -(84f + TrackHeight) - 288f);
-            _slipTotal.rectTransform.sizeDelta = new Vector2(540f, 24f);
+            _slipTotal = Text("SlipTotal", frame, string.Empty, 16f, Ink, TextAlignmentOptions.Right);
+            TopRight(_slipTotal.rectTransform, Margin + 4f, PairsTop - 8f, SlipWidth, 24f);
+        }
+
+        /// <summary>
+        /// The pair-bet selector, in a band of its own.
+        ///
+        /// 56 exactas and 28 quinellas do not fit on a board beside the singles, and a
+        /// grid of 84 two-digit buttons is not something anybody reads -- so the pair is
+        /// chosen with two steppers and the price for the current pair is shown live on
+        /// the two buttons beside them. The whole board still travels from the server;
+        /// this only picks which spot on it is being looked at.
+        ///
+        /// Built once here, into a holder at a fixed band. <see cref="RenderPairs"/>
+        /// refills that holder as the steppers move, so the selector can redraw without
+        /// the rest of the board moving underneath it.
+        /// </summary>
+        private static void BuildPairs(RectTransform frame)
+        {
+            var header = Text(
+                "PairHeader", frame, "EXACTA  /  QUINELLA", 13f,
+                new Color(Ink.r, Ink.g, Ink.b, 0.42f), TextAlignmentOptions.Left);
+            TopLeft(header.rectTransform, Margin + ColName, PairsTop, 300f, 20f);
+
+            _pairsHolder = New("Pairs", frame);
+            TopLeft(_pairsHolder, Margin, PairsTop + 24f, BoardWidth, 34f);
         }
 
         private static void BuildControls(RectTransform frame)
         {
-            const float row = 52f;
-
-            _status = Text("Status", frame, string.Empty, 16f, Ink, TextAlignmentOptions.Left);
-            _status.rectTransform.anchorMin = new Vector2(0f, 0f);
-            _status.rectTransform.anchorMax = new Vector2(0f, 0f);
-            _status.rectTransform.pivot = new Vector2(0f, 0f);
-            _status.rectTransform.anchoredPosition = new Vector2(30f, row + 30f);
-            _status.rectTransform.sizeDelta = new Vector2(880f, 24f);
-
             _result = Text("Result", frame, string.Empty, 24f, Ink, TextAlignmentOptions.Left);
-            _result.rectTransform.anchorMin = new Vector2(0f, 0f);
-            _result.rectTransform.anchorMax = new Vector2(0f, 0f);
-            _result.rectTransform.pivot = new Vector2(0f, 0f);
-            _result.rectTransform.anchoredPosition = new Vector2(30f, row + 58f);
-            _result.rectTransform.sizeDelta = new Vector2(880f, 32f);
+            TopLeft(_result.rectTransform, Margin + 4f, ResultTop, 900f, 32f);
             _result.fontStyle = FontStyles.Bold;
 
-            var stakeLabel = Text("StakeLabel", frame, "STAKE PER BET", 13f,
+            _status = Text("Status", frame, string.Empty, 16f, Ink, TextAlignmentOptions.Left);
+            TopLeft(_status.rectTransform, Margin + 4f, StatusTop, 900f, 24f);
+
+            var stakeLabel = Text(
+                "StakeLabel", frame, "STAKE PER BET", 13f,
                 new Color(Ink.r, Ink.g, Ink.b, 0.5f), TextAlignmentOptions.Left);
-            stakeLabel.rectTransform.anchorMin = new Vector2(0f, 0f);
-            stakeLabel.rectTransform.anchorMax = new Vector2(0f, 0f);
-            stakeLabel.rectTransform.pivot = new Vector2(0f, 0f);
-            stakeLabel.rectTransform.anchoredPosition = new Vector2(30f, row + 4f);
-            stakeLabel.rectTransform.sizeDelta = new Vector2(150f, 18f);
+            TopLeft(stakeLabel.rectTransform, Margin + 4f, ControlsTop + 12f, 150f, 18f);
 
             var down = MakeButton("StakeDown", frame, "-", 38f, 34f, () => StepStakeBy(-1));
-            down.anchorMin = new Vector2(0f, 0f);
-            down.anchorMax = new Vector2(0f, 0f);
-            down.pivot = new Vector2(0f, 0f);
-            down.anchoredPosition = new Vector2(180f, row - 8f);
+            TopLeft(down, Margin + 154f, ControlsTop);
 
-            _stakeField = MakeStakeField(frame, new Vector2(224f, row - 8f));
+            _stakeField = MakeStakeField(frame, Margin + 198f, ControlsTop);
 
             var up = MakeButton("StakeUp", frame, "+", 38f, 34f, () => StepStakeBy(1));
-            up.anchorMin = new Vector2(0f, 0f);
-            up.anchorMax = new Vector2(0f, 0f);
-            up.pivot = new Vector2(0f, 0f);
-            up.anchoredPosition = new Vector2(388f, row - 8f);
+            TopLeft(up, Margin + 362f, ControlsTop);
 
             var wallet = MakeButton("Wallet", frame, string.Empty, 130f, 34f, NextWallet);
-            wallet.anchorMin = new Vector2(0f, 0f);
-            wallet.anchorMax = new Vector2(0f, 0f);
-            wallet.pivot = new Vector2(0f, 0f);
-            wallet.anchoredPosition = new Vector2(440f, row - 8f);
+            TopLeft(wallet, Margin + 414f, ControlsTop);
             _walletLabel = wallet.GetComponentInChildren<TextMeshProUGUI>();
 
             var run = MakeButton("Run", frame, "RUN THE RACE", 240f, 46f, Go);
-            run.anchorMin = new Vector2(1f, 0f);
-            run.anchorMax = new Vector2(1f, 0f);
-            run.pivot = new Vector2(1f, 0f);
-            run.anchoredPosition = new Vector2(-26f, row - 14f);
+            TopRight(run, Margin, ControlsTop - 6f);
             _runButton = run.GetComponent<Button>();
 
             SetWalletLabel();
@@ -271,8 +298,7 @@ namespace HorseRacing.Client
         // ------------------------------------------------------------------ rendering
 
         /// <summary>
-        /// Draws the card: one row per runner, with its three single-runner prices as
-        /// buttons, and the pair bets underneath.
+        /// Draws the card: one row per runner, with its three single-runner prices.
         /// </summary>
         private static void RenderBoard()
         {
@@ -301,66 +327,37 @@ namespace HorseRacing.Client
 
                 var label = Text($"Runner{number}", _boardHolder,
                     $"{number}  {name}", 16f, Ink, TextAlignmentOptions.Left);
-                label.rectTransform.anchorMin = new Vector2(0f, 1f);
-                label.rectTransform.anchorMax = new Vector2(0f, 1f);
-                label.rectTransform.pivot = new Vector2(0f, 1f);
-                label.rectTransform.anchoredPosition = new Vector2(4f, y);
-                label.rectTransform.sizeDelta = new Vector2(300f, 26f);
+                TopLeft(label.rectTransform, ColName, y, 300f, RowHeight - 3f);
 
                 var form = Text($"Form{number}", _boardHolder,
                     $"{chance:P1}", 13f, new Color(Ink.r, Ink.g, Ink.b, 0.40f), TextAlignmentOptions.Left);
-                form.rectTransform.anchorMin = new Vector2(0f, 1f);
-                form.rectTransform.anchorMax = new Vector2(0f, 1f);
-                form.rectTransform.pivot = new Vector2(0f, 1f);
-                form.rectTransform.anchoredPosition = new Vector2(310f, y);
-                form.rectTransform.sizeDelta = new Vector2(80f, 26f);
+                TopLeft(form.rectTransform, ColChance, y, 80f, RowHeight - 3f);
 
-                var x = 420f;
-
-                foreach (var kind in new[] { "Win", "Place", "Show" })
+                for (var i = 0; i < 3; i++)
                 {
-                    var spot = MakeSpot(_boardHolder, kind, number, 0, new Vector2(x, y));
-                    x += 150f;
+                    var kind = i switch { 0 => "Win", 1 => "Place", _ => "Show" };
+                    MakeSpot(
+                        _boardHolder,
+                        kind,
+                        number,
+                        0,
+                        ColFirstPrice + (i * (PriceWidth + PriceGap)),
+                        y,
+                        PriceWidth);
                 }
 
-                y -= 30f;
+                y += RowHeight;
             }
 
-            RenderPairs(y - 10f);
+            RenderPairs();
         }
 
-        /// <summary>
-        /// The pair bets.
-        ///
-        /// 56 exactas and 28 quinellas do not fit on a board beside the singles, and a
-        /// grid of 84 two-digit buttons is not something anybody reads -- so the pair is
-        /// chosen with two steppers and the price for the current pair is shown live.
-        /// The whole board still travels from the server; this is only which spot on it
-        /// is being looked at.
-        /// </summary>
-        private static void RenderPairs(float y)
+        private static void RenderPairs()
         {
-            var header = Text("PairHeader", _boardHolder, "EXACTA  /  QUINELLA", 14f,
-                new Color(Ink.r, Ink.g, Ink.b, 0.45f), TextAlignmentOptions.Left);
-            header.rectTransform.anchorMin = new Vector2(0f, 1f);
-            header.rectTransform.anchorMax = new Vector2(0f, 1f);
-            header.rectTransform.pivot = new Vector2(0f, 1f);
-            header.rectTransform.anchoredPosition = new Vector2(4f, y);
-            header.rectTransform.sizeDelta = new Vector2(300f, 22f);
-
-            y -= 26f;
-
-            var first = MakeStepper(_boardHolder, "1st", _pairFirst, new Vector2(4f, y), value =>
+            if (_pairsHolder == null)
             {
-                _pairFirst = Wrap(value);
-                RenderBoard();
-            });
-
-            var second = MakeStepper(_boardHolder, "2nd", _pairSecond, new Vector2(220f, y), value =>
-            {
-                _pairSecond = Wrap(value);
-                RenderBoard();
-            });
+                return;
+            }
 
             // A runner cannot beat itself into second. Rather than refusing the click
             // and saying so, the second stepper simply steps past the first -- there is
@@ -370,13 +367,30 @@ namespace HorseRacing.Client
                 _pairSecond = Wrap(_pairFirst + 1);
             }
 
-            var exacta = MakeSpot(_boardHolder, "Exacta", _pairFirst, _pairSecond, new Vector2(440f, y));
-            var quinella = MakeSpot(
-                _boardHolder,
-                "Quinella",
-                Math.Min(_pairFirst, _pairSecond),
-                Math.Max(_pairFirst, _pairSecond),
-                new Vector2(620f, y));
+            foreach (Transform child in _pairsHolder)
+            {
+                UnityEngine.Object.Destroy(child.gameObject);
+            }
+
+            MakeStepper(_pairsHolder, "1st", _pairFirst, ColName, value =>
+            {
+                _pairFirst = Wrap(value);
+                RenderPairs();
+            });
+
+            MakeStepper(_pairsHolder, "2nd", _pairSecond, ColName + 296f, value =>
+            {
+                _pairSecond = Wrap(value);
+                RenderPairs();
+            });
+
+            MakeSpot(
+                _pairsHolder, "Exacta", _pairFirst, _pairSecond,
+                ColFirstPrice + (PriceWidth + PriceGap) - 42f, 0f, PriceWidth + 42f);
+
+            MakeSpot(
+                _pairsHolder, "Quinella", Math.Min(_pairFirst, _pairSecond), Math.Max(_pairFirst, _pairSecond),
+                ColFirstPrice + (2f * (PriceWidth + PriceGap)), 0f, PriceWidth + 42f);
         }
 
         private static int _pairFirst = 1;
@@ -417,15 +431,15 @@ namespace HorseRacing.Client
                 line.anchorMin = new Vector2(0f, 1f);
                 line.anchorMax = new Vector2(1f, 1f);
                 line.pivot = new Vector2(0.5f, 1f);
-                line.anchoredPosition = new Vector2(0f, y);
+                line.anchoredPosition = new Vector2(0f, -y);
                 line.sizeDelta = new Vector2(0f, 24f);
 
                 var text = Text("Text", line, Describe(bet), 15f, Ink, TextAlignmentOptions.Left);
                 Stretch(text.rectTransform);
-                text.rectTransform.offsetMin = new Vector2(8f, 0f);
-                text.rectTransform.offsetMax = new Vector2(-8f, 0f);
+                text.rectTransform.offsetMin = new Vector2(10f, 0f);
+                text.rectTransform.offsetMax = new Vector2(-10f, 0f);
 
-                y -= 26f;
+                y += 25f;
             }
 
             if (_slipTotal != null)
@@ -451,17 +465,13 @@ namespace HorseRacing.Client
 
         /// <summary>One clickable spot on the board: its price, and whether it is on.</summary>
         private static RectTransform MakeSpot(
-            RectTransform parent, string kind, int first, int second, Vector2 at)
+            RectTransform parent, string kind, int first, int second, float x, float y, float width)
         {
             var price = PriceOf(kind, first, second);
             var on = _slip.Any(b => b.Kind == kind && b.First == first && b.Second == second);
 
             var rect = New($"{kind}{first}_{second}", parent);
-            rect.anchorMin = new Vector2(0f, 1f);
-            rect.anchorMax = new Vector2(0f, 1f);
-            rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = at;
-            rect.sizeDelta = new Vector2(kind == "Win" || kind == "Place" || kind == "Show" ? 130f : 160f, 26f);
+            TopLeft(rect, x, y, width, RowHeight - 3f);
 
             var image = rect.gameObject.AddComponent<Image>();
             image.sprite = Textures.ButtonFace(
@@ -472,11 +482,14 @@ namespace HorseRacing.Client
                 1);
             image.type = Image.Type.Sliced;
 
-            var label = Text("Label", rect,
-                second > 0 ? $"{kind.Substring(0, 1)} {first}-{second}   {Odds(price)}" : Odds(price),
-                15f,
-                on ? new Color(0.1f, 0.1f, 0.1f, 1f) : Ink,
-                TextAlignmentOptions.Center);
+            // The pair spots say what they are; the three single-runner columns are
+            // already labelled by the header above them and would only repeat it.
+            var caption = second > 0
+                ? $"{kind.ToUpperInvariant()} {first}-{second}    {Odds(price)}"
+                : Odds(price);
+
+            var label = Text("Label", rect, caption, 15f,
+                on ? new Color(0.1f, 0.1f, 0.1f, 1f) : Ink, TextAlignmentOptions.Center);
             Stretch(label.rectTransform);
 
             var button = rect.gameObject.AddComponent<Button>();
@@ -487,53 +500,34 @@ namespace HorseRacing.Client
         }
 
         private static RectTransform MakeStepper(
-            RectTransform parent, string caption, int value, Vector2 at, Action<int> set)
+            RectTransform parent, string caption, int value, float x, Action<int> set)
         {
             var rect = New($"Stepper{caption}", parent);
-            rect.anchorMin = new Vector2(0f, 1f);
-            rect.anchorMax = new Vector2(0f, 1f);
-            rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = at;
-            rect.sizeDelta = new Vector2(200f, 26f);
+            TopLeft(rect, x, 0f, 282f, RowHeight - 3f);
 
-            var label = Text("Caption", rect, caption, 14f,
+            var label = Text("Caption", rect, caption, 13f,
                 new Color(Ink.r, Ink.g, Ink.b, 0.5f), TextAlignmentOptions.Left);
-            label.rectTransform.anchorMin = new Vector2(0f, 0f);
-            label.rectTransform.anchorMax = new Vector2(0f, 1f);
-            label.rectTransform.pivot = new Vector2(0f, 0.5f);
-            label.rectTransform.anchoredPosition = new Vector2(2f, 0f);
-            label.rectTransform.sizeDelta = new Vector2(34f, 0f);
+            TopLeft(label.rectTransform, 0f, 4f, 30f, 18f);
 
             var down = MakeButton($"{caption}Down", rect, "-", 26f, 24f, () => set(value - 1));
-            down.anchorMin = new Vector2(0f, 1f);
-            down.anchorMax = new Vector2(0f, 1f);
-            down.pivot = new Vector2(0f, 1f);
-            down.anchoredPosition = new Vector2(40f, -1f);
+            TopLeft(down, 32f, 0f);
 
+            // Wide enough for the longest name on the card with its number in front.
+            // At 100 units "NIGHT RAIDER" came out as "NIGHT RAIDE", which reads as a
+            // typo in the card rather than as a box that is too small.
             var shown = Text("Value", rect, $"{value}  {RunnerName(value)}", 15f, Ink, TextAlignmentOptions.Center);
-            shown.rectTransform.anchorMin = new Vector2(0f, 1f);
-            shown.rectTransform.anchorMax = new Vector2(0f, 1f);
-            shown.rectTransform.pivot = new Vector2(0f, 1f);
-            shown.rectTransform.anchoredPosition = new Vector2(70f, -1f);
-            shown.rectTransform.sizeDelta = new Vector2(100f, 24f);
+            TopLeft(shown.rectTransform, 62f, 0f, 186f, 24f);
 
             var up = MakeButton($"{caption}Up", rect, "+", 26f, 24f, () => set(value + 1));
-            up.anchorMin = new Vector2(0f, 1f);
-            up.anchorMax = new Vector2(0f, 1f);
-            up.pivot = new Vector2(0f, 1f);
-            up.anchoredPosition = new Vector2(172f, -1f);
+            TopLeft(up, 252f, 0f);
 
             return rect;
         }
 
-        private static TMP_InputField MakeStakeField(RectTransform parent, Vector2 at)
+        private static TMP_InputField MakeStakeField(RectTransform parent, float x, float y)
         {
             var rect = New("Stake", parent);
-            rect.anchorMin = new Vector2(0f, 0f);
-            rect.anchorMax = new Vector2(0f, 0f);
-            rect.pivot = new Vector2(0f, 0f);
-            rect.anchoredPosition = at;
-            rect.sizeDelta = new Vector2(158f, 34f);
+            TopLeft(rect, x, y, 158f, 34f);
 
             var image = rect.gameObject.AddComponent<Image>();
             image.sprite = Textures.RoundedBox(6, Slate, new Color(0f, 0f, 0f, 0.5f), 1);
@@ -605,6 +599,46 @@ namespace HorseRacing.Client
             text.raycastTarget = false;
 
             return text;
+        }
+
+        // ------------------------------------------------------------------ placement
+
+        /// <summary>Places a rect by its top-left corner, measured from its parent's.</summary>
+        private static void TopLeft(RectTransform rect, float x, float y, float width, float height)
+        {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.sizeDelta = new Vector2(width, height);
+            rect.anchoredPosition = new Vector2(x, -y);
+        }
+
+        /// <summary>Places an already-sized rect by its top-left corner.</summary>
+        private static void TopLeft(RectTransform rect, float x, float y)
+        {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(x, -y);
+        }
+
+        /// <summary>Places a rect by its top-right corner, x measured in from the right.</summary>
+        private static void TopRight(RectTransform rect, float x, float y, float width, float height)
+        {
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.sizeDelta = new Vector2(width, height);
+            rect.anchoredPosition = new Vector2(-x, -y);
+        }
+
+        /// <summary>Places an already-sized rect by its top-right corner.</summary>
+        private static void TopRight(RectTransform rect, float x, float y)
+        {
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = new Vector2(-x, -y);
         }
 
         // -------------------------------------------------------------------- stake
