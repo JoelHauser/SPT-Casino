@@ -39,17 +39,24 @@ namespace HorseRacing.Client
         private const float FrameHeight = 900f;
 
         // --- the band table. Distance down from the top edge of the frame. ---------
-        private const float TrackTop = 86f;
-        private const float TrackHeight = 288f;
+        //
+        // Checked for overlaps arithmetically rather than by looking at it, which is
+        // the thing this environment cannot do. Adding a course tab pushed every band
+        // below it down; the track lost 20 units to pay for it.
+        private const float TabsTop = 84f;
+        private const float TabsHeight = 34f;
 
-        private const float ColumnHeaderTop = 392f;
-        private const float RowsTop = 418f;
+        private const float TrackTop = 128f;
+        private const float TrackHeight = 268f;
+
+        private const float ColumnHeaderTop = 406f;
+        private const float RowsTop = 430f;
         private const float RowHeight = 27f;
 
-        private const float PairsTop = 644f;
+        private const float PairsTop = 654f;
         private const float ResultTop = 722f;
-        private const float StatusTop = 760f;
-        private const float ControlsTop = 796f;
+        private const float StatusTop = 758f;
+        private const float ControlsTop = 794f;
 
         // --- horizontal: the board on the left, the slip on the right --------------
         private const float Margin = 26f;
@@ -115,6 +122,7 @@ namespace HorseRacing.Client
             frameImage.type = Image.Type.Sliced;
 
             BuildHeader(frame);
+            BuildCourseTabs(frame);
             BuildTrack(frame);
             BuildBoard(frame);
             BuildSlip(frame);
@@ -133,26 +141,43 @@ namespace HorseRacing.Client
             TopLeft(title.rectTransform, Margin, 18f, 420f, 40f);
             title.fontStyle = FontStyles.Bold;
 
-            // The takeout, stated on the table. It comes from the server with the rest
-            // of the board rather than being written here, for the same reason the
-            // prices do: a number the panel owns is a number that can drift from the
-            // one the table actually charges.
-            var takeout = _card?.Value<double?>("Takeout") ?? 0d;
-
-            var blurb = Text(
+            _blurb = Text(
                 "Blurb",
                 frame,
-                $"Eight runners. {takeout:P2} to the house on every bet, computed rather than measured.",
+                string.Empty,
                 15f,
                 new Color(Ink.r, Ink.g, Ink.b, 0.55f),
                 TextAlignmentOptions.Left);
-            TopLeft(blurb.rectTransform, Margin + 2f, 60f, 760f, 22f);
+            TopLeft(_blurb.rectTransform, Margin + 2f, 60f, 1000f, 22f);
+
+            SetBlurb();
 
             var close = MakeButton("Close", frame, "CLOSE", 110f, 36f, Close);
             TopRight(close, Margin, 18f);
 
             _balance = Text("Balance", frame, string.Empty, 20f, Ink, TextAlignmentOptions.Right);
             TopRight(_balance.rectTransform, Margin + 126f, 22f, 300f, 32f);
+        }
+
+        /// <summary>
+        /// The line under the title: what this course is, and what the house takes.
+        ///
+        /// The takeout comes from the server with the rest of the board rather than
+        /// being written here, for the same reason the prices do -- a number the panel
+        /// owns is a number that can drift from the one the table actually charges.
+        /// </summary>
+        private static void SetBlurb()
+        {
+            if (_blurb == null)
+            {
+                return;
+            }
+
+            var takeout = _card?.Value<double?>("Takeout") ?? 0d;
+            var course = Course;
+            var what = course?.Value<string>("Blurb") ?? "Eight runners.";
+
+            _blurb.text = $"{what}   {takeout:P2} to the house on every bet, the same at every course.";
         }
 
         private static void BuildTrack(RectTransform frame)
@@ -164,9 +189,37 @@ namespace HorseRacing.Client
             _trackHolder.anchoredPosition = new Vector2(0f, -TrackTop);
             _trackHolder.sizeDelta = new Vector2(-(Margin * 2f), TrackHeight);
 
+            BuildTrackForCourse();
+        }
+
+        /// <summary>
+        /// Draws the course currently selected, replacing whatever was there.
+        ///
+        /// The shape can change -- the dash is a straight and the other two are ovals --
+        /// so this rebuilds rather than repositions.
+        ///
+        /// **A layout pass is forced first**, because the oval is laid out from the
+        /// holder's own rect and a RectTransform that has not been through one reports
+        /// a size of zero. A zero-radius oval draws eight horses in a heap at the
+        /// centre and nothing about it looks like a layout problem.
+        /// </summary>
+        private static void BuildTrackForCourse()
+        {
+            if (_trackHolder == null)
+            {
+                return;
+            }
+
+            var course = Course;
+
+            if (course == null)
+            {
+                return;
+            }
+
             var runners = new List<KeyValuePair<int, string>>();
 
-            if (_card?["Runners"] is JArray list)
+            if (course["Runners"] is JArray list)
             {
                 foreach (var runner in list)
                 {
@@ -176,7 +229,93 @@ namespace HorseRacing.Client
                 }
             }
 
-            TrackView.Build(_trackHolder, runners, _font);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_trackHolder);
+
+            var shape = string.Equals(
+                course.Value<string>("Shape"), "Oval", StringComparison.OrdinalIgnoreCase)
+                ? Shape.Oval
+                : Shape.Straight;
+
+            TrackView.Build(
+                _trackHolder,
+                shape,
+                course.Value<int?>("Laps") ?? 1,
+                (float)(course.Value<double?>("RunSeconds") ?? 6d),
+                runners,
+                _font);
+        }
+
+        /// <summary>
+        /// One tab per course, left to right, shortest first.
+        ///
+        /// Built into a holder at a fixed band and refilled by
+        /// <see cref="RenderCourseTabs"/>, so the selected one can change appearance
+        /// without the bands below moving.
+        /// </summary>
+        private static void BuildCourseTabs(RectTransform frame)
+        {
+            _tabsHolder = New("Tabs", frame);
+            TopLeft(_tabsHolder, Margin, TabsTop, FrameWidth - (Margin * 2f), TabsHeight);
+
+            RenderCourseTabs();
+        }
+
+        private static void RenderCourseTabs()
+        {
+            if (_tabsHolder == null)
+            {
+                return;
+            }
+
+            foreach (Transform child in _tabsHolder)
+            {
+                UnityEngine.Object.Destroy(child.gameObject);
+            }
+
+            var courses = Courses;
+            var x = 0f;
+
+            for (var i = 0; i < courses.Count; i++)
+            {
+                var course = courses[i] as JObject;
+
+                if (course == null)
+                {
+                    continue;
+                }
+
+                var on = i == _course;
+                var index = i;
+
+                var name = course.Value<string>("Name") ?? "COURSE";
+                var distance = course.Value<string>("Distance") ?? string.Empty;
+
+                var rect = New($"Tab{i}", _tabsHolder);
+                TopLeft(rect, x, 0f, 260f, TabsHeight);
+
+                var image = rect.gameObject.AddComponent<Image>();
+                image.sprite = Textures.ButtonFace(
+                    6,
+                    on ? Gold : Slate,
+                    on ? new Color(Gold.r * 0.78f, Gold.g * 0.78f, Gold.b * 0.78f, 1f)
+                       : new Color(0.09f, 0.10f, 0.09f, 1f),
+                    on ? Gold : new Color(0f, 0f, 0f, 0.45f),
+                    on ? 2 : 1);
+                image.type = Image.Type.Sliced;
+
+                var label = Text(
+                    "Label", rect, $"{name}   {distance}", 15f,
+                    on ? new Color(0.1f, 0.1f, 0.1f, 1f) : Ink,
+                    TextAlignmentOptions.Center);
+                Stretch(label.rectTransform);
+                label.fontStyle = on ? FontStyles.Bold : FontStyles.Normal;
+
+                var button = rect.gameObject.AddComponent<Button>();
+                button.targetGraphic = image;
+                button.onClick.AddListener(() => SwitchCourse(index));
+
+                x += 272f;
+            }
         }
 
         private static void BuildBoard(RectTransform frame)

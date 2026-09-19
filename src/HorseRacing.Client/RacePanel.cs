@@ -60,6 +60,8 @@ namespace HorseRacing.Client
         private static RectTransform _trackHolder;
         private static RectTransform _boardHolder;
         private static RectTransform _pairsHolder;
+        private static RectTransform _tabsHolder;
+        private static TextMeshProUGUI _blurb;
         private static RectTransform _slipHolder;
         private static TextMeshProUGUI _balance;
         private static TextMeshProUGUI _status;
@@ -77,6 +79,18 @@ namespace HorseRacing.Client
 
         /// <summary>The bets the player has built up, in the order they added them.</summary>
         private static readonly List<SlipBet> _slip = new List<SlipBet>();
+
+        /// <summary>
+        /// Which course is being looked at, as an index into the ping's Courses.
+        ///
+        /// The panel draws one course at a time. Switching is the only operation on
+        /// this table that **empties the slip**, and it has to be: the three courses
+        /// price the same bet differently -- runner 7 is 5.78 at the dash and 36.28 at
+        /// the marathon -- so a bet carried across would be sitting at a price the
+        /// player never agreed to. Carrying them over and silently re-pricing would be
+        /// worse still.
+        /// </summary>
+        private static int _course;
 
         private static string _wallet = "Roubles";
         private static long _stake = 10_000;
@@ -232,6 +246,42 @@ namespace HorseRacing.Client
             RenderBoard();
         }
 
+        /// <summary>
+        /// Moves to another course.
+        ///
+        /// Rebuilds the track -- the shape may change from a straight to an oval -- and
+        /// **empties the slip**, because every price on it belonged to the old board.
+        /// </summary>
+        private static void SwitchCourse(int index)
+        {
+            if (TrackView.IsRunning || index == _course)
+            {
+                return;
+            }
+
+            var all = Courses;
+
+            if (index < 0 || index >= all.Count)
+            {
+                return;
+            }
+
+            _course = index;
+
+            _slip.Clear();
+            BuildTrackForCourse();
+            RenderCourseTabs();
+            RenderBoard();
+            RenderSlip();
+            SetResult(string.Empty, Ink);
+
+            var name = Course?.Value<string>("Name") ?? "this course";
+            var blurb = Course?.Value<string>("Blurb") ?? string.Empty;
+
+            SetStatus($"{name}. {blurb}");
+            SetBlurb();
+        }
+
         private static void ClearSlip()
         {
             _slip.Clear();
@@ -260,7 +310,17 @@ namespace HorseRacing.Client
                 return;
             }
 
-            var reply = RaceApi.Place(_slip, _wallet, RaceClientPlugin.NoStakeCap != null && RaceClientPlugin.NoStakeCap.Value);
+            if (string.IsNullOrEmpty(CourseId))
+            {
+                SetStatus("No course is selected.");
+                return;
+            }
+
+            var reply = RaceApi.Place(
+                CourseId,
+                _slip,
+                _wallet,
+                RaceClientPlugin.NoStakeCap != null && RaceClientPlugin.NoStakeCap.Value);
 
             if (reply == null)
             {
@@ -453,6 +513,50 @@ namespace HorseRacing.Client
 
         private static int MaxBets => _card?.Value<int?>("MaxBets") ?? 108;
 
+        /// <summary>Every course the server offers, or an empty array before the first ping.</summary>
+        private static JArray Courses => _card?["Courses"] as JArray ?? [];
+
+        /// <summary>The course being looked at, or null if the ping has not landed.</summary>
+        private static JObject Course
+        {
+            get
+            {
+                var all = Courses;
+
+                if (all.Count == 0)
+                {
+                    return null;
+                }
+
+                // Clamped rather than trusted. The index survives a re-ping, and a
+                // server that came back offering fewer courses would otherwise read
+                // off the end.
+                var index = Mathf.Clamp(_course, 0, all.Count - 1);
+
+                return all[index] as JObject;
+            }
+        }
+
+        private static string CourseId => Course?.Value<string>("Id") ?? string.Empty;
+
+        /// <summary>
+        /// The most this slip may cost: the smaller of the currency's cap and the
+        /// course's own.
+        ///
+        /// The course cap is arithmetic -- the dash has the longest price on any board,
+        /// so it has the lowest ceiling. The server applies the same min() and is the
+        /// one that counts; this is so the panel can say the number before the player
+        /// finds out by being refused.
+        /// </summary>
+        private static long SlipCap()
+        {
+            var limits = _card?["Limits"] as JObject;
+            var wallet = (limits?[_wallet] as JObject)?.Value<long?>("Max") ?? 2_000_000L;
+            var course = Course?.Value<long?>("MaxSlip") ?? 2_000_000L;
+
+            return Math.Min(wallet, course);
+        }
+
         private static string Sign()
         {
             var limits = _card?["Limits"] as JObject;
@@ -473,7 +577,7 @@ namespace HorseRacing.Client
 
         private static string RunnerName(int number)
         {
-            if (_card?["Runners"] is not JArray runners)
+            if (Course?["Runners"] is not JArray runners)
             {
                 return string.Empty;
             }
@@ -492,7 +596,7 @@ namespace HorseRacing.Client
         /// <summary>The board price for a spot, or zero if the server did not quote it.</summary>
         private static double PriceOf(string kind, int first, int second)
         {
-            if (_card?["Board"] is not JArray board)
+            if (Course?["Board"] is not JArray board)
             {
                 return 0d;
             }

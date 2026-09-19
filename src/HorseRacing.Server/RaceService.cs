@@ -13,7 +13,13 @@ namespace HorseRacing.Server;
 /// paid arrives. That is Slots' arrangement rather than Poker's, and it is why there
 /// is no table store here.
 ///
-/// The one way this differs from every other table: **a slip is many bets and one
+/// **Three courses, one set of horses.** A slip names a course and every price on it
+/// comes from that course's board; the same bet is a different price at a different
+/// course, so the track is resolved once, up front, and threaded through the draw and
+/// the settlement together. Nothing here can price against one card and pay against
+/// another.
+///
+/// The other way this differs from every other table: **a slip is many bets and one
 /// transaction.** The stakes are summed and taken once, and the returns are summed and
 /// paid once. Taking them bet by bet would leave a partially-paid slip on any failure
 /// halfway down, which is a state nothing here knows how to recover from.
@@ -63,29 +69,53 @@ public class RaceService(
                 w => w.Wallet.ToString(),
                 w => new StakeLimits { Min = w.MinStake, Max = w.MaxStake, Step = w.Step, Sign = w.Sign }),
 
-            Runners =
-            [
-                .. Field.Runners.Select(r => new RunnerView
-                {
-                    Number = r.Number,
-                    Name = r.Name,
-                    Chance = Odds.Chance(BetKind.Win, r.Number),
-                }),
-            ],
-
-            Board =
-            [
-                .. Odds.All().Select(p => new PriceView
-                {
-                    Kind = p.Kind.ToString(),
-                    First = p.First,
-                    Second = p.Second,
-                    Chance = p.Chance,
-                    Price = p.Board,
-                }),
-            ],
+            Courses = [.. Tracks.All.Select(Describe)],
         };
     }
+
+    /// <summary>
+    /// One course as the panel needs it: its card, its whole board, and how to draw it.
+    ///
+    /// Computed per request rather than cached. Three courses at 108 spots each is 324
+    /// enumerations of 336 prefixes, which sounds like a lot and is about a millisecond
+    /// -- and a cache is a second copy of the prices that can go stale against the
+    /// weights, which is the one failure this whole table is arranged to avoid.
+    /// </summary>
+    private static CourseView Describe(Track track) => new()
+    {
+        Id = track.Id,
+        Name = track.Name,
+        Distance = track.Distance,
+        Blurb = track.Blurb,
+        Shape = track.Shape.ToString(),
+        Laps = track.Laps,
+        RunSeconds = track.RunSeconds,
+        MaxSlip = track.MaxSlip,
+
+        Runners =
+        [
+            .. Field.Runners.Select(r => new RunnerView
+            {
+                Number = r.Number,
+                Name = r.Name,
+                Speed = r.Speed,
+                Stamina = r.Stamina,
+                Chance = Odds.Chance(track, BetKind.Win, r.Number),
+            }),
+        ],
+
+        Board =
+        [
+            .. Odds.All(track).Select(p => new PriceView
+            {
+                Kind = p.Kind.ToString(),
+                First = p.First,
+                Second = p.Second,
+                Chance = p.Chance,
+                Price = p.Board,
+            }),
+        ],
+    };
 
     /// <summary>
     /// Runs a race against a slip, and the only place in this table where money moves.
@@ -123,6 +153,17 @@ public class RaceService(
         if (!Enum.TryParse<Wallet>(request.Wallet, ignoreCase: true, out var wallet))
         {
             return RaceResponse.Failed($"There is nothing called '{request.Wallet}' to bet with.");
+        }
+
+        // **The course, for exactly the same reason, and it matters more here.** A
+        // wallet typo spends the wrong currency; a course typo pays from the wrong
+        // board. Runner 7 is 5.78 at the dash and 36.28 at the marathon, so defaulting
+        // would hand a player a price they were never shown -- in either direction.
+        var track = Tracks.ById(request.Track);
+
+        if (track is null)
+        {
+            return RaceResponse.Failed($"There is no course here called '{request.Track}'.");
         }
 
         var info = WalletInfo.For(wallet);
@@ -167,13 +208,13 @@ public class RaceService(
             total += entry.Stake;
         }
 
-        if (!WalletInfo.AllowsSlip(wallet, total, request.IgnoreMaximum))
+        if (!WalletInfo.AllowsSlip(wallet, total, track.MaxSlip, request.IgnoreMaximum))
         {
+            var cap = WalletInfo.CapFor(wallet, track.MaxSlip, request.IgnoreMaximum);
+
             return Refused(
                 refunded,
-                request.IgnoreMaximum
-                    ? $"A slip in {info.Label} cannot exceed {WalletInfo.HardCeiling:N0} however the limit is set."
-                    : $"A slip in {info.Label} comes to at most {info.MaxStake:N0}, and this one is {total:N0}.");
+                $"A slip at {track.Name} in {info.Label} comes to at most {cap:N0}, and this one is {total:N0}.");
         }
 
         var staked = (int)total;
@@ -194,7 +235,7 @@ public class RaceService(
 
         // 4. Decided here and nowhere else. What the client does with it is
         // presentation: it is handed the finishing order and animates towards it.
-        var result = Race.Run(slip, _random);
+        var result = Race.Run(track, slip, _random);
 
         // 5. Paid, then released. Never the other way round.
         if (result.Returned > 0)
@@ -222,12 +263,14 @@ public class RaceService(
         if (result.Returned > 0)
         {
             log.Info(
-                $"paid {result.Returned:N0} {wallet} [{sessionId}] -- {winner.Number} {winner.Name} won, "
-                + $"{slip.Count} bet(s), {result.Staked:N0} staked");
+                $"paid {result.Returned:N0} {wallet} [{sessionId}] -- {track.Name}, "
+                + $"{winner.Number} {winner.Name} won, {slip.Count} bet(s), {result.Staked:N0} staked");
         }
         else
         {
-            log.Detail($"nothing [{sessionId}] -- {winner.Number} {winner.Name} won, {result.Staked:N0} {wallet}");
+            log.Detail(
+                $"nothing [{sessionId}] -- {track.Name}, {winner.Number} {winner.Name} won, "
+                + $"{result.Staked:N0} {wallet}");
         }
 
         return new RaceResponse { Note = refunded, Race = View(result) };
@@ -277,6 +320,7 @@ public class RaceService(
 
     private static RaceView View(RaceResult result) => new()
     {
+        Track = result.Track.Id,
         Order = result.Order,
         Staked = result.Staked,
         Returned = result.Returned,

@@ -26,6 +26,18 @@ public class MoneyInvariantTests
 {
     private static readonly MongoId Session = new("6a9b474574813708e8fc3ce5");
 
+    /// <summary>
+    /// The course these run at.
+    ///
+    /// One of them, because these are about the money path rather than about pricing:
+    /// the debit, the escrow and the ordering are identical wherever the race is run.
+    /// <c>CourseTests</c> is where the three are checked against each other.
+    /// </summary>
+    private const string Course = "mile";
+
+    /// <summary>The slip ceiling in force at <see cref="Course"/>.</summary>
+    private static int Ceiling => Tracks.ById(Course)!.MaxSlip;
+
     private const int Rich = 500_000_000;
 
     /// <summary>
@@ -113,7 +125,7 @@ public class MoneyInvariantTests
         bets.Add(new SlipEntry { Kind = nameof(BetKind.Win), First = 9, Stake = 10_000 });
 
         var reply = await service.PlaceAsync(
-            new PlaceRequest { Wallet = nameof(Wallet.Roubles), Bets = bets },
+            new PlaceRequest { Track = Course, Wallet = nameof(Wallet.Roubles), Bets = bets },
             Session,
             Output());
 
@@ -146,6 +158,7 @@ public class MoneyInvariantTests
         var reply = await service.PlaceAsync(
             new PlaceRequest
             {
+                Track = Course,
                 Wallet = nameof(Wallet.Roubles),
                 Bets = [new SlipEntry { Kind = kind, First = first, Second = second, Stake = stake }],
             },
@@ -175,7 +188,7 @@ public class MoneyInvariantTests
         bank.Seed(Wallet.Roubles, Rich);
 
         var reply = await service.PlaceAsync(
-            new PlaceRequest { Wallet = nameof(Wallet.Roubles), Bets = [] }, Session, Output());
+            new PlaceRequest { Track = Course, Wallet = nameof(Wallet.Roubles), Bets = [] }, Session, Output());
 
         Assert.False(reply.Ok);
         Assert.Contains("nothing on the slip", reply.Error);
@@ -203,6 +216,7 @@ public class MoneyInvariantTests
         var reply = await service.PlaceAsync(
             new PlaceRequest
             {
+                Track = Course,
                 Wallet = nameof(Wallet.Roubles),
                 Bets =
                 [
@@ -230,6 +244,7 @@ public class MoneyInvariantTests
         var reply = await service.PlaceAsync(
             new PlaceRequest
             {
+                Track = Course,
                 Wallet = "Doubloons",
                 Bets = [new SlipEntry { Kind = nameof(BetKind.Win), First = 1, Stake = 10_000 }],
             },
@@ -257,11 +272,12 @@ public class MoneyInvariantTests
 
         var overTheHardCeiling = new PlaceRequest
         {
+            Track = Course,
             Wallet = nameof(Wallet.Roubles),
             IgnoreMaximum = true,
             Bets =
             [
-                new SlipEntry { Kind = nameof(BetKind.Win), First = 1, Stake = WalletInfo.HardCeiling },
+                new SlipEntry { Kind = nameof(BetKind.Win), First = 1, Stake = Ceiling },
                 new SlipEntry { Kind = nameof(BetKind.Win), First = 2, Stake = 10_000 },
             ],
         };
@@ -287,11 +303,12 @@ public class MoneyInvariantTests
         var (service, bank, _, _) = Table();
         bank.Seed(Wallet.Roubles, Rich);
 
-        var longest = Odds.All().OrderByDescending(p => p.Board).First();
+        var longest = Odds.All(Tracks.ById(Course)!).OrderByDescending(p => p.Board).First();
 
         var reply = await service.PlaceAsync(
             new PlaceRequest
             {
+                Track = Course,
                 Wallet = nameof(Wallet.Roubles),
                 Bets =
                 [
@@ -300,7 +317,7 @@ public class MoneyInvariantTests
                         Kind = longest.Kind.ToString(),
                         First = longest.First,
                         Second = longest.Second,
-                        Stake = WalletInfo.HardCeiling,
+                        Stake = Ceiling,
                     },
                 ],
             },
@@ -333,6 +350,7 @@ public class MoneyInvariantTests
         var reply = await service.PlaceAsync(
             new PlaceRequest
             {
+                Track = Course,
                 Wallet = nameof(Wallet.Roubles),
                 Bets =
                 [
@@ -488,6 +506,7 @@ public class MoneyInvariantTests
     /// <summary>A small, ordinary slip: one win bet and one each way.</summary>
     private static PlaceRequest Slip() => new()
     {
+        Track = Course,
         Wallet = nameof(Wallet.Roubles),
         Bets =
         [
@@ -510,7 +529,7 @@ public class MoneyInvariantTests
             }
         }
 
-        return new PlaceRequest { Wallet = nameof(Wallet.Roubles), Bets = bets };
+        return new PlaceRequest { Track = Course, Wallet = nameof(Wallet.Roubles), Bets = bets };
     }
 
     /// <summary>

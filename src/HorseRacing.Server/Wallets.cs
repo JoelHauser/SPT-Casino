@@ -80,12 +80,13 @@ public sealed record WalletInfo(
     public static IEnumerable<WalletInfo> All => Table.Values;
 
     /// <summary>
-    /// The largest slip total that cannot overflow, whatever anybody has turned off.
+    /// The largest slip total any course could ever take, whatever anybody has turned
+    /// off. The real limit is the course's own <c>MaxSlip</c>, which is never larger.
     ///
-    /// Equal to the rouble ceiling: that one is already the arithmetic bound rather
-    /// than a cautious one, so there is nothing above it to unlock. Named separately
-    /// anyway, because the two being the same number is a consequence and not a
-    /// coincidence, and a future edit to the rouble limit must not silently move this.
+    /// Kept as a separate number rather than folded into the rouble cap because the
+    /// two mean different things -- one is the house being careful, the other is the
+    /// width of an int -- and a future edit to the rouble limit must not silently
+    /// move this.
     /// </summary>
     public static int HardCeiling => 2_000_000;
 
@@ -123,7 +124,7 @@ public sealed record WalletInfo(
     /// get a negative one. So this raises the limit to the arithmetic bound and no
     /// further.
     /// </param>
-    public static bool AllowsSlip(Wallet wallet, long total, bool ignoreMaximum = false)
+    public static bool AllowsSlip(Wallet wallet, long total, int courseCeiling, bool ignoreMaximum = false)
     {
         var info = For(wallet);
 
@@ -132,6 +133,20 @@ public sealed record WalletInfo(
             return false;
         }
 
-        return total <= (ignoreMaximum ? HardCeiling : info.MaxStake);
+        // **The course's ceiling always applies, and waiving the maximum cannot lift
+        // it.** The currency cap is the house being careful; the course cap is the
+        // width of an int at that course's longest price, and the dash's longest price
+        // is nearly twice the mile's. A player who waives the limit past it does not
+        // get a bigger win, they get a negative one.
+        var cap = Math.Min(ignoreMaximum ? HardCeiling : info.MaxStake, courseCeiling);
+
+        return total <= cap;
     }
+
+    /// <summary>
+    /// The cap actually in force for this currency at this course: the smaller of the
+    /// two, which is what the panel shows and what the window enforces.
+    /// </summary>
+    public static int CapFor(Wallet wallet, int courseCeiling, bool ignoreMaximum = false)
+        => Math.Min(ignoreMaximum ? HardCeiling : For(wallet).MaxStake, courseCeiling);
 }

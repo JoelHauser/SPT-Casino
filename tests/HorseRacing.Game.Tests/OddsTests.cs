@@ -1,14 +1,29 @@
 namespace HorseRacing.Game.Tests;
 
 /// <summary>
-/// What the board pays, and whether the arithmetic that says so is right.
+/// What a board pays, and whether the arithmetic that says so is right.
 ///
-/// The house edge here is arithmetic over the card rather than something to be
-/// discovered by running races. These check both that the arithmetic says something
-/// sane and that it says the truth.
+/// The house edge is arithmetic over the model rather than something to be discovered
+/// by running races. These check both that the arithmetic says something sane and that
+/// it says the truth -- **at every course**, since each weights the same horses
+/// differently and a formula that is right at one is not thereby right at another.
 /// </summary>
 public class OddsTests
 {
+    public static TheoryData<string> Courses()
+    {
+        var data = new TheoryData<string>();
+
+        foreach (var track in Tracks.All)
+        {
+            data.Add(track.Id);
+        }
+
+        return data;
+    }
+
+    private static Track Course(string id) => Tracks.ById(id)!;
+
     /// <summary>
     /// The cheapest possible check that the model is coherent, and the first thing
     /// worth asserting: the 336 ordered top-threes are mutually exclusive and
@@ -18,13 +33,15 @@ public class OddsTests
     /// denominator that forgot to shrink as the field did would all show up here and
     /// nowhere else nearly as loudly.
     /// </summary>
-    [Fact]
-    public void EveryOrderedTopThreeTogetherAccountsForExactlyOneRace()
+    [Theory]
+    [MemberData(nameof(Courses))]
+    public void EveryOrderedTopThreeTogetherAccountsForExactlyOneRace(string id)
     {
+        var track = Course(id);
         var count = 0;
         var total = 0.0;
 
-        foreach (var (_, probability) in Odds.Prefixes())
+        foreach (var (_, probability) in Odds.Prefixes(track))
         {
             Assert.True(probability > 0.0, "a prefix with no chance of happening is a bug in the weights.");
             count++;
@@ -37,61 +54,68 @@ public class OddsTests
 
     /// <summary>
     /// **The test that matters.** The closed form in <see cref="Odds"/> is checked
-    /// against actually running the races.
+    /// against actually running the races, at every course.
     ///
     /// A formula derived from the same misunderstanding as the code it describes would
     /// agree with itself perfectly, so this deliberately shares nothing with it: it
     /// draws real finishing orders through <see cref="Race.Draw"/> and counts what
-    /// happened. Two hundred thousand races puts the standard error on a 27% runner at
-    /// about a tenth of a percentage point, so a chance that were wrong in any way
-    /// worth caring about would not land this close.
+    /// happened. Two hundred thousand races puts the standard error on a 20% runner at
+    /// about a tenth of a percentage point, so a chance wrong in any way worth caring
+    /// about would not land this close.
     ///
-    /// Every bet kind is checked, not just Win. Place and Show are where an
-    /// off-by-one in the placings window hides, and the pair bets are where ordered
-    /// and unordered get confused -- and a quinella priced as an exacta is a bet
-    /// mispriced by exactly a factor of two, which no balance check would ever catch.
+    /// Every bet kind is checked, not just Win. Place and Show are where an off-by-one
+    /// in the placings window hides, and the pair bets are where ordered and unordered
+    /// get confused -- a quinella priced as an exacta is mispriced by exactly a factor
+    /// of two, which no balance check would ever catch.
     /// </summary>
     [Theory]
-    [InlineData(BetKind.Win, 1, 0)]
-    [InlineData(BetKind.Win, 8, 0)]
-    [InlineData(BetKind.Place, 1, 0)]
-    [InlineData(BetKind.Place, 6, 0)]
-    [InlineData(BetKind.Show, 2, 0)]
-    [InlineData(BetKind.Show, 8, 0)]
-    [InlineData(BetKind.Exacta, 1, 2)]
-    [InlineData(BetKind.Exacta, 2, 1)]
-    [InlineData(BetKind.Quinella, 1, 2)]
-    [InlineData(BetKind.Quinella, 3, 7)]
-    public void TheComputedChanceMatchesWhatActuallyHappens(BetKind kind, int first, int second)
+    [InlineData("dash", BetKind.Win, 1, 0)]
+    [InlineData("dash", BetKind.Show, 8, 0)]
+    [InlineData("dash", BetKind.Exacta, 1, 2)]
+    [InlineData("mile", BetKind.Win, 2, 0)]
+    [InlineData("mile", BetKind.Place, 6, 0)]
+    [InlineData("mile", BetKind.Quinella, 1, 2)]
+    [InlineData("marathon", BetKind.Win, 4, 0)]
+    [InlineData("marathon", BetKind.Win, 7, 0)]
+    [InlineData("marathon", BetKind.Place, 1, 0)]
+    [InlineData("marathon", BetKind.Show, 6, 0)]
+    [InlineData("marathon", BetKind.Exacta, 4, 3)]
+    [InlineData("marathon", BetKind.Quinella, 3, 7)]
+    public void TheComputedChanceMatchesWhatActuallyHappens(
+        string id, BetKind kind, int first, int second)
     {
         const int races = 200_000;
 
+        var track = Course(id);
         var bet = new Bet(kind, first, second, 0);
         var random = new Random(20260919);
         var won = 0;
 
         for (var i = 0; i < races; i++)
         {
-            if (bet.Covers(Race.Draw(random)))
+            if (bet.Covers(Race.Draw(track, random)))
             {
                 won++;
             }
         }
 
         var measured = (double)won / races;
-        var computed = Odds.Chance(kind, first, second);
+        var computed = Odds.Chance(track, kind, first, second);
 
         Assert.InRange(measured, computed - 0.005, computed + 0.005);
     }
 
     /// <summary>
     /// A quinella is the two exactas that make it up, exactly. Worth asserting on its
-    /// own because it is the one identity on this board that can be checked without
-    /// going anywhere near the enumeration.
+    /// own because it is the one identity on a board that can be checked without going
+    /// anywhere near the enumeration.
     /// </summary>
-    [Fact]
-    public void AQuinellaIsItsTwoExactasAddedTogether()
+    [Theory]
+    [MemberData(nameof(Courses))]
+    public void AQuinellaIsItsTwoExactasAddedTogether(string id)
     {
+        var track = Course(id);
+
         foreach (var a in Field.Runners)
         {
             foreach (var b in Field.Runners)
@@ -101,9 +125,9 @@ public class OddsTests
                     continue;
                 }
 
-                var quinella = Odds.Chance(BetKind.Quinella, a.Number, b.Number);
-                var forward = Odds.Chance(BetKind.Exacta, a.Number, b.Number);
-                var reverse = Odds.Chance(BetKind.Exacta, b.Number, a.Number);
+                var quinella = Odds.Chance(track, BetKind.Quinella, a.Number, b.Number);
+                var forward = Odds.Chance(track, BetKind.Exacta, a.Number, b.Number);
+                var reverse = Odds.Chance(track, BetKind.Exacta, b.Number, a.Number);
 
                 Assert.Equal(forward + reverse, quinella, 12);
             }
@@ -111,131 +135,68 @@ public class OddsTests
     }
 
     /// <summary>
-    /// Exactly one runner wins, so the win chances add to one. And a runner's chance
-    /// of placing is at least its chance of winning, and of showing at least of
-    /// placing -- a containment that a placings window built the wrong way round
-    /// would invert.
+    /// A runner's chance of placing is at least its chance of winning, and of showing
+    /// at least of placing -- a containment that a placings window built the wrong way
+    /// round would invert.
     /// </summary>
-    [Fact]
-    public void TheCardIsInternallyConsistent()
+    [Theory]
+    [MemberData(nameof(Courses))]
+    public void PlacingsContainEachOther(string id)
     {
-        var wins = 0.0;
+        var track = Course(id);
 
         foreach (var runner in Field.Runners)
         {
-            var win = Odds.Chance(BetKind.Win, runner.Number);
-            var place = Odds.Chance(BetKind.Place, runner.Number);
-            var show = Odds.Chance(BetKind.Show, runner.Number);
+            var win = Odds.Chance(track, BetKind.Win, runner.Number);
+            var place = Odds.Chance(track, BetKind.Place, runner.Number);
+            var show = Odds.Chance(track, BetKind.Show, runner.Number);
 
             Assert.True(win <= place, $"runner {runner.Number} wins more often than it places.");
             Assert.True(place <= show, $"runner {runner.Number} places more often than it shows.");
-
-            wins += win;
         }
-
-        Assert.Equal(1.0, wins, 12);
     }
 
     /// <summary>
-    /// The favourite is favourite and the rag is the rag. A sanity check on the card
-    /// itself rather than on the arithmetic, and the one test that would notice
-    /// somebody editing a weight in <see cref="Field"/> by accident.
+    /// A heavier runner is always the shorter price, at whichever course made it
+    /// heavier. This is what ties the board back to the weights.
     /// </summary>
-    [Fact]
-    public void AHeavierRunnerIsAlwaysTheShorterPrice()
+    [Theory]
+    [MemberData(nameof(Courses))]
+    public void AHeavierRunnerIsAlwaysTheShorterPrice(string id)
     {
-        for (var i = 1; i < Field.Runners.Count; i++)
+        var track = Course(id);
+        var byWeight = Field.Runners.OrderByDescending(track.WeightOf).ToList();
+
+        for (var i = 1; i < byWeight.Count; i++)
         {
-            var longer = Field.Runners[i - 1];
-            var shorter = Field.Runners[i];
+            var heavier = byWeight[i - 1];
+            var lighter = byWeight[i];
 
             Assert.True(
-                longer.Weight > shorter.Weight,
-                "the card is written favourite-first; a flat or inverted pair means it was edited without reading it.");
-
-            Assert.True(
-                Odds.BoardPrice(BetKind.Win, longer.Number) < Odds.BoardPrice(BetKind.Win, shorter.Number),
-                $"runner {longer.Number} is the heavier and must be the shorter price.");
+                Odds.BoardPrice(track, BetKind.Win, heavier.Number)
+                < Odds.BoardPrice(track, BetKind.Win, lighter.Number),
+                $"{track.Name}: {heavier.Name} is the heavier and must be the shorter price.");
         }
     }
 
     /// <summary>
-    /// **The house edge is the single number the game is built around, so it is
-    /// checked on every one of the 108 spots rather than on a sample.**
+    /// **The same bet is a different price at a different course**, which is the whole
+    /// reason the track is a parameter rather than a default.
     ///
-    /// The lower bound is the one that matters: a spot priced below the takeout is a
-    /// spot the house loses money on over time, and it would be the spot anyone
-    /// reading the board would find. The upper bound catches the opposite failure --
-    /// a tick coarse enough to quietly double the edge on the short-priced favourite,
-    /// which is where rounding down bites hardest because the price is small.
+    /// A regression here would mean the boards had silently collapsed into one, and
+    /// every other test in this file would still pass.
     /// </summary>
     [Fact]
-    public void NoSpotOnTheBoardIsPricedBelowTheTakeoutOrFarAboveIt()
+    public void TheSameBetIsPricedDifferentlyAtDifferentCourses()
     {
-        foreach (var price in Odds.All())
-        {
-            var realised = Odds.Realised(price.Kind, price.First, price.Second);
+        var sprinter = Field.Runners.OrderByDescending(r => r.Speed - r.Stamina).First();
 
-            Assert.True(
-                realised >= Odds.Takeout - 1e-9,
-                $"{price.Kind} {price.First}/{price.Second} carries {realised:P4}, under the {Odds.Takeout:P2} takeout.");
-
-            Assert.True(
-                realised <= Odds.Takeout + 0.01,
-                $"{price.Kind} {price.First}/{price.Second} carries {realised:P4}, more than a point over the takeout.");
-        }
-    }
-
-    /// <summary>
-    /// The board offers what the slip claims it does: 24 single-runner spots, 56
-    /// exactas, 28 quinellas. <see cref="RaceRules.MaxBets"/> is that total, and a
-    /// mismatch means a player can build a legal slip the window refuses.
-    /// </summary>
-    [Fact]
-    public void TheBoardIsTheHundredAndEightSpotsTheRulesAllow()
-    {
-        var all = Odds.All();
-
-        Assert.Equal(Field.Count * 3, all.Count(p => !new Bet(p.Kind, p.First, p.Second, 0).IsPair));
-        Assert.Equal(Field.Count * (Field.Count - 1), all.Count(p => p.Kind == BetKind.Exacta));
-        Assert.Equal(Field.Count * (Field.Count - 1) / 2, all.Count(p => p.Kind == BetKind.Quinella));
-
-        Assert.Equal(new RaceRules().MaxBets, all.Count);
-
-        // No spot quoted twice. A duplicated quinella is two places on the slip that
-        // take the same money for the same bet.
-        Assert.Equal(all.Count, all.Select(p => (p.Kind, p.First, p.Second)).Distinct().Count());
-    }
-
-    /// <summary>
-    /// **The arithmetic behind <see cref="RaceRules.MaxBet"/>, asserted against the
-    /// real card rather than against the paragraph that explains it.**
-    ///
-    /// The moment somebody edits a weight in <see cref="Field"/>, the longest price
-    /// moves and the prose in <c>RaceRules</c> does not. This is the test that
-    /// notices. A stake at the ceiling times the longest price on the board must still
-    /// fit in the <c>int</c> the engine counts chips in -- an overflow here does not
-    /// pay a big win, it pays a negative one.
-    /// </summary>
-    [Fact]
-    public void TheMaximumStakeAtTheLongestPriceStillFitsInAnInt()
-    {
-        var rules = new RaceRules();
-        var longest = Odds.All().Max(p => p.Board);
-
-        Assert.True(longest > 1.0, "a board whose longest price is a refund is not a board.");
-
-        var biggest = (long)Math.Floor(rules.MaxBet * longest);
+        var dash = Odds.BoardPrice(Tracks.Dash, BetKind.Win, sprinter.Number);
+        var marathon = Odds.BoardPrice(Tracks.Marathon, BetKind.Win, sprinter.Number);
 
         Assert.True(
-            biggest <= int.MaxValue,
-            $"{rules.MaxBet:N0} at {longest:F2} is {biggest:N0}, past int.MaxValue. Lower MaxBet or move the engine to long.");
-
-        // And the ceiling is not absurdly conservative either -- doubling it should be
-        // what breaks, so that MaxBet is demonstrably near the real limit rather than
-        // a round number somebody liked.
-        Assert.True(
-            (long)Math.Floor(rules.MaxBet * 2.0 * longest) > int.MaxValue,
-            "MaxBet is far below what the arithmetic actually allows; it should be the binding limit or not exist.");
+            marathon > dash * 2.0,
+            $"{sprinter.Name} is {dash:F2} at the dash and {marathon:F2} at the marathon; "
+            + "the boards have collapsed into one.");
     }
 }

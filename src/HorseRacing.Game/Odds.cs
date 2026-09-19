@@ -1,6 +1,6 @@
 namespace HorseRacing.Game;
 
-/// <summary>A runner or a pair, and what the board pays it.</summary>
+/// <summary>A runner or a pair, and what one track's board pays it.</summary>
 /// <param name="Kind">Which bet this is the price of.</param>
 /// <param name="First">The runner backed.</param>
 /// <param name="Second">The second runner, or zero for a one-runner bet.</param>
@@ -12,12 +12,19 @@ namespace HorseRacing.Game;
 public sealed record Price(BetKind Kind, int First, int Second, double Chance, double Board);
 
 /// <summary>
-/// The board, computed rather than measured.
+/// The board, computed rather than measured -- one board per <see cref="Track"/>.
 ///
 /// This is horse racing's equivalent of roulette's 2.70%, and it is arrived at the
-/// same way: by arithmetic over the model, not by running a hundred thousand races
-/// and hoping the average settles down. A game whose return is only known
-/// approximately is a game whose house edge nobody actually knows.
+/// same way: by arithmetic over the model, not by running a hundred thousand races and
+/// hoping the average settles down. A game whose return is only known approximately is
+/// a game whose house edge nobody actually knows.
+///
+/// **Every method here takes a track**, and there is no overload that does not. The
+/// three courses weight the same horses differently, so "the chance runner 7 wins" is
+/// not a question with one answer -- it is 16.3% at the dash and 2.6% at the marathon.
+/// A default track would let a caller price a bet against one card and settle it
+/// against another, which is exactly the class of failure the rest of this file exists
+/// to prevent.
 ///
 /// ## The arithmetic, since it is not obvious
 ///
@@ -26,13 +33,12 @@ public sealed record Price(BetKind Kind, int First, int Second, double Chance, d
 ///
 ///     w_a / W  *  w_b / (W - w_a)  *  w_c / (W - w_a - w_b)
 ///
-/// exactly, where W is the total weight. On a field of eight there are
-/// 8 * 7 * 6 = 336 such prefixes, they are mutually exclusive, and their
-/// probabilities sum to one. **Every bet this game takes is decided by the first
-/// three home** -- win, place and show by construction, exacta and quinella by the
-/// first two -- so walking those 336 prefixes and adding up the ones a bet covers
-/// gives its exact chance. No enumeration of all 40,320 full orders is needed, and
-/// no simulation.
+/// exactly, where the weights and W are this track's. On a field of eight there are
+/// 8 * 7 * 6 = 336 such prefixes, they are mutually exclusive, and their probabilities
+/// sum to one. **Every bet this game takes is decided by the first three home** -- win,
+/// place and show by construction, exacta and quinella by the first two -- so walking
+/// those 336 prefixes and adding up the ones a bet covers gives its exact chance. No
+/// enumeration of all 40,320 full orders is needed, and no simulation.
 ///
 /// ## Why the odds are computed with the same method that settles the bet
 ///
@@ -51,12 +57,14 @@ public static class Odds
     /// <summary>
     /// The house's cut, before the board is rounded.
     ///
-    /// Six percent. Between roulette's 2.70% and the slot machine's edge, and a long
-    /// way kinder than any real track, where a tote takeout of 15-20% is ordinary.
-    /// This is a single number applied identically to every bet on the board, which is
-    /// the property worth protecting: a game where the exacta quietly carries three
-    /// times the edge of the win bet is a game that punishes the players who read it
-    /// most carefully.
+    /// Six percent, and **the same at every track**. That is the property worth
+    /// protecting: a marathon quietly carrying twice the edge of a dash would punish
+    /// exactly the players who read the boards most carefully, and there would be no
+    /// way to tell from looking. The tracks differ in who wins, never in what the house
+    /// takes.
+    ///
+    /// It sits between roulette's 2.70% and the slot machine's, and is a long way
+    /// kinder than any real track, where a tote takeout of 15-20% is ordinary.
     /// </summary>
     public const double Takeout = 0.06;
 
@@ -68,19 +76,21 @@ public static class Odds
     /// house edge small enough to make that safe on the one bet that gets hammered.
     ///
     /// The rounding is applied to the price itself rather than to the payout, so the
-    /// number on the board is the number that settles the bet. A board showing 3.60
-    /// and a table paying 3.6127 is a lie that happens to be in the player's favour,
-    /// and it is still a lie -- see <see cref="Realised"/>, which reports the edge the
-    /// board actually carries rather than the one <see cref="Takeout"/> intended.
+    /// number on the board is the number that settles the bet. A board showing 3.60 and
+    /// a table paying 3.6127 is a lie that happens to be in the player's favour, and it
+    /// is still a lie -- see <see cref="Realised"/>, which reports the edge the board
+    /// actually carries rather than the one <see cref="Takeout"/> intended.
     /// </summary>
     public const double Tick = 0.01;
 
     /// <summary>
-    /// The exact probability this bet wins, by enumeration over the 336 ordered
-    /// top-threes.
+    /// The exact probability this bet wins at this track, by enumeration over the 336
+    /// ordered top-threes.
     /// </summary>
-    public static double Chance(BetKind kind, int first, int second = 0)
+    public static double Chance(Track track, BetKind kind, int first, int second = 0)
     {
+        ArgumentNullException.ThrowIfNull(track);
+
         var bet = new Bet(kind, first, second, 0);
 
         if (!bet.IsWellFormed())
@@ -90,7 +100,7 @@ public static class Odds
 
         var chance = 0.0;
 
-        foreach (var (order, probability) in Prefixes())
+        foreach (var (order, probability) in Prefixes(track))
         {
             if (bet.Covers(order))
             {
@@ -102,19 +112,19 @@ public static class Odds
     }
 
     /// <summary>
-    /// What one chip returns in total if this bet wins, stake included.
+    /// What one chip returns in total if this bet wins at this track, stake included.
     ///
     /// Fair would be <c>1 / chance</c>. The board pays <c>(1 - Takeout) / chance</c>,
     /// rounded down to a <see cref="Tick"/>.
     /// </summary>
-    public static double BoardPrice(BetKind kind, int first, int second = 0)
+    public static double BoardPrice(Track track, BetKind kind, int first, int second = 0)
     {
-        var chance = Chance(kind, first, second);
+        var chance = Chance(track, kind, first, second);
 
-        // Unreachable on the shipped card -- every runner has a positive weight, so
-        // every bet on the board has a positive chance. Guarded anyway because the
-        // alternative is an infinite price, and an infinite price paid on an int stake
-        // is not a big win, it is an overflow.
+        // Unreachable on any shipped card -- Track.MinWeight keeps every runner's
+        // weight positive, so every bet on the board has a positive chance. Guarded
+        // anyway because the alternative is an infinite price, and an infinite price
+        // paid on an int stake is not a big win, it is an overflow.
         if (chance <= 0.0)
         {
             return 0.0;
@@ -133,8 +143,9 @@ public static class Odds
     /// and inventing one is inventing money. At a ten-thousand minimum this costs a
     /// winner less than one part in a million of their return.
     /// </summary>
-    public static int Returns(Bet bet, IReadOnlyList<int> order)
+    public static int Returns(Track track, Bet bet, IReadOnlyList<int> order)
     {
+        ArgumentNullException.ThrowIfNull(track);
         ArgumentNullException.ThrowIfNull(bet);
         ArgumentNullException.ThrowIfNull(order);
 
@@ -143,34 +154,36 @@ public static class Odds
             return 0;
         }
 
-        var price = BoardPrice(bet.Kind, bet.First, bet.Second);
+        var price = BoardPrice(track, bet.Kind, bet.First, bet.Second);
 
         return (int)Math.Floor(bet.Stake * price);
     }
 
     /// <summary>
-    /// The edge the board actually carries on this bet, after the price was rounded
-    /// down to a tick.
+    /// The edge this track's board actually carries on this bet, after the price was
+    /// rounded down to a tick.
     ///
     /// Always at least <see cref="Takeout"/> and never much above it. This exists so
-    /// that the number can be *checked* rather than asserted: the rounding is a real
-    /// effect on a real player's money, and a test that only ever compares against
+    /// the number can be *checked* rather than asserted: the rounding is a real effect
+    /// on a real player's money, and a test that only ever compared against
     /// <see cref="Takeout"/> would not notice a tick coarse enough to double the edge
-    /// on the short-priced favourite.
+    /// on a short-priced favourite.
     /// </summary>
-    public static double Realised(BetKind kind, int first, int second = 0)
-        => 1.0 - (Chance(kind, first, second) * BoardPrice(kind, first, second));
+    public static double Realised(Track track, BetKind kind, int first, int second = 0)
+        => 1.0 - (Chance(track, kind, first, second) * BoardPrice(track, kind, first, second));
 
-    /// <summary>The whole board, in the order the slip shows it.</summary>
-    public static IReadOnlyList<Price> All()
+    /// <summary>This track's whole board, in the order the slip shows it.</summary>
+    public static IReadOnlyList<Price> All(Track track)
     {
+        ArgumentNullException.ThrowIfNull(track);
+
         var prices = new List<Price>();
 
         foreach (var kind in new[] { BetKind.Win, BetKind.Place, BetKind.Show })
         {
             foreach (var runner in Field.Runners)
             {
-                prices.Add(Quote(kind, runner.Number, 0));
+                prices.Add(Quote(track, kind, runner.Number, 0));
             }
         }
 
@@ -180,7 +193,7 @@ public static class Odds
             {
                 if (first.Number != second.Number)
                 {
-                    prices.Add(Quote(BetKind.Exacta, first.Number, second.Number));
+                    prices.Add(Quote(track, BetKind.Exacta, first.Number, second.Number));
                 }
 
                 // Quinella is unordered, so it is quoted once per pair rather than
@@ -189,7 +202,7 @@ public static class Odds
                 // player ends up believing they are two different bets.
                 if (first.Number < second.Number)
                 {
-                    prices.Add(Quote(BetKind.Quinella, first.Number, second.Number));
+                    prices.Add(Quote(track, BetKind.Quinella, first.Number, second.Number));
                 }
             }
         }
@@ -197,23 +210,49 @@ public static class Odds
         return prices;
     }
 
-    private static Price Quote(BetKind kind, int first, int second)
-        => new(kind, first, second, Chance(kind, first, second), BoardPrice(kind, first, second));
+    /// <summary>The longest price anywhere on this track's board.</summary>
+    /// <remarks>
+    /// What bounds <see cref="Track.MaxSlip"/>: a slip can return its whole stake times
+    /// this, and that product has to fit in the <c>int</c> the engine counts chips in.
+    /// </remarks>
+    public static double LongestPrice(Track track)
+    {
+        var longest = 0.0;
+
+        foreach (var price in All(track))
+        {
+            if (price.Board > longest)
+            {
+                longest = price.Board;
+            }
+        }
+
+        return longest;
+    }
+
+    private static Price Quote(Track track, BetKind kind, int first, int second)
+        => new(
+            kind,
+            first,
+            second,
+            Chance(track, kind, first, second),
+            BoardPrice(track, kind, first, second));
 
     /// <summary>
-    /// Every ordered top-three and its exact probability.
+    /// Every ordered top-three at this track and its exact probability.
     ///
     /// 336 of them on a field of eight. Their probabilities sum to one, which is worth
     /// knowing because it is the cheapest possible check that the model is coherent --
-    /// and it is the first thing the tests assert.
+    /// and it is the first thing the tests assert, for every track.
     /// </summary>
-    internal static IEnumerable<(int[] Order, double Probability)> Prefixes()
+    internal static IEnumerable<(int[] Order, double Probability)> Prefixes(Track track)
     {
-        var total = (double)Field.TotalWeight;
+        var total = (double)track.TotalWeight;
 
         foreach (var a in Field.Runners)
         {
-            var afterA = total - a.Weight;
+            var wa = track.WeightOf(a);
+            var afterA = total - wa;
 
             foreach (var b in Field.Runners)
             {
@@ -222,7 +261,8 @@ public static class Odds
                     continue;
                 }
 
-                var afterB = afterA - b.Weight;
+                var wb = track.WeightOf(b);
+                var afterB = afterA - wb;
 
                 foreach (var c in Field.Runners)
                 {
@@ -232,9 +272,9 @@ public static class Odds
                     }
 
                     var probability =
-                        (a.Weight / total)
-                        * (b.Weight / afterA)
-                        * (c.Weight / afterB);
+                        (wa / total)
+                        * (wb / afterA)
+                        * (track.WeightOf(c) / afterB);
 
                     yield return ([a.Number, b.Number, c.Number], probability);
                 }

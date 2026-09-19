@@ -26,8 +26,19 @@ public class Startup(RaceLog log) : IOnLoad
         log.Banner("routes: POST /races/ping, /place, /stats");
         log.Banner($"item event: {RaceActions.Sync}, so the stash keeps up without a reload");
         log.Banner(
-            $"{Field.Count} runners, {Odds.All().Count} spots on the board -- "
-            + $"{Odds.Takeout:P2} to the house on every one of them, computed rather than measured");
+            $"{Field.Count} runners over {Tracks.All.Count} courses, {Odds.All(Tracks.Dash).Count} spots "
+            + $"on each board -- {Odds.Takeout:P2} to the house at every one of them, "
+            + "computed rather than measured");
+
+        foreach (var track in Tracks.All)
+        {
+            var favourite = Field.Runners.OrderByDescending(track.WeightOf).First();
+
+            log.Banner(
+                $"  {track.Name} ({track.Distance}, {track.Laps} lap(s)) -- favourite {favourite.Name} at "
+                + $"{Odds.BoardPrice(track, BetKind.Win, favourite.Number):F2}, "
+                + $"slip max {track.MaxSlip:N0}");
+        }
 
         log.Notice("THIS TABLE PLAYS FOR REAL MONEY. The stakes leave your stash when the");
         log.Notice("race is off, and whatever the slip paid arrives when they pass the post.");

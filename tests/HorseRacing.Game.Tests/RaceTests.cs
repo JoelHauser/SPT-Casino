@@ -10,6 +10,14 @@ namespace HorseRacing.Game.Tests;
 public class RaceTests
 {
     /// <summary>
+    /// These are about the settlement rather than about pricing, so they all run at one
+    /// course. Which one does not matter and that is the point: the money rules are the
+    /// same wherever the race is run. <c>OddsTests</c> and <c>TrackTests</c> are where
+    /// the three boards are compared against each other.
+    /// </summary>
+    private static readonly Track Track = Tracks.Mile;
+
+    /// <summary>
     /// A race finishes with every runner somewhere and none of them twice.
     ///
     /// The failure this catches is the one that would make the whole game quietly
@@ -24,7 +32,7 @@ public class RaceTests
 
         for (var i = 0; i < 20_000; i++)
         {
-            var order = Race.Draw(random);
+            var order = Race.Draw(Track, random);
 
             Assert.Equal(Field.Count, order.Length);
             Assert.Equal(Field.Count, order.Distinct().Count());
@@ -50,7 +58,7 @@ public class RaceTests
 
         for (var i = 0; i < 100_000; i++)
         {
-            var order = Race.Draw(random);
+            var order = Race.Draw(Track, random);
             won.Add(order[0]);
             last.Add(order[^1]);
         }
@@ -81,7 +89,7 @@ public class RaceTests
             new Bet(BetKind.Quinella, 2, 7, 100_000),
         };
 
-        var result = Race.Settle(slip, order);
+        var result = Race.Settle(Track, slip, order);
 
         Assert.Equal(500_000, result.Staked);
         Assert.Equal(0, result.Returned);
@@ -110,13 +118,13 @@ public class RaceTests
             Bet.On(BetKind.Show, 3, 100_000),
         };
 
-        var result = Race.Settle(slip, order);
+        var result = Race.Settle(Track, slip, order);
 
         Assert.All(result.Settlements, s => Assert.True(s.Won));
         Assert.All(result.Settlements, s => Assert.True(s.Returned > 0));
 
         var expected =
-            Odds.Returns(slip[0], order) + Odds.Returns(slip[1], order) + Odds.Returns(slip[2], order);
+            Odds.Returns(Track, slip[0], order) + Odds.Returns(Track, slip[1], order) + Odds.Returns(Track, slip[2], order);
 
         Assert.Equal(expected, result.Returned);
     }
@@ -141,7 +149,7 @@ public class RaceTests
                 new Bet(BetKind.Exacta, 1 + (i % Field.Count), 1 + ((i + 1) % Field.Count), rules.MinBet),
             };
 
-            var result = Race.Run(slip, random);
+            var result = Race.Run(Track, slip, random);
 
             Assert.Equal(result.Settlements.Sum(s => s.Bet.Stake), result.Staked);
             Assert.Equal(result.Settlements.Sum(s => s.Returned), result.Returned);
@@ -166,7 +174,7 @@ public class RaceTests
     {
         const int stake = 137_000;
 
-        foreach (var price in Odds.All())
+        foreach (var price in Odds.All(Track))
         {
             var bet = new Bet(price.Kind, price.First, price.Second, stake);
 
@@ -175,7 +183,7 @@ public class RaceTests
             var order = CoveringOrder(bet);
 
             Assert.True(bet.Covers(order), $"{price.Kind} {price.First}/{price.Second} could not be made to win.");
-            Assert.Equal((int)Math.Floor(stake * price.Board), Odds.Returns(bet, order));
+            Assert.Equal((int)Math.Floor(stake * price.Board), Odds.Returns(Track, bet, order));
         }
     }
 
@@ -190,15 +198,15 @@ public class RaceTests
     public void TheBiggestPossibleWinIsStillAPositiveNumber()
     {
         var rules = new RaceRules();
-        var longest = Odds.All().OrderByDescending(p => p.Board).First();
+        var longest = Odds.All(Track).OrderByDescending(p => p.Board).First();
 
-        var bet = new Bet(longest.Kind, longest.First, longest.Second, rules.MaxBet);
+        var bet = new Bet(longest.Kind, longest.First, longest.Second, Track.MaxSlip);
         var order = CoveringOrder(bet);
-        var paid = Odds.Returns(bet, order);
+        var paid = Odds.Returns(Track, bet, order);
 
         Assert.True(paid > 0, $"the biggest win on the board came back as {paid}.");
-        Assert.True(paid > rules.MaxBet, "a winning bet must return more than it staked.");
-        Assert.Equal((int)Math.Floor(rules.MaxBet * longest.Board), paid);
+        Assert.True(paid > Track.MaxSlip, "a winning bet must return more than it staked.");
+        Assert.Equal((int)Math.Floor(Track.MaxSlip * longest.Board), paid);
     }
 
     [Fact]
@@ -206,11 +214,11 @@ public class RaceTests
     {
         var rules = new RaceRules();
 
-        Assert.True(rules.Accepts(Bet.On(BetKind.Win, 1, 25_000)));
-        Assert.False(rules.Accepts(Bet.On(BetKind.Win, 1, 12_345)));
-        Assert.False(rules.Accepts(Bet.On(BetKind.Win, 1, rules.MinBet - rules.Step)));
-        Assert.False(rules.Accepts(Bet.On(BetKind.Win, 1, rules.MaxBet + rules.Step)));
-        Assert.False(rules.Accepts(Bet.On(BetKind.Win, 9, rules.MinBet)));
+        Assert.True(rules.Accepts(Track, Bet.On(BetKind.Win, 1, 25_000)));
+        Assert.False(rules.Accepts(Track, Bet.On(BetKind.Win, 1, 12_345)));
+        Assert.False(rules.Accepts(Track, Bet.On(BetKind.Win, 1, rules.MinBet - rules.Step)));
+        Assert.False(rules.Accepts(Track, Bet.On(BetKind.Win, 1, Track.MaxSlip + rules.Step)));
+        Assert.False(rules.Accepts(Track, Bet.On(BetKind.Win, 9, rules.MinBet)));
     }
 
     /// <summary>

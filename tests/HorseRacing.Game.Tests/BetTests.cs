@@ -106,10 +106,18 @@ public class BetTests
         Assert.True(new Bet(BetKind.Win, 3, 0, 10_000).IsWellFormed());
     }
 
+    /// <summary>
+    /// Every spot every board quotes is a bet the window would actually take.
+    ///
+    /// Checked at all three courses. They offer the same 108 spots by construction, so
+    /// this ought to be redundant -- which is exactly why it is worth asserting: a
+    /// course that started quoting something unbettable would otherwise be found by a
+    /// player rather than by a test.
+    /// </summary>
     [Fact]
-    public void EveryBetOnTheBoardIsWellFormed()
+    public void EveryBetOnEveryBoardIsWellFormed()
     {
-        foreach (var price in Odds.All())
+        foreach (var price in Tracks.All.SelectMany(Odds.All))
         {
             Assert.True(
                 new Bet(price.Kind, price.First, price.Second, 10_000).IsWellFormed(),

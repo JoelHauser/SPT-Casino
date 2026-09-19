@@ -14,8 +14,8 @@ namespace HorseRacing.Server;
 /// go over as integers unless every property carrying one is attributed. Four sibling
 /// tables were caught by that; sending strings sidesteps it.
 ///
-/// That applies to <see cref="SlipEntry.Kind"/> in particular, which is a
-/// <c>BetKind</c> everywhere except on the wire.
+/// That applies to <see cref="SlipEntry.Kind"/> and to the course shape, both of which
+/// are enums everywhere except here.
 /// </summary>
 public record PingRequest : IRequestData;
 
@@ -38,13 +38,23 @@ public record SlipEntry
 /// <summary>Puts a slip on and runs the race.</summary>
 public record PlaceRequest : IRequestData
 {
+    /// <summary>
+    /// Which course, by id: "dash", "mile" or "marathon".
+    ///
+    /// **Refused if it is not one of them, rather than defaulted.** The three courses
+    /// price the same bet differently -- runner 7 is 5.78 at the dash and 36.28 at the
+    /// marathon -- so quietly running a slip at the wrong one would pay from a board
+    /// the player was never shown.
+    /// </summary>
+    public string Track { get; set; } = string.Empty;
+
     /// <summary>Roubles, Dollars or Euros. Parsed by name, refused if unknown.</summary>
     public string Wallet { get; set; } = nameof(HorseRacing.Server.Wallet.Roubles);
 
     /// <summary>
-    /// The bets. **One currency for the whole slip**, which is why the wallet is up
-    /// here rather than on each entry: a slip half in roubles and half in dollars has
-    /// no total, and the ceiling this table enforces is a ceiling on the total.
+    /// The bets. **One currency and one course for the whole slip**, which is why both
+    /// are up here rather than on each entry: a slip half in roubles and half at the
+    /// marathon has no total and no board.
     /// </summary>
     public List<SlipEntry> Bets { get; set; } = [];
 
@@ -64,18 +74,24 @@ public record RaceSyncAction : BaseInteractionRequestData;
 /// <summary>Asks for the lifetime record. Nothing to send -- the session id is enough.</summary>
 public record StatsRequest : IRequestData;
 
-/// <summary>One runner, as the board shows it.</summary>
+/// <summary>One runner as a given course prices it.</summary>
 public record RunnerView
 {
     public int Number { get; init; }
 
     public string Name { get; init; } = string.Empty;
 
-    /// <summary>Its exact chance of winning, for the form line under the name.</summary>
+    /// <summary>Its speed rating, 1-20. Shown so the form is readable rather than magic.</summary>
+    public int Speed { get; init; }
+
+    /// <summary>Its stamina rating, 1-20.</summary>
+    public int Stamina { get; init; }
+
+    /// <summary>Its exact chance of winning **at this course**.</summary>
     public double Chance { get; init; }
 }
 
-/// <summary>One spot on the board and what it pays.</summary>
+/// <summary>One spot on a board and what it pays.</summary>
 public record PriceView
 {
     public string Kind { get; init; } = string.Empty;
@@ -88,6 +104,45 @@ public record PriceView
 
     /// <summary>Total returned per unit staked, stake included.</summary>
     public double Price { get; init; }
+}
+
+/// <summary>
+/// One course, its card and its whole board.
+///
+/// Self-contained on purpose: the panel switches course by swapping which one of these
+/// it is drawing from, with nothing to re-fetch and nothing to recompute. Three of them
+/// is about 30KB of JSON on a route that is already called once per open.
+/// </summary>
+public record CourseView
+{
+    public string Id { get; init; } = string.Empty;
+
+    public string Name { get; init; } = string.Empty;
+
+    public string Distance { get; init; } = string.Empty;
+
+    public string Blurb { get; init; } = string.Empty;
+
+    /// <summary>"Straight" or "Oval". The client draws from this.</summary>
+    public string Shape { get; init; } = string.Empty;
+
+    public int Laps { get; init; }
+
+    /// <summary>How long the race takes on screen, in seconds.</summary>
+    public double RunSeconds { get; init; }
+
+    /// <summary>
+    /// The most a whole slip may cost here, in chips.
+    ///
+    /// Per course, because it is arithmetic on that course's longest price rather than
+    /// a house rule. The panel shows the smaller of this and the currency's own cap.
+    /// </summary>
+    public int MaxSlip { get; init; }
+
+    public IReadOnlyList<RunnerView> Runners { get; init; } = [];
+
+    /// <summary>All 108 spots at this course.</summary>
+    public IReadOnlyList<PriceView> Board { get; init; } = [];
 }
 
 /// <summary>What one bet on the slip did.</summary>
@@ -106,17 +161,18 @@ public record SettlementView
     public long Returned { get; init; }
 }
 
-/// <summary>
-/// The race that just ran.
-/// </summary>
+/// <summary>The race that just ran.</summary>
 public record RaceView
 {
+    /// <summary>Which course it was run at, echoed back so the client cannot mis-draw it.</summary>
+    public string Track { get; init; } = string.Empty;
+
     /// <summary>
     /// Every runner's saddlecloth number in finishing position. <c>Order[0]</c> won.
     ///
     /// **This is what the client animates to.** The whole field is sent rather than
-    /// only the placings, because the panel draws eight horses crossing a line and
-    /// has to know where the other five went.
+    /// only the placings, because the panel draws eight horses crossing a line and has
+    /// to know where the other five went.
     /// </summary>
     public IReadOnlyList<int> Order { get; init; } = [];
 
@@ -154,7 +210,10 @@ public record StakeLimits
     /// <summary>The smallest single bet.</summary>
     public int Min { get; init; }
 
-    /// <summary>The most the whole slip may come to. See <see cref="WalletInfo"/>.</summary>
+    /// <summary>
+    /// The most the whole slip may come to in this currency, before the course's own
+    /// ceiling is applied. See <see cref="CourseView.MaxSlip"/>.
+    /// </summary>
     public int Max { get; init; }
 
     public int Step { get; init; }
@@ -166,7 +225,7 @@ public record StakeLimits
 /// The health check. Answers "did the mod load, did the session resolve, can the money
 /// be read" -- the first thing worth having and the last thing to stop working.
 ///
-/// It also carries the card, the board and the limits, so the panel draws the table's
+/// It also carries every course, its card and its board, so the panel draws the table's
 /// own numbers rather than a copy that can drift from them. A panel holding its own
 /// copy of the prices is a panel that can advertise a payout the table does not give.
 /// </summary>
@@ -184,13 +243,10 @@ public record PingResponse
 
     public Dictionary<string, StakeLimits> Limits { get; init; } = [];
 
-    /// <summary>The card, in saddlecloth order.</summary>
-    public IReadOnlyList<RunnerView> Runners { get; init; } = [];
+    /// <summary>Every course, shortest first.</summary>
+    public IReadOnlyList<CourseView> Courses { get; init; } = [];
 
-    /// <summary>All 108 spots and their prices.</summary>
-    public IReadOnlyList<PriceView> Board { get; init; } = [];
-
-    /// <summary>The house's cut, as a fraction. Computed, not measured.</summary>
+    /// <summary>The house's cut, as a fraction. The same at every course.</summary>
     public double Takeout { get; init; }
 
     /// <summary>How many bets may be on one slip.</summary>

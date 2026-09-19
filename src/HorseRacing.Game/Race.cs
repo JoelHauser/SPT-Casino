@@ -11,8 +11,10 @@ namespace HorseRacing.Game;
 public sealed record Settlement(Bet Bet, bool Won, int Returned);
 
 /// <summary>
-/// The result of a race: who finished where, and what the slip was worth.
+/// The result of a race: where it was run, who finished where, and what the slip was
+/// worth.
 /// </summary>
+/// <param name="Track">The course it was run at. What priced every bet on the slip.</param>
 /// <param name="Order">
 /// Every runner's saddlecloth number in finishing position. <c>Order[0]</c> won. The
 /// full field is reported rather than just the placings, because the client draws
@@ -22,6 +24,7 @@ public sealed record Settlement(Bet Bet, bool Won, int Returned);
 /// <param name="Staked">The total that went in.</param>
 /// <param name="Returned">The total that came back, stakes of winning bets included.</param>
 public sealed record RaceResult(
+    Track Track,
     IReadOnlyList<int> Order,
     IReadOnlyList<Settlement> Settlements,
     int Staked,
@@ -36,22 +39,27 @@ public sealed record RaceResult(
 public static class Race
 {
     /// <summary>
-    /// Draws a finishing order.
+    /// Draws a finishing order at this track.
     ///
-    /// Weighted sampling without replacement: the winner is drawn in proportion to
-    /// weight, removed, and the next drawn from what is left. That is the model
-    /// <see cref="Odds"/> prices against, and the fact that both the draw and the
-    /// board come from one description of the race is the only reason the stated edge
-    /// is the real one.
+    /// Weighted sampling without replacement, using **this track's** weights: the
+    /// winner is drawn in proportion to weight, removed, and the next drawn from what
+    /// is left. That is the model <see cref="Odds"/> prices against, and the fact that
+    /// both the draw and the board come from one description of the race is the only
+    /// reason the stated edge is the real one.
+    ///
+    /// The track is a parameter rather than something the caller has already baked in,
+    /// so a race can never be drawn against one card and paid against another.
     /// </summary>
+    /// <param name="track">The course.</param>
     /// <param name="random">
     /// The source of randomness. Passed in rather than owned so a test can force a
-    /// result -- and so the server can hold one seeded instance rather than newing up
-    /// a <see cref="System.Random"/> per race, which on a fast machine hands
-    /// consecutive races the same tick-seeded sequence.
+    /// result -- and so the server can hold one instance rather than newing up a
+    /// <see cref="System.Random"/> per race, which on a fast machine hands consecutive
+    /// races the same tick-seeded sequence.
     /// </param>
-    public static int[] Draw(Random random)
+    public static int[] Draw(Track track, Random random)
     {
+        ArgumentNullException.ThrowIfNull(track);
         ArgumentNullException.ThrowIfNull(random);
 
         var remaining = new List<Horse>(Field.Runners);
@@ -63,7 +71,7 @@ public static class Race
 
             foreach (var runner in remaining)
             {
-                total += runner.Weight;
+                total += track.WeightOf(runner);
             }
 
             // NextDouble is [0, 1), so the cursor never reaches total and the final
@@ -73,7 +81,7 @@ public static class Race
 
             for (var index = 0; index < remaining.Count; index++)
             {
-                cursor -= remaining[index].Weight;
+                cursor -= track.WeightOf(remaining[index]);
 
                 if (cursor < 0.0)
                 {
@@ -90,7 +98,7 @@ public static class Race
     }
 
     /// <summary>
-    /// Settles a slip against a finishing order.
+    /// Settles a slip against a finishing order at this track.
     /// </summary>
     /// <remarks>
     /// Every bet is settled independently and none of them can see each other. That is
@@ -98,8 +106,9 @@ public static class Race
     /// since surely only one bet can win -- is false here and expensively so: a punter
     /// backing runner 3 to win, to place and to show collects all three when it wins.
     /// </remarks>
-    public static RaceResult Settle(IReadOnlyList<Bet> slip, IReadOnlyList<int> order)
+    public static RaceResult Settle(Track track, IReadOnlyList<Bet> slip, IReadOnlyList<int> order)
     {
+        ArgumentNullException.ThrowIfNull(track);
         ArgumentNullException.ThrowIfNull(slip);
         ArgumentNullException.ThrowIfNull(order);
 
@@ -110,7 +119,7 @@ public static class Race
         foreach (var bet in slip)
         {
             var won = bet.Covers(order);
-            var paid = won ? Odds.Returns(bet, order) : 0;
+            var paid = won ? Odds.Returns(track, bet, order) : 0;
 
             settlements.Add(new Settlement(bet, won, paid));
 
@@ -118,12 +127,10 @@ public static class Race
             returned += paid;
         }
 
-        return new RaceResult(order, settlements, staked, returned);
+        return new RaceResult(track, order, settlements, staked, returned);
     }
 
-    /// <summary>
-    /// Runs a race and settles the slip against it, in one call.
-    /// </summary>
-    public static RaceResult Run(IReadOnlyList<Bet> slip, Random random)
-        => Settle(slip, Draw(random));
+    /// <summary>Runs a race at this track and settles the slip against it, in one call.</summary>
+    public static RaceResult Run(Track track, IReadOnlyList<Bet> slip, Random random)
+        => Settle(track, slip, Draw(track, random));
 }

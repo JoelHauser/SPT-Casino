@@ -10,30 +10,58 @@ and believes it.
 
 ## Current state
 
-**2026-09-19. Engine, server and client written; not yet played.** Everything below is
-true of the code, and the parts that have been *verified* are marked as such. Nothing
-in this file claims in-game behaviour, because no game client has been run against it
--- see "What has not been checked".
+**2026-09-19, second pass. Three courses, and the panel relaid out.** The first
+version had one course and a layout that overlapped itself; both are fixed. The engine
+and money path have been played through the live server but **not yet through a game
+client** -- see "What has not been checked".
 
-- Engine: 34 tests, 13/13 mutants caught. The 336 prefixes sum to 1.0, and a 200,000
-  race Monte Carlo agrees with the computed chance for all five bet kinds.
-- Server: 24 money tests, 12/12 mutants caught. Routes `/races/ping`, `/races/place`
-  and `/races/stats`, item event `RacesSync`.
-- Client: the fifth tile in the lobby. Track, board, slip, stake stepper, currency
-  switch, and the result drawn when the last runner is home.
+- **Three courses**, the same eight horses at each: THE DASH (5f, straight), THE MILE
+  (8f, one lap of an oval), THE MARATHON (2m, two laps). A horse's chance comes from
+  its speed and stamina ratings weighted by the course, so the form inverts as the
+  races get longer.
+- Engine: 64 tests. The 336 prefixes sum to 1.0 **at every course**, and a 200,000-race
+  Monte Carlo agrees with the computed chance at all three.
+- Server: 38 tests, 12/12 mutants caught on the money path. Routes `/races/ping`,
+  `/races/place` and `/races/stats`, item event `RacesSync`.
+- Client: fifth tile in the lobby. Course tabs, two track renderers, board, slip, stake
+  stepper, currency switch, and the result drawn when the last runner is home.
+- Verified live against a running server on 2026-09-19: all three boards served, each
+  108 spots with win chances summing to 1.0000000000, per-course ceilings enforced, and
+  an unknown course refused by name.
 - Verified against the built assembly: every racing type is in `Casino.Client.dll`, and
   the private-use byte scan comes back zero.
 - `scripts/casino/pack.ps1` stages 11 assemblies and `horseracing.config.json`.
+
+## Randomness
+
+`RandomSource.Create()` returns `Random.Shared` -- .NET's `ThreadSafeRandom`, xoshiro256\*\*
+under the hood, seeded per thread from a strong entropy source. Races are not
+reproducible across restarts and concurrent requests cannot corrupt its state.
+
+Audited over 2,000,000 races on 2026-09-19:
+
+| | |
+| --- | --- |
+| Winner distribution | chi-square 2.63 on 7 df (5% critical value 14.07) |
+| Every runner finishes exactly once | row/column sum error 2.2e-16 |
+| Race N to race N+1 correlation | chi-square 49.16 on 49 df -- the expected value *is* 49 |
+
+Worst single deviation was 0.24%. **There is no memory between races**: a losing run
+does not make the next race kinder, and the edge is a flat 6% at every spot of every
+course.
 
 ---
 
 ## The single most important fact about this table
 
-**Every price on the board is exact, and both the board and the settlement compute it
-the same way.**
+**Every price on every board is exact, and both the board and the settlement compute it
+the same way -- from the same course.**
 
 `Odds.Chance` asks `Bet.Covers` which of the 336 ordered top-threes win, and so does the
-settlement. That is deliberate, and it is not a tidiness argument. The failure it
+settlement. Every method on `Odds` takes a `Track` and **there is no overload that does
+not**: "the chance runner 7 wins" is not a question with one answer, it is 16.26% at the
+dash and 2.59% at the marathon. A default course would let a caller price against one
+card and settle against another. That is deliberate, and it is not a tidiness argument. The failure it
 removes is the one where the board and the table quietly disagree about what a bet
 means: a quinella priced as an ordered pair and paid as an unordered one is mispriced by
 a factor of two, and **every individual payout would still be correct**, so no balance
@@ -57,30 +85,54 @@ exclusive, their probabilities sum to one, and **every bet this table takes is d
 by the first three home**. So a bet's chance is the sum of the prefixes it covers. No
 enumeration of all 40,320 full orders, and no simulation.
 
-## The card
+## The stable, and the three cards it makes
 
-Weights, not probabilities. A field of probabilities has to sum to one, so every edit to
-it is an edit to every other runner -- and worse, the sum is a thing that can be wrong. A
-card adding to 0.99 is a silently rigged race and nothing about reading the numbers would
-show it. Weights cannot be inconsistent with each other.
+**A horse has no weight of its own.** It has a speed rating and a stamina rating, and
+each course turns those into a weight with its own formula. That is the whole reason
+there is more than one course: three cards of unrelated horses would be three separate
+games sharing a panel, whereas this way the form is worth learning.
 
-| # | Name | Weight | Win | Price | Place | Show |
+| # | Name | Speed | Stamina | DASH | MILE | MARATHON |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | GRAY GHOST | 30 | 27.03% | 3.47 | 1.87 | 1.36 |
-| 2 | DOLLAR SIGN | 24 | 21.62% | 4.34 | 2.23 | 1.54 |
-| 3 | FACTORY FLYER | 18 | 16.22% | 5.79 | 2.85 | 1.88 |
-| 4 | NIGHT RAIDER | 14 | 12.61% | 7.45 | 3.58 | 2.29 |
-| 5 | RESHALA'S PRIDE | 10 | 9.01% | 10.43 | 4.90 | 3.05 |
-| 6 | SCAV LUCK | 7 | 6.31% | 14.90 | 6.90 | 4.21 |
-| 7 | LABS LIGHTNING | 5 | 4.50% | 20.86 | 9.58 | 5.78 |
-| 8 | LEFT BEHIND | 3 | 2.70% | 34.77 | 15.82 | 9.44 |
+| 1 | GRAY GHOST | 20 | 9 | **22.17%** | 19.40% | 12.95% |
+| 2 | DOLLAR SIGN | 17 | 13 | 19.70% | **19.65%** | 17.62% |
+| 3 | FACTORY FLYER | 12 | 16 | 13.79% | 16.42% | 19.69% |
+| 4 | NIGHT RAIDER | 8 | 19 | 9.36% | 14.43% | **22.28%** |
+| 5 | RESHALA'S PRIDE | 15 | 6 | 13.30% | 10.20% | 5.70% |
+| 6 | SCAV LUCK | 5 | 15 | 2.96% | 6.72% | 14.51% |
+| 7 | LABS LIGHTNING | 18 | 3 | 16.26% | 10.95% | 2.59% |
+| 8 | LEFT BEHIND | 7 | 8 | 2.46% | 2.24% | 4.66% |
+
+LABS LIGHTNING and SCAV LUCK are mirror images and are what the design is for: one wins
+a race in six over five furlongs and one in forty over two miles; the other does the
+reverse. DOLLAR SIGN is the class horse, never worse than third choice anywhere. LEFT
+BEHIND is the rag, and a card needs one -- the longest price on every board involves it.
+
+The courses:
+
+| Course | Distance | Shape | Weight formula | Spread | Longest price | Slip max |
+| --- | --- | --- | --- | --- | --- | --- |
+| THE DASH | 5f | straight | 3*Speed + 1*Stamina - 24 | 45:5 | 1259.41 | 1,500,000 |
+| THE MILE | 8f | oval, 1 lap | 5*Speed + 4*Stamina - 58 | 79:9 | 611.13 | 2,000,000 |
+| THE MARATHON | 2m | oval, 2 laps | 1*Speed + 3*Stamina - 22 | 43:5 | 757.93 | 2,000,000 |
+
+**The threshold is what makes a card interesting.** Without it the weights would be raw
+scores like 69 and 29 -- barely two to one, every runner priced within a whisker of every
+other. Subtracting a fixed amount stretches what is left to about nine to one, which is
+roughly what a real card looks like. It is subtraction rather than a power curve because
+it keeps the weights whole numbers, and whole numbers are what let a chance be an exact
+ratio rather than a float already rounded twice.
+
+`Track.MinWeight` floors a weight at 1 so a badly-treated horse cannot go negative -- a
+negative weight makes the field's total *smaller* by entering it, which would corrupt
+every other price rather than failing. `TrackTests` asserts no shipped course actually
+reaches the floor, so it is a guard and not something in use.
+
+The ratings were tuned against three constraints that `TrackTests` enforces: **no ties at
+any course** (two identical prices is a choice nobody can make), **nothing at the floor**,
+and **not all three courses may share a favourite**.
 
 A price is the **total** returned per chip, stake included, not the profit.
-
-The weights are the only numbers in this game chosen by taste. Everything else is
-computed from them. The spread is the whole character of the table: the favourite wins a
-little over a quarter of the time and the rag wins about one race in thirty-seven. A flat
-field would make every bet the same bet wearing a different number.
 
 **Eight runners, and that is the one number worth defending.** Exacta is an ordered pair,
 so the field size squares: six runners give thirty exactas, twelve give a hundred and
@@ -89,7 +141,11 @@ the board stays readable.
 
 ## The takeout, and what it actually is
 
-`Odds.Takeout` is 6%, one number applied identically to all 108 spots. **The realised
+`Odds.Takeout` is 6%, one number applied identically to all 108 spots **at all three
+courses**. That is the property worth protecting: a marathon quietly carrying twice the
+edge of a dash would punish exactly the players who compare the boards most carefully,
+and nothing on screen would say so. The courses differ in who wins, never in what the
+house takes. **The realised
 edge is 6.0002% to 6.4327%**, and the gap is the tick: prices are rounded *down* to 0.01,
 which costs the player a little and costs them most on the short-priced favourite, where
 the price is small enough for a hundredth to matter.
@@ -103,20 +159,23 @@ asserts both ends of it on every spot rather than on a sample.
 Six percent sits between roulette's 2.70% and the slot machine's, and is a long way
 kinder than any real track, where a tote takeout of 15-20% is ordinary.
 
-## MaxBet is arithmetic, not a house limit
+## The slip ceiling is per course, and it is arithmetic
 
-The longest price on this card is **751.24** -- the two slowest runners home in order --
-and the engine counts chips in an `int`. Two million at that price is about 1.5 billion;
-three million does not fit. An overflow here does not pay a big win, it pays a negative
-one.
+**Each course carries its own `MaxSlip`, and the dash's is the lowest.** Not because the
+house is more careful over five furlongs: the dash has the widest spread, so it has the
+longest price (1259.41), and 2,000,000 at that price is 2.52 billion -- past the `int`
+the engine counts chips in. An overflow does not pay a big win, it pays a negative one.
 
-`OddsTests.TheMaximumStakeAtTheLongestPriceStillFitsInAnInt` asserts this against the
-real card rather than against the paragraph above, and also asserts that *doubling*
-MaxBet breaks -- so the limit is demonstrably the binding one rather than a round number
-somebody liked. The moment anybody edits a weight in `Field`, that test moves and this
+`TrackTests.TheSlipCeilingAtItsOwnLongestPriceStillFitsInAnInt` asserts this against each
+real board rather than against the paragraph above, and also asserts that *doubling* the
+ceiling breaks -- so each limit is demonstrably the binding one rather than a round number
+somebody liked. The moment anybody edits a rating or a threshold, that test moves and this
 prose does not.
 
-Raising it means moving the engine to `long` first.
+The cap in force is `min(currency cap, course cap)`, applied by `WalletInfo.AllowsSlip`
+and shown by the panel before the player finds out by being refused.
+
+Raising any of them means moving the engine to `long` first.
 
 ## The ceiling is on the slip, not on the bet
 
@@ -168,9 +227,23 @@ the casino.** No such file has ever existed for it, and a lookup for one could o
 find somebody else's money. `Casino.Server.LegacyData` is not called from here, and that
 is not an oversight.
 
-## The track
+## The two track renderers
 
-`TrackView` draws eight lanes side-on, running left to right.
+`TrackView` draws either a straight (the dash) or an oval (the mile and the marathon,
+the latter twice round).
+
+**The shape changes only where a runner is drawn, never how fast it gets there.**
+`Gallop` computes one number per runner per frame -- how far round it is, 0 to 1 -- and
+hands it to whichever placement the course uses. That split is what keeps the guarantee
+below true at both shapes: there is exactly one piece of code that decides who is in
+front, and it does not know what the course looks like.
+
+The oval's aspect is **capped at 2.6:1 against its height, not stretched to the panel's
+width**. The holder is 1468 x 268, so filling it would give a six-to-one sliver that
+reads as a stadium and squashes the runners flat on the bends, where they are most
+bunched. Capping it leaves a wide margin on the left, which is where the results board
+went -- an oval has no lanes to write each runner's placing beside, and eight rows do not
+fit in an infield 130 units tall.
 
 **The ordering is arithmetic, not arrangement.** Each runner is given a finishing time
 strictly ordered by its finishing position, and its progress is its own elapsed fraction
@@ -198,6 +271,23 @@ this with its wheel and Slots with its reels.
 That ordering is the 1.2.6 lesson from `docs/slots.md`: a line that could throw was put
 ahead of the try guarding the drawing, so every table paid out correctly and then drew
 nothing.
+
+## The panel is laid out from a band table
+
+Every element takes its vertical position from a named constant measured down from the
+top of the frame, and **never from the element before it**. The first version positioned
+the pair-bet row relative to where the runner loop happened to finish and the status and
+result relative to the bottom of the frame: two coordinate systems growing towards each
+other, which at eight runners overlapped by 18 pixels and drew the word NOTHING through
+the EXACTA/QUINELLA selector.
+
+The bands are checked for overlaps arithmetically rather than by looking at the panel,
+because looking at it is the thing this environment cannot do.
+
+The canvas uses `ScaleWithScreenSize` against a 1920x1080 reference matched on height,
+the same as Roulette's and Slots'. It was `ConstantPixelSize` at first, which would have
+left it a fixed 1520x900 actual pixels -- shrinking into the middle of a 1440p or 4K
+screen while every other table scaled up around it.
 
 ## The pip is a horseshoe
 
@@ -227,11 +317,13 @@ about code that reads correctly, not an observation.
 
 Specifically unverified:
 
-- The panel's layout at any real resolution. The frame is 1520x900 with a 384px track,
-  which fits 8 lanes at 46px -- but that arithmetic has never met a screen.
-- Whether the board and the slip actually fit side by side without overlapping at the
-  hardcoded offsets in `RacePanelChrome`.
-- Whether the race reads as a race.
+- The panel at any real resolution. The band table is verified to have no overlaps and
+  60 units of bottom margin, but that arithmetic has still never met a screen.
+- **Whether the oval reads as a racecourse.** It is drawn from `Textures.Ring` at a
+  large thickness, which is an annulus and ought to look like a track; it has never been
+  seen. The two-lap marathon in particular has never been watched.
+- Whether the mown stripes and rails on the straight help or just add noise.
+- Whether three course tabs at 260 units each are the right size.
 - Whether the item-event sync actually round-trips in a running game. The two strings
   themselves **do** agree -- `RacePanel.SyncAction` and `RaceActions.Sync` were both
   read out of the source on 2026-09-19 and are both `"RacesSync"` -- but **nothing

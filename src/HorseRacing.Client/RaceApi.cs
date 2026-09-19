@@ -28,7 +28,7 @@ namespace HorseRacing.Client
         internal static JObject Stats() => Post("/races/stats", "{}");
 
         /// <summary>
-        /// Sends the slip and runs the race.
+        /// Sends the slip and runs the race at a named course.
         ///
         /// PascalCase property names, deliberately, like every other body here. SPT
         /// matches request bodies case-sensitively, so lowercase keys bind nothing and
@@ -40,11 +40,13 @@ namespace HorseRacing.Client
         /// elsewhere is a serialiser that can start emitting camelCase without this
         /// file changing.
         /// </summary>
-        internal static JObject Place(IEnumerable<SlipBet> bets, string wallet, bool ignoreMaximum)
+        internal static JObject Place(
+            string track, IEnumerable<SlipBet> bets, string wallet, bool ignoreMaximum)
         {
             var body = new StringBuilder();
 
-            body.Append("{\"Wallet\":\"").Append(wallet).Append("\",\"IgnoreMaximum\":")
+            body.Append("{\"Track\":\"").Append(track)
+                .Append("\",\"Wallet\":\"").Append(wallet).Append("\",\"IgnoreMaximum\":")
                 .Append(ignoreMaximum ? "true" : "false")
                 .Append(",\"Bets\":[");
 
