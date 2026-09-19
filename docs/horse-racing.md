@@ -10,6 +10,20 @@ and believes it.
 
 ## Current state
 
+**2026-09-19, sixth pass. Both lines, and the draw order.**
+
+- **The runners are built last, so nothing is painted over them.** Unity draws siblings
+  in creation order and the finish line was built after the horses, so it was drawn over
+  the top of the field standing at it. That is what "they stop directly under the finish
+  line" meant. Start line, finish line, then runners.
+- **The start line was wonky and now matches the finish line.** It had stretched anchors,
+  a height of `parent - 32`, a centre pivot and an 8 unit nudge, which worked out as a
+  236 unit line hung from -126 to +110 in a box running -134 to +134 -- off-centre, short
+  at one end, long at the other, lined up with nothing. Both lines are now the same top,
+  height and width, differing only in that the finish is checkered.
+- The field stops **on** the line rather than twenty past it. Past it looked like the
+  race carried on after the result.
+
 **2026-09-19, fifth pass. The finish, third attempt.**
 
 - **The field no longer staggers at the post.** Spreading it by finishing position was
@@ -82,7 +96,30 @@ client** -- see "What has not been checked".
   the private-use byte scan comes back zero.
 - `scripts/casino/pack.ps1` stages 11 assemblies and `horseracing.config.json`.
 
-## Randomness
+## Randomness, and what the FORM column means
+
+**The percentages are each runner's exact chance of winning that race, and they are
+deliberately not equal.** That is the whole game: a card where every horse had a 12.5%
+chance would make every bet the same bet wearing a different number. They sum to 100% at
+every course.
+
+The consequence that surprises people, measured over 200,000 races per course:
+
+| Course | Favourite | Wins | **Loses** | Finishes last | Longest run without winning |
+| --- | --- | --- | --- | --- | --- |
+| THE DASH | GRAY GHOST | 22.2% | **77.8%** | 0.7% | 45 races |
+| THE MILE | DOLLAR SIGN | 19.8% | **80.2%** | 1.5% | 41 races |
+| THE MARATHON | NIGHT RAIDER | 22.2% | **77.8%** | 0.8% | 42 races |
+
+A favourite at these prices loses about four races in five and can go forty in a row
+without winning one. **Nothing is wrong when that happens** -- it is what a 22% chance
+looks like from the inside.
+
+Observed win rates match the stated chances to within about a tenth of a percentage
+point at every runner of every course, which is the check that the board is telling the
+truth rather than merely being self-consistent.
+
+
 
 `RandomSource.Create()` returns `Random.Shared` -- .NET's `ThreadSafeRandom`, xoshiro256\*\*
 under the hood, seeded per thread from a strong entropy source. Races are not

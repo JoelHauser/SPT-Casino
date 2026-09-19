@@ -190,13 +190,18 @@ namespace HorseRacing.Client
 
             BuildFurlongMarkers(parent, furlongs, font);
 
+            // **The two lines go down before the runners do.** Unity draws siblings in
+            // creation order, so building them afterwards painted the finish line over
+            // the top of the horses standing at it -- which is what "they stop directly
+            // under the finish line" was describing. The runners are the thing being
+            // looked at; nothing on this track is allowed in front of them.
+            BuildStalls(parent);
+            BuildPost(parent);
+
             for (var lane = 0; lane < runners.Count; lane++)
             {
                 BuildLane(parent, lane, runners[lane].Key, runners[lane].Value, font);
             }
-
-            BuildStalls(parent);
-            BuildPost(parent);
         }
 
         /// <summary>
@@ -305,18 +310,32 @@ namespace HorseRacing.Client
                 Start, top - ((LaneHeight - HorseSize) / 2f))));
         }
 
-        /// <summary>The starting stalls, which is what the left edge of a race is.</summary>
+        /// <summary>
+        /// The starting line, drawn the same way the finish line is.
+        ///
+        /// It used to stretch to the holder's full height and then subtract 32, with
+        /// the pivot at the vertical centre and an 8 unit nudge on top -- which worked
+        /// out as a 236 unit line hung from -126 to +110 in a box running -134 to +134.
+        /// Off-centre, short at one end, long at the other, and lined up with nothing.
+        /// It read as a stray mark rather than as the start of the race.
+        ///
+        /// Now it is sized and placed exactly like <see cref="BuildPost"/>: same top,
+        /// same height, same width, pivot centred horizontally. Plain rather than
+        /// checkered, because the two ends of a race should not look like each other.
+        /// </summary>
         private static void BuildStalls(RectTransform parent)
         {
+            var height = Mathf.Max(40f, parent.rect.height - 8f);
+
             var stalls = New("Stalls", parent);
-            stalls.anchorMin = new Vector2(0f, 0f);
+            stalls.anchorMin = new Vector2(0f, 1f);
             stalls.anchorMax = new Vector2(0f, 1f);
-            stalls.pivot = new Vector2(0f, 0.5f);
-            stalls.anchoredPosition = new Vector2(Start - (HorseSize * 0.5f) - 8f, -8f);
-            stalls.sizeDelta = new Vector2(5f, -32f);
+            stalls.pivot = new Vector2(0.5f, 1f);
+            stalls.anchoredPosition = new Vector2(Start - (HorseSize * 0.5f) - 6f, -4f);
+            stalls.sizeDelta = new Vector2(3f, height);
 
             var image = stalls.gameObject.AddComponent<Image>();
-            image.color = new Color(Rail.r, Rail.g, Rail.b, 0.5f);
+            image.color = new Color(Rail.r, Rail.g, Rail.b, 0.55f);
             image.raycastTarget = false;
         }
 
@@ -573,10 +592,15 @@ namespace HorseRacing.Client
         /// tenth of the visible track, is not that -- it is eight horses stopped in
         /// eight different places.
         ///
-        /// So the field ends in a column just past the line, which is what a field that
-        /// has crossed looks like, and **the order is read from the placings beside
-        /// each lane** -- which is what that column is for and is unambiguous in a way
-        /// that comparing eight x-positions by eye never was.
+        /// So the field ends in a column **on** the line rather than past it, and the
+        /// order is read from the placings beside each lane -- which is what that
+        /// column is for and is unambiguous in a way that comparing eight x-positions
+        /// by eye never was.
+        ///
+        /// On the line rather than twenty beyond it because beyond it looks like the
+        /// race carried on after the result: a runner whose centre is at the post has
+        /// plainly just finished there. The runners are built after the line so they
+        /// sit in front of it.
         /// </summary>
         private static void Finish(float travel)
         {
@@ -585,7 +609,7 @@ namespace HorseRacing.Client
                 if (runner != null)
                 {
                     runner.anchoredPosition = new Vector2(
-                        Start + travel + 20f, runner.anchoredPosition.y);
+                        Start + travel, runner.anchoredPosition.y);
                 }
             }
         }
