@@ -68,6 +68,18 @@ lines in `Casino.Client.csproj`, one entry in `Games.All`, a shim in `Shims.cs`,
 It needed no `.Client.csproj` of its own: the other four have one only because they used
 to be standalone plugins.
 
+**The lobby wraps at four tiles a row, and that is a standing rule rather than a number
+that suited five games.** `CasinoLobby.PerRow` is 4; a fifth table starts a second row,
+a ninth a third, and nothing needs editing to make that happen. A second row also shrinks
+the tiles from 300x240 to 272x212, because two rows at the old size do not fit the 1080
+units the scaler gives (it matches height against a 1080 reference, so that budget is the
+same on every monitor). Four games or fewer are arithmetically unchanged -- title at 250,
+subtitle 200, hint -230, CLOSE -300, the exact numbers those were hardcoded to before.
+
+It fits comfortably to eight and is already six units over at nine to twelve. **A ninth
+table means shrinking again**, and it will fail by drawing off the bottom of the screen
+rather than by complaining.
+
 ### The layers, which matter more than they look
 
 | Canvas | Sorting order |

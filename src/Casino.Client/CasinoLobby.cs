@@ -221,52 +221,120 @@ namespace Casino.Client
             backdrop.offsetMin = Vector2.zero;
             backdrop.offsetMax = Vector2.zero;
 
-            var title = NewText("Title", canvasObject.transform, "SPT CASINO", 44f);
-            title.rectTransform.anchorMin = title.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-            title.rectTransform.sizeDelta = new Vector2(900f, 60f);
-            title.rectTransform.anchoredPosition = new Vector2(0f, 250f);
-            title.color = Gold;
+            // The tiles go down first, and everything else is positioned off the block
+            // they occupy rather than at numbers of its own. With one row that lands
+            // the title, the hint and CLOSE exactly where they always were; with two it
+            // moves them out of the way instead of letting a second row run through
+            // them. See BuildTiles.
+            var tiles = BuildTiles(canvasObject.transform);
 
             var sub = NewText("Sub", canvasObject.transform, "Pick a table.", 22f);
             sub.rectTransform.anchorMin = sub.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             sub.rectTransform.sizeDelta = new Vector2(900f, 30f);
-            sub.rectTransform.anchoredPosition = new Vector2(0f, 200f);
+            sub.rectTransform.anchoredPosition = new Vector2(0f, tiles.yMax + 60f);
 
-            BuildTiles(canvasObject.transform);
+            var title = NewText("Title", canvasObject.transform, "SPT CASINO", 44f);
+            title.rectTransform.anchorMin = title.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            title.rectTransform.sizeDelta = new Vector2(900f, 60f);
+            title.rectTransform.anchoredPosition = new Vector2(0f, tiles.yMax + 110f);
+            title.color = Gold;
 
             var hint = NewText("Hint", canvasObject.transform, "Escape closes the casino. At a table it brings you back here.", 19f);
             hint.rectTransform.anchorMin = hint.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             hint.rectTransform.sizeDelta = new Vector2(1200f, 28f);
-            hint.rectTransform.anchoredPosition = new Vector2(0f, -230f);
+            hint.rectTransform.anchoredPosition = new Vector2(0f, tiles.yMin - 130f);
             hint.color = new Color(0.65f, 0.63f, 0.58f, 1f);
 
-            BuildButton(canvasObject.transform, "CLOSE", new Vector2(0f, -300f), CloseEverything);
+            BuildButton(canvasObject.transform, "CLOSE", new Vector2(0f, tiles.yMin - 200f), CloseEverything);
         }
 
         /// <summary>
-        /// One tile per game, in a row, centred as a group.
+        /// How many tiles go on one row before a new one starts.
+        ///
+        /// **Four, and it is a standing rule rather than a number that happened to
+        /// suit five games.** A fifth table arriving in September 2026 was the first
+        /// time the single row did not fit; rather than widening it again and again,
+        /// the lobby now wraps, and every fourth table after this one starts a row of
+        /// its own without anybody editing this file.
+        /// </summary>
+        private const int PerRow = 4;
+
+        /// <summary>Where the block of tiles ended up, so the rest of the lobby can dodge it.</summary>
+        private readonly struct TileBlock
+        {
+            internal TileBlock(float yMin, float yMax)
+            {
+                this.yMin = yMin;
+                this.yMax = yMax;
+            }
+
+            internal float yMin { get; }
+
+            internal float yMax { get; }
+        }
+
+        /// <summary>
+        /// The tiles, four to a row, each row centred and the block centred as a whole.
         ///
         /// Sized and placed rather than laid out by a group component, because a
         /// HorizontalLayoutGroup on a canvas this size fights the scaler and the tiles
-        /// end up a pixel out from each other at some resolutions.
+        /// end up a pixel out from each other at some resolutions. A GridLayoutGroup
+        /// would have the same problem and would additionally left-align the last row,
+        /// which on five games means one tile hanging off the left rather than sitting
+        /// under the middle of the four above it.
+        ///
+        /// **A second row shrinks the tiles.** Two rows at the single-row size come to
+        /// 516 units, and the canvas only has 1080 to give -- the scaler matches height
+        /// against a 1080 reference with matchWidthOrHeight at 1, so that budget is the
+        /// same at every resolution rather than something to test per monitor.
+        ///
+        /// The single-row case is arithmetically unchanged: with four games or fewer
+        /// this puts the title at 250, the subtitle at 200, the hint at -230 and CLOSE
+        /// at -300, which are the exact numbers they were hardcoded to before.
+        ///
+        /// **It fits comfortably to eight games and runs out at thirteen.** Three rows
+        /// (nine to twelve) puts CLOSE at -546 against a -540 edge, so it is already
+        /// six units over and wants the tiles shrinking again; four rows is far past
+        /// it. Whoever adds a ninth table should shrink rather than assume this scales
+        /// -- it does not, and it fails by drawing off the bottom of the screen rather
+        /// than by complaining.
         /// </summary>
-        private static void BuildTiles(Transform parent)
+        private static TileBlock BuildTiles(Transform parent)
         {
-            const float width = 300f;
-            const float height = 240f;
-            const float gap = 36f;
-
             var games = Games.All;
-            var span = (games.Count * width) + ((games.Count - 1) * gap);
-            var left = -span * 0.5f;
+            var rows = ((games.Count - 1) / PerRow) + 1;
+
+            var width = rows > 1 ? 272f : 300f;
+            var height = rows > 1 ? 212f : 240f;
+            var gap = rows > 1 ? 30f : 36f;
+            const float rowGap = 26f;
+
+            // Where a single row has always sat. The block stays centred on it, so one
+            // row is unchanged and two straddle it evenly.
+            const float centreY = 20f;
+
+            var blockHeight = (rows * height) + ((rows - 1) * rowGap);
+            var blockTop = centreY + (blockHeight * 0.5f);
 
             for (var i = 0; i < games.Count; i++)
             {
                 var game = games[i];
 
+                var row = i / PerRow;
+                var column = i % PerRow;
+
+                // The last row is usually short, and it is centred on its own count
+                // rather than on PerRow -- otherwise the fifth game sits under the
+                // first column instead of under the middle of the row above it.
+                var inRow = Math.Min(PerRow, games.Count - (row * PerRow));
+                var span = (inRow * width) + ((inRow - 1) * gap);
+                var left = -span * 0.5f;
+
                 var tile = NewBox("Tile_" + game.Name, parent, Color.white);
                 tile.sizeDelta = new Vector2(width, height);
-                tile.anchoredPosition = new Vector2(left + (i * (width + gap)) + (width * 0.5f), 20f);
+                tile.anchoredPosition = new Vector2(
+                    left + (column * (width + gap)) + (width * 0.5f),
+                    blockTop - (row * (height + rowGap)) - (height * 0.5f));
 
                 var face = tile.GetComponent<Image>();
                 face.sprite = Textures.RoundedBox(10, Tile, TileEdge, 2);
@@ -279,9 +347,14 @@ namespace Casino.Client
                 // colour. The drawn fallback is a flat shape and does want the tint.
                 var art = Textures.FromFile(System.IO.Path.Combine(Casino.Shared.Host.AssetFolder, game.Icon));
 
+                // Everything inside a tile is a fraction of it rather than a fixed
+                // number, so the shrunk two-row tile keeps the same proportions
+                // instead of a full-size glyph crowding a smaller box.
+                var scale = height / 240f;
+
                 var pip = NewBox("Pip", tile, Color.white);
-                pip.sizeDelta = new Vector2(104f, 104f);
-                pip.anchoredPosition = new Vector2(0f, 46f);
+                pip.sizeDelta = new Vector2(104f * scale, 104f * scale);
+                pip.anchoredPosition = new Vector2(0f, 46f * scale);
 
                 var pipImage = pip.GetComponent<Image>();
                 pipImage.sprite = art ?? Textures.Suit(game.Pip, Gold);
@@ -295,22 +368,24 @@ namespace Casino.Client
                         $"[Casino] no {game.Icon} beside the plugin; {game.Name} falls back to a drawn suit.");
                 }
 
-                var name = NewText("Name", tile, game.Name, 26f);
+                var name = NewText("Name", tile, game.Name, 26f * scale);
                 name.rectTransform.anchorMin = name.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
                 name.rectTransform.sizeDelta = new Vector2(width - 24f, 34f);
-                name.rectTransform.anchoredPosition = new Vector2(0f, -34f);
+                name.rectTransform.anchoredPosition = new Vector2(0f, -34f * scale);
                 name.color = Gold;
 
-                var blurb = NewText("Blurb", tile, game.Blurb, 17f);
+                var blurb = NewText("Blurb", tile, game.Blurb, 17f * scale);
                 blurb.rectTransform.anchorMin = blurb.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-                blurb.rectTransform.sizeDelta = new Vector2(width - 34f, 54f);
-                blurb.rectTransform.anchoredPosition = new Vector2(0f, -84f);
+                blurb.rectTransform.sizeDelta = new Vector2(width - 34f, 54f * scale);
+                blurb.rectTransform.anchoredPosition = new Vector2(0f, -84f * scale);
                 blurb.enableWordWrapping = true;
                 blurb.color = new Color(0.70f, 0.68f, 0.63f, 1f);
 
                 var chosen = game;
                 tile.gameObject.AddComponent<Button>().onClick.AddListener(() => Enter(chosen));
             }
+
+            return new TileBlock(centreY - (blockHeight * 0.5f), blockTop);
         }
 
         /// <summary>
