@@ -22,10 +22,10 @@ namespace HorseRacing.Client
     ///
     /// So the ordering is not *arranged* here, it is *arithmetic*. Each runner is given
     /// a finishing time strictly ordered by its finishing position, and its progress is
-    /// its own elapsed fraction of that time. At the post every runner is at exactly
-    /// 1.0, reached in ascending order of finish time, and nothing in the jostle can
-    /// change that -- see <see cref="Jostle"/>, which is multiplied by a term that is
-    /// zero at the line.
+    /// a monotonic function of its own elapsed fraction of that time. At the post every
+    /// runner is at exactly 1.0, reached in ascending order of finish time, and nothing
+    /// in the wobble can change that -- see <see cref="Warp"/>, which divides one
+    /// strictly-increasing integral by another and so cannot run backwards or overshoot.
     ///
     /// ## Every course is a straight, and there used to be an oval
     ///
@@ -56,6 +56,12 @@ namespace HorseRacing.Client
 
         private const float LaneHeight = 30f;
         private const float HorseSize = 22f;
+
+        /// <summary>How many lanes there are. The card has eight runners and always has.</summary>
+        private const int Lanes = 8;
+
+        /// <summary>The band along the top that the furlong markers live in.</summary>
+        private const float FurlongStrip = 22f;
 
         /// <summary>Where a runner stands before the stalls open.</summary>
         private const float Start = 250f;
@@ -251,7 +257,7 @@ namespace HorseRacing.Client
             RectTransform parent, int lane, int number, string name, TMP_FontAsset font)
         {
             // Below the furlong strip along the top.
-            var top = -(lane * LaneHeight) - 22f;
+            var top = -(lane * LaneHeight) - FurlongStrip;
 
             var label = New($"Name{number}", parent);
             label.anchorMin = new Vector2(0f, 1f);
@@ -304,14 +310,28 @@ namespace HorseRacing.Client
             image.raycastTarget = false;
         }
 
+        /// <summary>
+        /// The finishing post: one line, straight down every lane.
+        ///
+        /// Sized from the lanes rather than from the holder. The first version
+        /// stretched to the holder and then trimmed 28 units to clear the furlong
+        /// strip, which left it starting below the top rail and stopping short of the
+        /// bottom one -- a line that plainly did not cross the whole track, and was
+        /// reported as such.
+        ///
+        /// Its pivot is centred horizontally so that the line sits exactly where a
+        /// runner's centre lands at the end of its travel. A right-hand pivot put it
+        /// one and a half pixels past them, which is invisible until a photo finish is
+        /// the thing being looked at.
+        /// </summary>
         private static void BuildPost(RectTransform parent)
         {
             var post = New("Post", parent);
-            post.anchorMin = new Vector2(1f, 0f);
+            post.anchorMin = new Vector2(1f, 1f);
             post.anchorMax = new Vector2(1f, 1f);
-            post.pivot = new Vector2(1f, 0.5f);
-            post.anchoredPosition = new Vector2(-FinishInset, -8f);
-            post.sizeDelta = new Vector2(3f, -28f);
+            post.pivot = new Vector2(0.5f, 1f);
+            post.anchoredPosition = new Vector2(-FinishInset, -(FurlongStrip - 4f));
+            post.sizeDelta = new Vector2(4f, (Lanes * LaneHeight) + 8f);
 
             var image = post.gameObject.AddComponent<Image>();
             image.color = Post;
@@ -478,8 +498,7 @@ namespace HorseRacing.Client
                         continue;
                     }
 
-                    var u = Mathf.Clamp01(elapsed / finish);
-                    var progress = Mathf.Clamp01(Pace(u) + Jostle(number, elapsed, u));
+                    var progress = Pace(Warp(number, elapsed, finish));
 
                     runner.anchoredPosition = new Vector2(
                         Start + (progress * travel), runner.anchoredPosition.y);
@@ -523,9 +542,14 @@ namespace HorseRacing.Client
         ///
         /// Snapping them all to the same x was the first version, and it drew eight
         /// discs in a column on the post: correct, and it threw away the one thing the
-        /// picture is for. The winner now sits on the line and each place behind it is
-        /// set back a little, so the frozen frame says who won without the player
-        /// reading the placings column beside it.
+        /// picture is for.
+        ///
+        /// The second version put the winner on the line and set every other place back
+        /// nine pixels each, which spread the field over sixty-three pixels and read as
+        /// **seven horses that never finished**. Real ones do not stop on the line, they
+        /// cross it and pull up; so the field now straddles the post -- the winner a
+        /// little past it, the last of them a little short -- over a total of thirty-five
+        /// pixels rather than sixty-three.
         ///
         /// Presentation only. The order here is taken from the same array the
         /// settlement used, so it cannot disagree with what was paid.
@@ -539,7 +563,7 @@ namespace HorseRacing.Client
                 if (index >= 0 && index < _runners.Count && _runners[index] != null)
                 {
                     _runners[index].anchoredPosition = new Vector2(
-                        Start + travel - (place * 9f),
+                        Start + travel + 16f - (place * 5f),
                         _runners[index].anchoredPosition.y);
                 }
             }
@@ -554,25 +578,78 @@ namespace HorseRacing.Client
         /// </summary>
         private static float Pace(float u) => (u * u * (3f - (2f * u)) * 0.55f) + (u * 0.45f);
 
+        // How much a runner's speed varies, and how fast. The two frequencies are
+        // deliberately not multiples of each other, so the field does not breathe in
+        // and out together like a concertina.
+        //
+        // **WobbleA + WobbleB must stay below 1.** Speed is 1 + A*sin + B*sin, so at
+        // 0.53 the slowest a horse ever runs is 0.47 of the average -- and the moment
+        // the sum reaches 1 that speed touches zero and the guarantee below is lost.
+        private const float WobbleA = 0.35f;
+        private const float WobbleB = 0.18f;
+        private const float WobbleW1 = 1.9f;
+        private const float WobbleW2 = 3.1f;
+
         /// <summary>
-        /// The jostle: what makes it a race rather than eight progress bars.
+        /// The distance this runner has covered by <paramref name="elapsed"/>, in
+        /// arbitrary units -- the integral of its own speed.
         ///
-        /// **Multiplied by <c>(1 - u)^2</c>, which is exactly zero at the post.** That
-        /// is what lets this be as ugly as it likes in the back straight without ever
-        /// touching the finishing order. Nothing here needs to know who won.
+        /// Speed is <c>1 + A*sin(w1 t) + B*sin(w2 t)</c>, which is never less than
+        /// 0.47, so this is **strictly increasing**. That is the whole point: see
+        /// <see cref="Warp"/>.
         ///
-        /// The two frequencies are deliberately not multiples of each other, so the
-        /// field does not breathe in and out together like a concertina.
+        /// Integrated in closed form rather than accumulated frame by frame, because an
+        /// accumulator depends on the frame rate and could not be asked where a runner
+        /// will be at some future instant -- which <see cref="Warp"/> has to know in
+        /// order to normalise.
         /// </summary>
-        private static float Jostle(int number, float elapsed, float u)
+        private static float Ridden(int number, float elapsed)
         {
-            var fade = (1f - u) * (1f - u);
-            var phase = number * 1.7f;
+            var p1 = number * 1.7f;
+            var p2 = number * 1.02f;
 
-            var swing = (Mathf.Sin((elapsed * 1.9f) + phase) * 0.045f)
-                + (Mathf.Sin((elapsed * 3.1f) + (phase * 0.6f)) * 0.022f);
+            return elapsed
+                + (WobbleA * (Mathf.Cos(p1) - Mathf.Cos((WobbleW1 * elapsed) + p1)) / WobbleW1)
+                + (WobbleB * (Mathf.Cos(p2) - Mathf.Cos((WobbleW2 * elapsed) + p2)) / WobbleW2);
+        }
 
-            return swing * fade;
+        /// <summary>
+        /// This runner's own sense of how far through its race it is: 0 at the stalls,
+        /// exactly 1 at its finishing time, and **never going backwards in between**.
+        ///
+        /// ## Why the wobble warps time instead of moving the horse
+        ///
+        /// The first version added the wobble straight to the position --
+        /// <c>Pace(u) + Jostle(u)</c> -- and that is wrong in a way that is easy to
+        /// miss. Early in a race <c>Pace</c> is still shallow, so when the sine term
+        /// turned over it fell faster than <c>Pace</c> was rising and the net position
+        /// *decreased*: the horse visibly slid backwards. Measured at up to 9 pixels on
+        /// the shipped numbers, which is exactly what it was reported as -- "some
+        /// horses go forward then fall backwards in place".
+        ///
+        /// Dividing one strictly-increasing integral by another cannot do that. The
+        /// wobble now changes how fast the clock runs for this horse, never which way,
+        /// and <see cref="Pace"/> is applied on top -- a monotonic function of a
+        /// monotonic function is monotonic.
+        ///
+        /// **Both guarantees survive**: <c>Ridden(0)</c> is 0 and the ratio is 1 at
+        /// <paramref name="finish"/>, so every runner still reaches the post exactly
+        /// when its own timer expires, and those timers are ordered by finishing
+        /// position.
+        /// </summary>
+        private static float Warp(int number, float elapsed, float finish)
+        {
+            var total = Ridden(number, finish);
+
+            // Unreachable while WobbleA + WobbleB < 1, since the integrand is positive
+            // throughout. Guarded because dividing by it would put a NaN into every
+            // runner's position at once.
+            if (total <= 0f)
+            {
+                return Mathf.Clamp01(elapsed / finish);
+            }
+
+            return Mathf.Clamp01(Ridden(number, elapsed) / total);
         }
 
         private static string Ordinal(int place) => place switch

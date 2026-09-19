@@ -10,6 +10,27 @@ and believes it.
 
 ## Current state
 
+**2026-09-19, fourth pass. The race itself, from a screenshot.**
+
+Four things, all found by looking at it rather than by any test:
+
+- **Horses slid backwards.** Progress was `Pace(u) + Jostle(u)` -- the wobble added
+  straight to the *position*. Early in a race `Pace` is still shallow, so when the sine
+  turned over it fell faster than `Pace` rose and the net position decreased. Measured
+  at up to 9 pixels. The wobble now warps *time* instead: progress is one
+  strictly-increasing integral divided by another, which cannot run backwards, and
+  `Pace` is applied on top. Both guarantees survive -- verified that every runner still
+  reaches exactly 1.0 at its own finish time.
+- **The field stopped short of the line.** The finish stagger was 9 pixels per place, so
+  seven of eight horses ended up to 63 pixels behind the post and read as never having
+  finished. They now straddle it over 35 -- the winner a little past, the last a little
+  short, the way real ones cross and pull up.
+- **The finish line did not cross the whole track.** It was stretched to the holder and
+  trimmed to clear the furlong strip, leaving gaps at both ends. It is sized from the
+  lanes now, and its pivot is centred so it sits exactly where a runner's centre lands.
+- **"3 FACTORY FLYE".** The exacta button was drawn over the last 74 pixels of the
+  second stepper. The pairs row now has explicit widths that end at 880 of 890.
+
 **2026-09-19, third pass. Betting fixed, and the oval dropped for a straight.**
 
 The second pass shipped a table nobody could bet at. `RenderBoard` was still reading
@@ -334,6 +355,9 @@ Specifically unverified:
 - The panel at any real resolution. The band table is verified to have no overlaps and
   60 units of bottom margin, but that arithmetic has still never met a screen.
 - Whether the mown stripes, rails, stalls and furlong markers help or just add noise.
+- Whether the wobble is now too tame. It was cut from a position offset to a speed
+  variation of plus or minus 53%, which cannot reverse a horse but may also no longer
+  read as jostling.
 - Whether sixteen furlong markers across the same span as five reads as "longer" or
   just as "busier".
 - Whether three course tabs at 260 units each are the right size.

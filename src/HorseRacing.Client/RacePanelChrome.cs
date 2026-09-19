@@ -510,26 +510,43 @@ namespace HorseRacing.Client
                 UnityEngine.Object.Destroy(child.gameObject);
             }
 
-            MakeStepper(_pairsHolder, "1st", _pairFirst, ColName, value =>
+            // Laid out left to right with explicit widths that add up to less than the
+            // board. The first version put the second stepper at 300 with a width of
+            // 282 and the exacta button at 508, so the button sat on top of the last 74
+            // pixels of the stepper -- which is why the longest name on the card read as
+            // "3 FACTORY FLYE".
+            MakeStepper(_pairsHolder, "1st", _pairFirst, StepperOne, value =>
             {
                 _pairFirst = Wrap(value);
                 RenderPairs();
             });
 
-            MakeStepper(_pairsHolder, "2nd", _pairSecond, ColName + 296f, value =>
+            MakeStepper(_pairsHolder, "2nd", _pairSecond, StepperTwo, value =>
             {
                 _pairSecond = Wrap(value);
                 RenderPairs();
             });
 
-            MakeSpot(
-                _pairsHolder, "Exacta", _pairFirst, _pairSecond,
-                ColFirstPrice + (PriceWidth + PriceGap) - 42f, 0f, PriceWidth + 42f);
+            MakeSpot(_pairsHolder, "Exacta", _pairFirst, _pairSecond, PairExacta, 0f, PairButton);
 
             MakeSpot(
-                _pairsHolder, "Quinella", Math.Min(_pairFirst, _pairSecond), Math.Max(_pairFirst, _pairSecond),
-                ColFirstPrice + (2f * (PriceWidth + PriceGap)), 0f, PriceWidth + 42f);
+                _pairsHolder,
+                "Quinella",
+                Math.Min(_pairFirst, _pairSecond),
+                Math.Max(_pairFirst, _pairSecond),
+                PairQuinella,
+                0f,
+                PairButton);
         }
+
+        // The pairs row, as offsets from the board's left edge. Checked against
+        // BoardWidth rather than eyeballed: the last button ends at 880 of 890.
+        private const float StepperOne = 0f;
+        private const float StepperTwo = 254f;
+        private const float StepperWidth = 234f;
+        private const float PairExacta = 508f;
+        private const float PairQuinella = 700f;
+        private const float PairButton = 180f;
 
         private static int _pairFirst = 1;
         private static int _pairSecond = 2;
@@ -641,23 +658,24 @@ namespace HorseRacing.Client
             RectTransform parent, string caption, int value, float x, Action<int> set)
         {
             var rect = New($"Stepper{caption}", parent);
-            TopLeft(rect, x, 0f, 282f, RowHeight - 3f);
+            TopLeft(rect, x, 0f, StepperWidth, RowHeight - 3f);
 
             var label = Text("Caption", rect, caption, 13f,
                 new Color(Ink.r, Ink.g, Ink.b, 0.5f), TextAlignmentOptions.Left);
-            TopLeft(label.rectTransform, 0f, 4f, 30f, 18f);
+            TopLeft(label.rectTransform, 0f, 4f, 26f, 18f);
 
-            var down = MakeButton($"{caption}Down", rect, "-", 26f, 24f, () => set(value - 1));
-            TopLeft(down, 32f, 0f);
+            var down = MakeButton($"{caption}Down", rect, "-", 24f, 24f, () => set(value - 1));
+            TopLeft(down, 28f, 0f);
 
-            // Wide enough for the longest name on the card with its number in front.
-            // At 100 units "NIGHT RAIDER" came out as "NIGHT RAIDE", which reads as a
-            // typo in the card rather than as a box that is too small.
-            var shown = Text("Value", rect, $"{value}  {RunnerName(value)}", 15f, Ink, TextAlignmentOptions.Center);
-            TopLeft(shown.rectTransform, 62f, 0f, 186f, 24f);
+            // 150 units at 14pt fits the longest name on the card with its number in
+            // front -- "5  RESHALA'S PRIDE" -- with a little to spare. It has been too
+            // small twice: once because the box itself was 100, and once because the
+            // exacta button was drawn over the right-hand end of it.
+            var shown = Text("Value", rect, $"{value}  {RunnerName(value)}", 14f, Ink, TextAlignmentOptions.Center);
+            TopLeft(shown.rectTransform, 56f, 1f, 150f, 22f);
 
-            var up = MakeButton($"{caption}Up", rect, "+", 26f, 24f, () => set(value + 1));
-            TopLeft(up, 252f, 0f);
+            var up = MakeButton($"{caption}Up", rect, "+", 24f, 24f, () => set(value + 1));
+            TopLeft(up, 210f, 0f);
 
             return rect;
         }
