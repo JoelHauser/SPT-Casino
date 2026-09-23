@@ -51,6 +51,8 @@ public class RouletteService(
     /// <summary>Cheap health check. Touches nothing and starts no game.</summary>
     public PingResponse Ping(MongoId sessionId)
     {
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         var known = profiles.HasProfile(sessionId);
 
         return new PingResponse
@@ -87,6 +89,8 @@ public class RouletteService(
     /// </summary>
     public async Task<RouletteResponse> StateAsync(MongoId sessionId, ItemEventRouterResponse output)
     {
+        using var gate = await Casino.Server.SessionGate.EnterAsync(sessionId);
+
         var refunded = await RefundStranded(sessionId, output);
 
         return Success(sessionId) with { Note = refunded };
@@ -101,6 +105,8 @@ public class RouletteService(
     /// </summary>
     public RouletteResponse Place(PlaceRequest request, MongoId sessionId)
     {
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         // Refused by name rather than defaulting. Enum.TryParse on an unknown string
         // leaves the value at zero, which here is Straight -- so a typo would put the
         // player's money on a single number they never chose.
@@ -146,6 +152,8 @@ public class RouletteService(
     /// </summary>
     public RouletteResponse Remove(RemoveRequest request, MongoId sessionId)
     {
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         if (!Enum.TryParse<BetKind>(request.Kind, ignoreCase: true, out var kind))
         {
             return RouletteResponse.Failed($"There is no bet called '{request.Kind}'.");
@@ -167,6 +175,8 @@ public class RouletteService(
 
     public RouletteResponse Clear(MongoId sessionId)
     {
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         var table = Table(sessionId);
 
         try
@@ -202,6 +212,8 @@ public class RouletteService(
     /// </summary>
     public async Task<RouletteResponse> SpinAsync(MongoId sessionId, ItemEventRouterResponse output)
     {
+        using var gate = await Casino.Server.SessionGate.EnterAsync(sessionId);
+
         var refunded = await RefundStranded(sessionId, output);
         var table = Table(sessionId);
 
@@ -338,6 +350,8 @@ public class RouletteService(
     /// </summary>
     public async Task<RouletteResponse> LeaveAsync(MongoId sessionId, ItemEventRouterResponse output)
     {
+        using var gate = await Casino.Server.SessionGate.EnterAsync(sessionId);
+
         var refunded = await RefundStranded(sessionId, output);
 
         tables.Clear(sessionId);

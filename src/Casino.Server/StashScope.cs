@@ -33,8 +33,25 @@ public static class StashScope
             return false;
         }
 
+        if (item is null)
+        {
+            return false;
+        }
+
         var stashId = stash.Value.ToString();
-        var byId = items.ToDictionary(i => i.Id.ToString());
+
+        // Built by hand rather than with ToDictionary, which throws on the first null
+        // entry or repeated id. A profile damaged that way used to take every balance
+        // read down with it; now the bad entries are simply not walked through.
+        var byId = new Dictionary<string, Item>(items.Count);
+
+        foreach (var entry in items)
+        {
+            if (entry is not null)
+            {
+                byId.TryAdd(entry.Id.ToString(), entry);
+            }
+        }
 
         var current = item;
         var hops = 0;

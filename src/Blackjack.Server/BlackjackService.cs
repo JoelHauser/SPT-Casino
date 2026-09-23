@@ -40,6 +40,8 @@ public class BlackjackService(
         MongoId sessionId,
         ItemEventRouterResponse output)
     {
+        using var gate = await Casino.Server.SessionGate.EnterAsync(sessionId);
+
         if (!profiles.HasProfile(sessionId))
         {
             return BlackjackResponse.Failed("No PMC profile for this session.");
@@ -102,6 +104,8 @@ public class BlackjackService(
         MongoId sessionId,
         ItemEventRouterResponse output)
     {
+        using var gate = await Casino.Server.SessionGate.EnterAsync(sessionId);
+
         if (!profiles.HasProfile(sessionId))
         {
             return BlackjackResponse.Failed("No PMC profile for this session.");
@@ -178,6 +182,8 @@ public class BlackjackService(
     /// <summary>Cheap health check. Touches no money and starts no round.</summary>
     public PingResponse Ping(MongoId sessionId)
     {
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         var known = profiles.HasProfile(sessionId);
 
         return new PingResponse
@@ -204,6 +210,8 @@ public class BlackjackService(
 
     public BlackjackResponse State(MongoId sessionId, ItemEventRouterResponse output)
     {
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         if (!profiles.HasProfile(sessionId))
         {
             return BlackjackResponse.Failed("No PMC profile for this session.");

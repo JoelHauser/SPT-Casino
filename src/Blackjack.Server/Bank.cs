@@ -224,7 +224,10 @@ public class Bank(
                 // Losing a payout is the worst outcome in the mod, so this is loud and
                 // says exactly how much never made it.
                 log.Error($"AddItemToStash threw paying {size:N0} {wallet}. {remaining:N0} unpaid.", ex);
-                return;
+
+                // Not a return: whatever did not land is measured below and posted,
+                // exactly as for a full stash. Returning here lost it outright.
+                break;
             }
 
             remaining -= size;
@@ -293,5 +296,5 @@ public class Bank(
 
     private static IEnumerable<Item> StacksOf(PmcData pmcData, MongoId tpl) =>
         pmcData.Inventory?.Items?.Where(item =>
-            item.Template == tpl && Casino.Server.StashScope.IsInStash(pmcData, item)) ?? [];
+            item is not null && item.Template == tpl && Casino.Server.StashScope.IsInStash(pmcData, item)) ?? [];
 }

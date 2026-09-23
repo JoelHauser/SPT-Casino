@@ -303,6 +303,43 @@ public class MoneyInvariantTests
         }
     }
 
+    /// <summary>
+    /// **A ping that arrives mid-pull waits for it, and refunds nothing.**
+    ///
+    /// The shape of the 2026-09-22 corruption. On AUTO the sync item event after one
+    /// pull can land while the next is still running. The ping saw the live pull's
+    /// escrow record, took it for a crash and paid the stake back -- from a second
+    /// thread, into the same stash list the pull was writing to. The refund was the
+    /// double-pay; the second writer was what left a null in the profile.
+    /// </summary>
+    [Fact]
+    public async Task APingDuringAPullWaitsForItRatherThanRefundingIt()
+    {
+        var session = new MongoId("6a9b474574813708e8fc3cf0");
+        var (service, bank, _, escrow) = Machine();
+        bank.Seed(Wallet.Roubles, Rich);
+
+        using var entered = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+        bank.DebitEntered = entered;
+        bank.DebitGate = release;
+
+        var pull = Task.Run(() => service.PullAsync(Request(10_000), session, Output()));
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(10)), "the pull never reached its debit.");
+        Assert.NotNull(escrow.Get(session));
+
+        var ping = Task.Run(() => service.Ping(session, Output()));
+        Assert.False(ping.Wait(TimeSpan.FromMilliseconds(250)), "the ping ran beside a live pull.");
+
+        release.Set();
+        var reply = await pull;
+        var pong = await ping;
+
+        Assert.Null(pong.Note);
+        Assert.Equal(1, bank.Debits);
+        Assert.Equal(reply.Pull!.Paid - reply.Pull.Staked, bank.Moved);
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private static (SlotService Service, FakeBank Bank, FakeProfiles Profiles, FakeEscrow Escrow) Machine()

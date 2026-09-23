@@ -49,6 +49,9 @@ public class RaceService(
     /// </summary>
     public PingResponse Ping(MongoId sessionId, ItemEventRouterResponse output)
     {
+        // Refunds from escrow, so it must not run beside a slip -- see SessionGate.
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         var known = profiles.HasProfile(sessionId);
         var refunded = RefundStranded(sessionId, output).GetAwaiter().GetResult();
 
@@ -141,6 +144,8 @@ public class RaceService(
     public async Task<RaceResponse> PlaceAsync(
         PlaceRequest request, MongoId sessionId, ItemEventRouterResponse output)
     {
+        using var gate = await Casino.Server.SessionGate.EnterAsync(sessionId);
+
         if (!profiles.HasProfile(sessionId))
         {
             return RaceResponse.Failed("No PMC profile for this session.");

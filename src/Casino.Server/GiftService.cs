@@ -50,6 +50,8 @@ public class GiftService(IGiftStore store, IGiftBank bank, ICasinoLog log)
     /// </summary>
     public GiftResponse Claim(MongoId sessionId, ItemEventRouterResponse output)
     {
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         if (!store.Writable)
         {
             return new GiftResponse

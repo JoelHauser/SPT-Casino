@@ -38,6 +38,10 @@ public class SlotService(
     /// </summary>
     public PingResponse Ping(MongoId sessionId, ItemEventRouterResponse output)
     {
+        // The sync item event lands here too, and on AUTO it can arrive while the next
+        // pull is still running. See SessionGate for what that cost.
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         var known = profiles.HasProfile(sessionId);
         var refunded = RefundStranded(sessionId, output).GetAwaiter().GetResult();
 
@@ -85,6 +89,8 @@ public class SlotService(
     public async Task<SlotResponse> PullAsync(
         PullRequest request, MongoId sessionId, ItemEventRouterResponse output)
     {
+        using var gate = await Casino.Server.SessionGate.EnterAsync(sessionId);
+
         if (!profiles.HasProfile(sessionId))
         {
             return SlotResponse.Failed("No PMC profile for this session.");

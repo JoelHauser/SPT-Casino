@@ -32,8 +32,17 @@ public sealed class FakeBank : IBank
 
     public int GetBalance(MongoId sessionId, Wallet wallet) => _balances.GetValueOrDefault(wallet);
 
+    /// <summary>Set when a debit starts, so a test knows a pull is mid-transaction.</summary>
+    public ManualResetEventSlim? DebitEntered { get; set; }
+
+    /// <summary>Holds every debit until set, so a test can act while one is in flight.</summary>
+    public ManualResetEventSlim? DebitGate { get; set; }
+
     public bool TryDebit(MongoId sessionId, Wallet wallet, int amount, ItemEventRouterResponse output)
     {
+        DebitEntered?.Set();
+        DebitGate?.Wait();
+
         if (amount <= 0 || GetBalance(sessionId, wallet) < amount)
         {
             RefusedDebits++;

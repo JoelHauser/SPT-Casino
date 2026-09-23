@@ -30,6 +30,8 @@ public class PokerService(
     /// <summary>Cheap health check. Touches nothing and starts no game.</summary>
     public PingResponse Ping(MongoId sessionId)
     {
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         var known = profiles.HasProfile(sessionId);
 
         return new PingResponse
@@ -57,6 +59,8 @@ public class PokerService(
 
     public async Task<PokerResponse> SitAsync(SitRequest request, MongoId sessionId, ItemEventRouterResponse output)
     {
+        using var gate = await Casino.Server.SessionGate.EnterAsync(sessionId);
+
         if (!profiles.HasProfile(sessionId))
         {
             return PokerResponse.Failed("No PMC profile for this session.");
@@ -175,6 +179,8 @@ public class PokerService(
 
     public PokerResponse Deal(MongoId sessionId)
     {
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         var session = tables.Get(sessionId);
 
         if (session is null)
@@ -213,6 +219,8 @@ public class PokerService(
 
     public PokerResponse Act(ActRequest request, MongoId sessionId)
     {
+        using var gate = Casino.Server.SessionGate.Enter(sessionId);
+
         var session = tables.Get(sessionId);
 
         if (session is null)
@@ -263,6 +271,8 @@ public class PokerService(
     /// </summary>
     public async Task<PokerResponse> StateAsync(MongoId sessionId, ItemEventRouterResponse output)
     {
+        using var gate = await Casino.Server.SessionGate.EnterAsync(sessionId);
+
         var note = RefundAbandoned(sessionId, output);
 
         if (note is not null)
@@ -288,6 +298,8 @@ public class PokerService(
     /// </summary>
     public async Task<PokerResponse> LeaveAsync(MongoId sessionId, ItemEventRouterResponse output)
     {
+        using var gate = await Casino.Server.SessionGate.EnterAsync(sessionId);
+
         var session = tables.Get(sessionId);
 
         if (session is null)
