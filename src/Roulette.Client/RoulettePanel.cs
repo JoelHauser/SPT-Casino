@@ -797,7 +797,18 @@ namespace Roulette.Client
             // ellipse -- which on a wheel is worse than on anything else.
             scaler.matchWidthOrHeight = 1f;
 
+            // Kept across scene loads, like every other table. Without it the raid
+            // took the canvas down with the menu scene, the next open built a fresh
+            // one, and the wheel and cloth were never redrawn into it (below).
+            UnityEngine.Object.DontDestroyOnLoad(canvasObject);
             _root = canvasObject;
+
+            // The signatures describe what is drawn inside the holders, and these are
+            // new, empty holders. Left set, EnsureWheel and EnsureCloth took the old
+            // drawing to still be there, and ShowBets reached into the destroyed cloth
+            // and threw -- the table came up as a title and a chip tray.
+            _pocketSignature = null;
+            _layoutSignature = null;
 
             // Faded rather than switched. See FadeTo.
             var group = canvasObject.AddComponent<CanvasGroup>();
