@@ -8,7 +8,7 @@ There is no unlock, no hideout requirement and no quest. Install it, and a **CAS
 
 The bar is on every screen outside a raid, so the tables open from the hideout, the flea market or a trader screen without backing out of them first.
 
-**This is a place, not a feature.** The lobby is built to grow: each table is a tile, and new games get added as tiles rather than as new mods with new tabs. Blackjack, hold'em, a single-zero wheel, a slot machine and a racecourse are open so far, and more will arrive in this mod rather than beside it.
+**This is a place, not a feature.** The lobby is built to grow: each table is a tile, and new games get added as tiles rather than as new mods with new tabs. Blackjack, hold'em, a single-zero wheel, a slot machine, a racecourse and a war table are open so far, and more will arrive in this mod rather than beside it.
 
 ![SPT Casino](https://i.imgur.com/HPJ7e19.png)
 
@@ -20,7 +20,7 @@ If your stash is too full to take a payout, it arrives in the post instead. Noth
 
 **Your gear is never at stake.** Weapons, armour and rigs cannot be bet.
 
-The house edge is real too, and it does not get tired. Roulette keeps 2.70% of everything staked on it, forever; the slot machine gives back 92.51% and keeps the rest. Blackjack and poker are not charity either. Play with what you could lose in a raid.
+The house edge is real too, and it does not get tired. Roulette keeps 2.70% of everything staked on it, forever; the slot machine gives back 92.51% and keeps the rest; the war table keeps 2.88% if you always go to war. Blackjack and poker are not charity either. Play with what you could lose in a raid.
 
 ## The tables {.tabset}
 
@@ -133,6 +133,33 @@ Stake roubles, dollars or euros.
 | Euros | 100 | 20,000 |
 
 The dash has a lower ceiling than the other two, and that is arithmetic rather than caution: it has the widest spread of any card, so it has the longest price -- over 1,250 to one on the right exacta -- and a bigger slip than that could not be paid out correctly.
+
+### Casino War
+
+One card for you, one for the dealer. High card wins, aces high, and a win pays even money.
+
+**A tie stops the hand and asks you a question:**
+
+- **Go to war** -- match your bet. Three cards are burned and one more is dealt to each of you. Equal or higher wins.
+- **Surrender** -- take back half your bet.
+
+An optional **tie bet** sits beside your main bet and pays **10 to 1** if the first two cards tie, even if you go on to lose the war.
+
+- Six decks
+- **2.88% to the house** if you always go to war, 3.70% if you always surrender, 18.65% on the tie bet
+- **AUTO** deals until you press STOP and goes to war on every tie; **SPEED** cycles 1X/2X/4X/6X, like the slot machine
+- Close the table mid-tie and the hand is still waiting when you come back
+- A STATS button keeps a record of hands, wars, surrenders and tie bets
+
+Stake roubles, dollars or euros.
+
+| Currency | Minimum | Maximum |
+|---|---|---|
+| Roubles | 1,000 | 500,000 |
+| Dollars | 10 | 5,000 |
+| Euros | 10 | 5,000 |
+
+**F12 → Casino War → No maximum bet** raises the maximum to 100,000,000.
 
 ## Installing
 
