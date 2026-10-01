@@ -1,11 +1,12 @@
 # SPT-Casino -- working notes for Claude
 
-**SPT Casino** is one mod: a single task-bar tab that opens a lobby, and five tables
-behind it -- **Blackjack**, **Poker**, **Roulette**, **Slots** and **Horse Racing**. It
+**SPT Casino** is one mod: a single task-bar tab that opens a lobby, and six tables
+behind it -- **Blackjack**, **Poker**, **Roulette**, **Slots**, **Horse Racing** and
+**Casino War**. It
 was three separate mods until 2026-09-05, and the seams are still visible on purpose.
 
 **One folder each side.** `BepInEx/plugins/Casino` and `SPT_Runtime/user/mods/Casino`.
-The server folder holds eleven assemblies -- a metadata one plus a `.Server` and a
+The server folder holds thirteen assemblies -- a metadata one plus a `.Server` and a
 `.Game` per table -- and SPT is perfectly happy with that. See "One folder, seven
 assemblies", which was written when there were seven and is true of any number.
 
@@ -19,6 +20,7 @@ all three; everything specific lives next door and is much longer:
 | Roulette | `docs/roulette.md` | Plays for roubles as of 2026-09-05. Never released |
 | Slots | `docs/slots.md` | Roubles, dollars or euros. Played, never released |
 | Horse Racing | `docs/horse-racing.md` | Three courses. Roubles, dollars or euros. Played; shipped in 1.3.0 |
+| Casino War | `docs/war.md` | Roubles, dollars or euros. Pre-released in 1.3.3; never run in game |
 
 `docs/blackjack-readme.md` is Blackjack's public README, kept because it was the
 repo's front page before the merge.

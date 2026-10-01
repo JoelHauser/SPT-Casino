@@ -1,7 +1,7 @@
 # SPT Casino
 
 A casino for [SPT](https://sp-tarkov.com) 4.1.x. One tab on the menu bar opens a
-lobby; the lobby has five tables.
+lobby; the lobby has six tables.
 
 | | |
 | --- | --- |
@@ -10,6 +10,7 @@ lobby; the lobby has five tables.
 | **Roulette** | A single-zero European wheel that actually spins, and a full betting cloth to play it from. |
 | **Slots** | Five reels and 243 ways, spinning the item icons out of your own install. AUTO and SPEED keep it moving without a click every time. Takes roubles, dollars or euros. |
 | **Horse Racing** | Eight runners over three distances -- a five-furlong dash, a mile, and a two-mile marathon. The same horses run all three and the form changes with the trip: a sprinter that wins one race in six over five furlongs wins one in forty over two miles. Back one to win, place or show, or pick the first two for an exacta. Every price is exact and the house takes 6%. Roubles, dollars or euros. |
+| **Casino War** | One card each, high card wins, aces high. On a tie, go to war or surrender half. An optional tie bet pays 10 to 1. Six decks; roubles, dollars or euros. |
 
 **It plays for real money out of your stash -- never your gear.** A stake leaves the
 moment you commit it and winnings are paid straight back in, and it only ever comes
@@ -20,7 +21,8 @@ payout, it arrives in the post instead.
 
 The house edge is real too, and it is computed rather than guessed at. Roulette keeps
 2.70% of everything staked on it; the slot machine returns 92.51% and keeps the rest.
-The other two are not charity either.
+Casino War keeps 2.88% if you go to war on every tie, 3.70% if you always surrender,
+and 18.65% of the tie bet. The others are not charity either.
 
 ## Installing
 
@@ -36,7 +38,7 @@ a bug: the server declares `~4.1.3` and loads nothing outside it.
 
 Each table can be made talkative on its own, with `VerboseLogging` in its config file
 beside the mod -- `blackjack.config.json`, `poker.config.json`, `roulette.config.json`,
-`slots.config.json`, `horseracing.config.json`.
+`slots.config.json`, `horseracing.config.json`, `war.config.json`.
 
 ## Playing
 
@@ -53,9 +55,12 @@ rather than popping into place -- and a hole card turns over in place instead of
 dealt again when it's revealed. The result doesn't post until every card involved has
 actually finished turning over.
 
-Blackjack and Slots each keep a running record behind their own STATS button: rounds
-or pulls, wins and losses, best streak, and staked and returned per currency. Poker
-and Roulette don't have one yet.
+Blackjack, Slots and Casino War each keep a running record behind their own STATS
+button: rounds or pulls, wins and losses, best streak, and staked and returned per
+currency. Poker and Roulette don't have one yet.
+
+At the war table a tie stops the hand and leaves your bet on the table until you
+answer. Close the table and it is still waiting when you come back.
 
 ### Settings
 
@@ -70,8 +75,14 @@ there:
 | Blackjack | **Enforce the table maximum** | Refuse a wager over the limit instead of trimming it. |
 | Slots | **No maximum stake** | Bet as much as you like. The minimum still applies. |
 | Horse Racing | **No maximum slip total** | Lifts the cap on what a whole slip may cost. It does not lift far: the limit here is arithmetic rather than caution, since the longest price pays over 750 for one. |
+| Casino War | **No maximum bet** | Bet up to 100,000,000 on the main bet and the tie bet. The minimum still applies. |
 
 ## Known issues
+
+**Casino War is new in 1.3.3, a pre-release, and has not been played in game yet.** Its
+rules, odds and money path are covered by tests the same way every other table's are,
+but nobody has sat at it. If anything on the table looks out of place or a hand
+settles wrong, that is exactly what this pre-release is for -- please report it.
 
 **Horse Racing is new.** It has been played and the money side is covered by tests the
 same way every other table is -- stakes, payouts and the house edge are all checked, and

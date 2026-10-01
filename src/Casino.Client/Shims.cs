@@ -78,6 +78,26 @@ namespace HorseRacing.Client
     }
 }
 
+namespace War.Client
+{
+    /// <summary>
+    /// Casino War never had a plugin of its own -- it was written into the casino -- but
+    /// it takes the same shape as the tables that did, so it reads like them.
+    /// </summary>
+    internal static class WarClientPlugin
+    {
+        internal static BaseUnityPlugin Instance;
+
+        internal static ManualLogSource Log;
+
+        /// <summary>
+        /// Whether the table's maximum bet is off. Bound by
+        /// <see cref="Casino.Client.CasinoPlugin"/> and settable from the F12 menu.
+        /// </summary>
+        internal static ConfigEntry<bool> NoBetCap;
+    }
+}
+
 namespace Blackjack.Client
 {
     internal static class BlackjackClientPlugin

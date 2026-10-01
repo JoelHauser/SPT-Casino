@@ -1,14 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>Casino.Server</RootNamespace>
-    <AssemblyName>Casino.Server</AssemblyName>
+    <RootNamespace>War.Server</RootNamespace>
+    <AssemblyName>War.Server</AssemblyName>
 
-    <!-- Must match ModMetadata.Version. Two places, and they have to agree. -->
-    <Version>1.3.3</Version>
+    <Version>0.1.0</Version>
 
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
@@ -17,6 +16,12 @@
     <PackageReference Include="SPTarkov.Server.Core" Version="4.1.2">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
+    <ProjectReference Include="..\War.Game\War.Game.csproj" />
+    <ProjectReference Include="..\Casino.Server\Casino.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="war.config.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

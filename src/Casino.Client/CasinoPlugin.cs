@@ -28,7 +28,7 @@ namespace Casino.Client
     {
         public const string PluginGuid = "com.mybutthasarash.sptcasino";
         public const string PluginName = "SPT Casino";
-        public const string PluginVersion = "1.3.2";
+        public const string PluginVersion = "1.3.3";
 
         internal static ManualLogSource Log;
 
@@ -74,6 +74,8 @@ namespace Casino.Client
             SlotMachine.Client.SlotClientPlugin.Log = Logger;
             HorseRacing.Client.RaceClientPlugin.Instance = this;
             HorseRacing.Client.RaceClientPlugin.Log = Logger;
+            War.Client.WarClientPlugin.Instance = this;
+            War.Client.WarClientPlugin.Log = Logger;
 
             ShowTaskBarTab = Config.Bind(
                 "Menu",
@@ -128,6 +130,14 @@ namespace Casino.Client
                 + "on the card pays over 750 for one, and a bigger slip would overflow the "
                 + "payout -- so turning this on lifts the limit to that bound and no "
                 + "further. The minimum stake is unaffected.");
+
+            War.Client.WarClientPlugin.NoBetCap = Config.Bind(
+                "Casino War",
+                "No maximum bet",
+                false,
+                "Off by default. The war table takes up to 500,000 roubles (or 5,000 dollars "
+                + "or euros) on the main bet and the same on the tie bet. Turn this on to bet "
+                + "up to 100,000,000 on either. The minimum bet is unaffected.");
 
             Blackjack.Client.BlackjackClientPlugin.EnforceTableMaximum = Config.Bind(
                 "Blackjack",

@@ -95,6 +95,15 @@ namespace Casino.Client
                 () => HorseRacing.Client.RacePanel.IsOpen,
                 HorseRacing.Client.RacePanel.Open,
                 HorseRacing.Client.RacePanel.Close),
+
+            new Table(
+                "CASINO WAR",
+                "tile-war.png",
+                'S',
+                "High card wins. Tie? Go to war.",
+                () => War.Client.WarPanel.IsOpen,
+                War.Client.WarPanel.Open,
+                War.Client.WarPanel.Close),
         };
 
         /// <summary>The table the player is at, or null if they are in the lobby.</summary>

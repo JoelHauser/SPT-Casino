@@ -35,13 +35,19 @@ $ErrorActionPreference = 'Stop'
 # Two levels up: this sits in scripts/<mod>/.
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
-$version = '1.3.2'
+$version = '1.3.3'
 
 # What the download is called. Deliberately not $version: the plugin carries a
 # three-part version because BepInEx expects one, and the release is named the way it
 # is published.
-$release = '1.3.2'
-$tables = @('Blackjack', 'Poker', 'Roulette', 'SlotMachine', 'HorseRacing')
+$release = '1.3.3'
+$tables = @('Blackjack', 'Poker', 'Roulette', 'SlotMachine', 'HorseRacing', 'War')
+
+# The tables that were once mods of their own, and so may have an old folder to retire.
+# Not $tables: Horse Racing and Casino War were written into the casino and never
+# shipped alone, and retiring a folder by a name as plain as "War" would move aside
+# somebody else's mod.
+$retiring = @('Blackjack', 'Poker', 'Roulette', 'SlotMachine')
 $plugin = Join-Path $root 'src\Casino.Client\Casino.Client.csproj'
 $stage = Join-Path $root 'dist\casino'
 
@@ -103,7 +109,7 @@ foreach ($name in $wanted) {
 # Named for the table's own config file rather than derived from the folder: the
 # slot machine's routes are /slots/*, so its config is slots.config.json and a
 # derived slotmachine.config.json would be a file nothing reads.
-$configs = @{ Blackjack = 'blackjack'; Poker = 'poker'; Roulette = 'roulette'; SlotMachine = 'slots'; HorseRacing = 'horseracing' }
+$configs = @{ Blackjack = 'blackjack'; Poker = 'poker'; Roulette = 'roulette'; SlotMachine = 'slots'; HorseRacing = 'horseracing'; War = 'war' }
 foreach ($table in $tables) {
     $config = Join-Path $root ("src\{0}.Server\{1}.config.json" -f $table, $configs[$table])
     if (Test-Path $config) { Copy-Item $config -Destination $modDir -Force }
@@ -171,7 +177,7 @@ if (-not (Test-Path (Join-Path $target 'BepInEx'))) {
 # patches. Moved aside rather than deleted: they are somebody's working install.
 $retired = Join-Path $target 'BepInEx\plugins\_replaced-by-SPT-Casino'
 
-foreach ($old in $tables) {
+foreach ($old in $retiring) {
     $dir = Join-Path $target "BepInEx\plugins\$old"
     if (Test-Path $dir) {
         New-Item -ItemType Directory -Force -Path $retired | Out-Null
@@ -193,7 +199,7 @@ foreach ($old in $tables) {
 # old mods in there traded three folders for a stack trace on every boot.
 $retiredMods = Join-Path $target "SPT_Runtime\user\_replaced-by-SPT-Casino"
 
-foreach ($old in $tables) {
+foreach ($old in $retiring) {
     $dir = Join-Path $target "SPT_Runtime\user\mods\$old"
     if (Test-Path $dir) {
         New-Item -ItemType Directory -Force -Path $retiredMods | Out-Null

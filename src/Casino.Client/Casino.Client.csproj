@@ -9,7 +9,7 @@
     <AssemblyName>Casino.Client</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <Version>1.3.2</Version>
+    <Version>1.3.3</Version>
 
     <!--
       The three tables are compiled in from where they already live rather than
@@ -75,6 +75,13 @@
     <Compile Include="..\HorseRacing.Client\RacePanelChrome.cs" Link="Games\HorseRacing\RacePanelChrome.cs" />
     <Compile Include="..\HorseRacing.Client\TrackView.cs"       Link="Games\HorseRacing\TrackView.cs" />
     <Compile Include="..\HorseRacing.Client\RaceApi.cs"         Link="Games\HorseRacing\RaceApi.cs" />
+
+    <!--
+      Casino War was written into the casino rather than merged into it, so it has no
+      project of its own to build alone: these two files are its whole client.
+    -->
+    <Compile Include="..\War.Client\WarPanel.cs" Link="Games\War\WarPanel.cs" />
+    <Compile Include="..\War.Client\WarApi.cs"   Link="Games\War\WarApi.cs" />
   </ItemGroup>
 
   <ItemGroup>

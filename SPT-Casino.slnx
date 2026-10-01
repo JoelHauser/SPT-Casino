@@ -42,6 +42,16 @@
     <Project Path="src/HorseRacing.Server/HorseRacing.Server.csproj" />
     <Project Path="tests/HorseRacing.Server.Tests/HorseRacing.Server.Tests.csproj" />
   </Folder>
+  <Folder Name="/War/">
+    <!--
+      Casino War. Engine and server here; the client is two files compiled straight
+      into Casino.Client, with no project of its own.
+    -->
+    <Project Path="src/War.Game/War.Game.csproj" />
+    <Project Path="tests/War.Game.Tests/War.Game.Tests.csproj" />
+    <Project Path="src/War.Server/War.Server.csproj" />
+    <Project Path="tests/War.Server.Tests/War.Server.Tests.csproj" />
+  </Folder>
   <Folder Name="/Blackjack/">
     <Project Path="src/Blackjack.Game/Blackjack.Game.csproj" />
     <Project Path="src/Blackjack.Server/Blackjack.Server.csproj" />
