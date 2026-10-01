@@ -10,7 +10,7 @@ lobby; the lobby has six tables.
 | **Roulette** | A single-zero European wheel that actually spins, and a full betting cloth to play it from. |
 | **Slots** | Five reels and 243 ways, spinning the item icons out of your own install. AUTO and SPEED keep it moving without a click every time. Takes roubles, dollars or euros. |
 | **Horse Racing** | Eight runners over three distances -- a five-furlong dash, a mile, and a two-mile marathon. The same horses run all three and the form changes with the trip: a sprinter that wins one race in six over five furlongs wins one in forty over two miles. Back one to win, place or show, or pick the first two for an exacta. Every price is exact and the house takes 6%. Roubles, dollars or euros. |
-| **Casino War** | One card each, high card wins, aces high. On a tie, go to war or surrender half. An optional tie bet pays 10 to 1. Six decks; roubles, dollars or euros. |
+| **Casino War** | One card each, high card wins, aces high. On a tie, go to war or surrender half. An optional tie bet pays 10 to 1. AUTO and SPEED, as on the slot machine. Six decks; roubles, dollars or euros. |
 
 **It plays for real money out of your stash -- never your gear.** A stake leaves the
 moment you commit it and winnings are paid straight back in, and it only ever comes
@@ -79,10 +79,10 @@ there:
 
 ## Known issues
 
-**Casino War is new in 1.3.3, a pre-release, and has not been played in game yet.** Its
-rules, odds and money path are covered by tests the same way every other table's are,
-but nobody has sat at it. If anything on the table looks out of place or a hand
-settles wrong, that is exactly what this pre-release is for -- please report it.
+**Casino War is new in 1.3.3.** It has been played, and its rules, odds and money path
+are covered by tests the same way every other table's are. It has had the least time in
+front of people of any table, so if anything looks out of place or a hand settles
+wrong, please report it.
 
 **Horse Racing is new.** It has been played and the money side is covered by tests the
 same way every other table is -- stakes, payouts and the house edge are all checked, and

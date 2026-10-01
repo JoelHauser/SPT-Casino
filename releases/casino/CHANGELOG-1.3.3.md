@@ -1,7 +1,7 @@
-# SPT Casino 1.3.3 (pre-release)
+# SPT Casino 1.3.3
 
-A sixth table: **Casino War**. This is a pre-release because nobody has played it in game
-yet -- see the bottom of this page.
+A sixth table: **Casino War**, with AUTO and SPEED like the slot machine. Plus, the lobby
+tiles now light up under the cursor.
 
 ## Casino War
 
@@ -40,20 +40,34 @@ you open the table -- more than surrendering would have paid you.
 The table keeps a record behind its own STATS button: hands, wins and losses, ties, wars won
 and lost, surrenders, tie bets won, and staked and returned per currency.
 
+**AUTO** sits beside DEAL. It deals a hand, leaves the result up for a moment, and deals
+again. On a tie it always goes to war, the cheaper choice. It only surrenders when you
+can't cover the second bet. Change the bet mid-run and the next hand uses it. Press STOP
+at any time, even with cards in the air. STOP during a tie hands the choice back to you. AUTO
+stops by itself when you can't afford the next hand, the bet is over the limit, or the server
+refuses. It also stops when you switch currency, open STATS or close the table.
+
+**SPEED** is the button after AUTO: 1X, 2X, 4X, 6X, as on the slot machine. It speeds up
+the whole table, hands you deal yourself included: the deal, the war, and AUTO's pause
+between hands.
+
+The cards sit in the middle of the table. When a tie goes to war, the first card slides
+aside so the war card can land next to it.
+
 ## Also
 
-The install step in the build script no longer moves aside a folder just because it shares a
-table's name. Only Blackjack, Poker, Roulette and Slots ever shipped as mods of their own, so
-only their old folders are retired. This only affects people building from source.
+- **The lobby tiles light up under the cursor:** a lighter tile with a gold edge, the same
+  feedback the buttons at every table give. So does the lobby's CLOSE button.
+- The install step in the build script no longer moves aside a folder just because it shares
+  a table's name. Only Blackjack, Poker, Roulette and Slots ever shipped as mods of their
+  own, so only their old folders are retired. This only affects people building from source.
 
-## Before you rely on it
+## Testing
 
-**Casino War has not been played in game yet.** Its rules, odds and money handling are covered
-by tests the same way every other table's are -- every way a hand can end, the house edge
-checked three ways, and every way the money could go wrong tried on purpose and caught. What
-has not been seen is the table itself: where the cards land, how the result reads, and whether
-everything lines up on your screen. If anything looks out of place or a hand settles wrong,
-please report it.
+Casino War has been played in game, AUTO and SPEED included. Its rules, odds and money
+handling are covered by tests the same way every other table's are: every way a hand can
+end, the house edge checked three ways, and every way the money could go wrong tried on
+purpose and caught. If anything looks out of place or a hand settles wrong, please report it.
 
 No change to any other table's odds, payouts, or limits. Install as usual: extract into your
 SPT folder and overwrite.

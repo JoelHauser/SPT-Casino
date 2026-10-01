@@ -44,17 +44,33 @@ namespace War.Client
         private static readonly Color BrassBottom = new Color(0.33f, 0.25f, 0.08f, 1f);
         private static readonly Color BrassEdge = new Color(0.72f, 0.58f, 0.26f, 1f);
 
-        // Where the cards sit on the cloth, from the centre of their row. The first card
-        // and the war card each have a fixed place, so a war arriving does not slide the
-        // card that started it sideways -- a row laid out by a group would.
+        // Where the cards sit on the cloth, from the centre of their row. A hand that is
+        // only the first two cards sits dead centre; a war moves the first card left to
+        // FirstCardX and puts the war card beside it, so the pair is centred instead.
+        // The move is a short slide (see Place), not a jump -- a row laid out by a group
+        // would snap it.
         private const float FirstCardX = -70f;
         private const float WarCardX = 70f;
         private const float BurnX = -330f;
+        private const float SlideDuration = 0.2f;
 
         // Blackjack's pace, not Poker's: a round here is two cards, and the slower deal
         // reads as waiting rather than as drama.
         private const float DealStagger = 0.22f;
         private const float DealDuration = 0.35f;
+
+        /// <summary>
+        /// The SPEED button's steps, the slot machine's: 1X, 2X, 4X, 6X, wrapping back to
+        /// 1X. Divides every timing on the table -- the deal, the stagger, the war slide
+        /// and AUTO's pause -- so it is the pace of the table, manual hands included,
+        /// not a setting that belongs to AUTO. Not saved; the table opens at whatever
+        /// it was last left at this session.
+        /// </summary>
+        private static readonly float[] SpeedSteps = { 1f, 2f, 4f, 6f };
+
+        private static int _speedStep;
+
+        private static float Speed => SpeedSteps[_speedStep];
 
         private static GameObject _root;
         private static TMP_FontAsset _font;
@@ -96,6 +112,9 @@ namespace War.Client
         /// </summary>
         private static readonly Dictionary<string, string> Dealt = new Dictionary<string, string>();
 
+        /// <summary>Where each place on the cloth was last drawn, so a card that moves can slide.</summary>
+        private static readonly Dictionary<string, float> PlacedAt = new Dictionary<string, float>();
+
         private static string _wallet = "Roubles";
         private static long _ante = 10_000;
         private static long _tie;
@@ -107,6 +126,27 @@ namespace War.Client
         /// click cannot deal a second hand over a first that has not finished landing.
         /// </summary>
         private static bool _busy;
+
+        /// <summary>
+        /// Armed by AUTO: deal again a beat after each hand settles, and on a tie go to
+        /// war. War rather than surrender because it is the cheaper choice -- 2.88% of
+        /// the bet against 3.70% -- and surrender only when the second ante is not
+        /// there to put up. The bet is read fresh each hand, so a change to it applies
+        /// to the next one.
+        ///
+        /// Like Slots' AUTO, the only thing that ever schedules the next step is a hand
+        /// finishing (<see cref="Render"/>); stopping just leaves this false and the run
+        /// ends there.
+        /// </summary>
+        private static bool _auto;
+
+        private static Coroutine _autoWait;
+
+        /// <summary>How long a result sits on the cloth before AUTO deals again.</summary>
+        private const float AutoPauseSeconds = 1.4f;
+
+        /// <summary>The round on the cloth, so AUTO knows whether it is facing a tie.</summary>
+        private static JObject _lastRound;
 
         private static bool _rewriting;
 
@@ -149,6 +189,9 @@ namespace War.Client
 
         internal static void Close()
         {
+            // Nobody is left to press STOP once the table is shut. A tie AUTO had not
+            // answered yet waits on the server, the same as a manual one.
+            StopAuto();
             HideStats();
 
             if (_root == null || !_root.activeSelf)
@@ -215,6 +258,160 @@ namespace War.Client
             Render(reply, animate: true);
         }
 
+        /// <summary>
+        /// Arms or disarms a run. Arming plays straight away if the cloth is still --
+        /// otherwise the hand in the air finishes and <see cref="Render"/> picks the run
+        /// up from there.
+        /// </summary>
+        private static void ToggleAuto()
+        {
+            if (_auto)
+            {
+                StopAuto();
+                return;
+            }
+
+            _auto = true;
+            HideStats();
+
+            // STOP in AUTO's place now, not when the first hand lands.
+            RenderActions(_lastRound);
+
+            if (!_busy)
+            {
+                AutoStep();
+            }
+        }
+
+        /// <summary>
+        /// Disarms a run and cancels the pause it may be waiting out. Safe to call
+        /// whether or not one is armed. Never touches a hand in the air.
+        /// </summary>
+        private static void StopAuto()
+        {
+            var wasArmed = _auto;
+            _auto = false;
+
+            if (_autoWait != null && WarClientPlugin.Instance != null)
+            {
+                WarClientPlugin.Instance.StopCoroutine(_autoWait);
+            }
+
+            _autoWait = null;
+
+            if (!wasArmed || _root == null || !_root.activeSelf)
+            {
+                return;
+            }
+
+            // Put AUTO back where STOP was. If cards are still moving, the row goes the
+            // way a manual deal's does -- hidden until they land -- so STOP vanishes the
+            // moment it is pressed and cannot be pressed again into re-arming the run.
+            if (_busy)
+            {
+                ClearActions();
+            }
+            else
+            {
+                RenderActions(_lastRound);
+            }
+        }
+
+        private static void ScheduleAuto()
+        {
+            if (WarClientPlugin.Instance == null)
+            {
+                StopAuto();
+                return;
+            }
+
+            // A hand dealt by hand during the pause settles and schedules again. One
+            // wait at a time, or that would be two runs dealing over each other.
+            if (_autoWait != null)
+            {
+                WarClientPlugin.Instance.StopCoroutine(_autoWait);
+            }
+
+            _autoWait = WarClientPlugin.Instance.StartCoroutine(AutoWait());
+        }
+
+        private static IEnumerator AutoWait()
+        {
+            yield return new WaitForSecondsRealtime(AutoPauseSeconds / Speed);
+
+            _autoWait = null;
+
+            if (_auto && !_busy && _root != null && _root.activeSelf)
+            {
+                AutoStep();
+            }
+        }
+
+        /// <summary>
+        /// One move on the player's behalf: answer a tie, or deal the next hand. Stops
+        /// the run, saying why, when the next hand cannot be paid for -- checked here
+        /// because <see cref="Deal"/> refuses those without a round trip, and a refusal
+        /// that never reaches <see cref="Render"/> would leave the run armed and idle.
+        /// </summary>
+        private static void AutoStep()
+        {
+            var known = Balances.TryGetValue(_wallet, out var held);
+
+            if ((_lastRound?["Phase"]?.ToString() ?? "AwaitingBet") == "AwaitingDecision")
+            {
+                var ante = _lastRound["Ante"]?.ToObject<long>() ?? 0;
+                Decide(known && held < ante ? "Surrender" : "War");
+                return;
+            }
+
+            var ceiling = CeilingFor(_wallet);
+            string why = null;
+
+            if (_ante <= 0)
+            {
+                why = "Type an amount to bet first.";
+            }
+            else if (ceiling > 0 && (_ante > ceiling || _tie > ceiling))
+            {
+                why = $"AUTO stopped: the table takes up to {ceiling:N0} a bet.";
+            }
+            else if (known && _ante + _tie > held)
+            {
+                why = $"AUTO stopped: the next hand costs {_ante + _tie:N0} {Short(_wallet)} and you have {held:N0}.";
+            }
+
+            if (why != null)
+            {
+                Say(why, Bad);
+                StopAuto();
+                return;
+            }
+
+            Deal();
+        }
+
+        /// <summary>
+        /// SPEED: one button cycling 1X, 2X, 4X, 6X, as on the slot machine. Sits at the
+        /// end of whichever row is showing, so it can be turned up mid-run, tie or not.
+        /// </summary>
+        private static void SpeedChip()
+        {
+            Chip(_actionRow, $"{Speed:0}X", 96f, CycleSpeed);
+        }
+
+        private static void CycleSpeed()
+        {
+            _speedStep = (_speedStep + 1) % SpeedSteps.Length;
+
+            // Redraw the row with the new label. Under AUTO it is on screen even while
+            // cards move; otherwise it is only clickable once they have landed. A run
+            // waiting out its pause keeps the old length for that one wait.
+            if (_auto || !_busy)
+            {
+                RenderActions(_lastRound);
+            }
+        }
+
         private static void ChooseWallet(string wallet)
         {
             if (_busy)
@@ -222,6 +419,8 @@ namespace War.Client
                 return;
             }
 
+            // A run started in roubles does not carry on in dollars.
+            StopAuto();
             _wallet = wallet;
 
             // A rouble bet carried over to dollars is a hundred times the money.
@@ -250,6 +449,7 @@ namespace War.Client
             if (response == null)
             {
                 Say("No answer from the server. Is it running?", Bad);
+                StopAuto();
                 return;
             }
 
@@ -291,7 +491,13 @@ namespace War.Client
             // until the cards that decided them have landed. Reading WIN before the
             // dealer's card arrives is reading the result off the wrong thing.
             _busy = finish > 0f;
-            ClearActions();
+
+            // Except under AUTO, whose row stays put for the whole run so STOP is always
+            // there to press -- see RenderAutoActions.
+            if (!_auto)
+            {
+                ClearActions();
+            }
 
             DealAnimator.After(finish, () =>
             {
@@ -302,8 +508,22 @@ namespace War.Client
                     return;
                 }
 
+                _lastRound = round;
                 ShowHeadline(round);
                 RenderActions(round);
+
+                // A refusal ends a run where it stands, with the reason already said.
+                if (_auto)
+                {
+                    if (ok)
+                    {
+                        ScheduleAuto();
+                    }
+                    else
+                    {
+                        StopAuto();
+                    }
+                }
 
                 if (response["Balance"] != null && !string.IsNullOrEmpty(wallet))
                 {
@@ -351,8 +571,9 @@ namespace War.Client
 
             // The order a dealer would deal them: player, dealer, then for a war three
             // burned, the player's war card and the dealer's.
-            Place(_playerRow, player, FirstCardX, 1f, "player", animate, ref sequence, ref finish);
-            Place(_dealerRow, dealer, FirstCardX, 1f, "dealer", animate, ref sequence, ref finish);
+            var firstX = string.IsNullOrEmpty(playerWar) ? 0f : FirstCardX;
+            Place(_playerRow, player, firstX, 1f, "player", animate, ref sequence, ref finish);
+            Place(_dealerRow, dealer, firstX, 1f, "dealer", animate, ref sequence, ref finish);
 
             for (var i = 0; i < burned; i++)
             {
@@ -382,9 +603,18 @@ namespace War.Client
             slot.anchoredPosition = new Vector2(x, 0f);
 
             var state = code ?? "back";
+            var hadX = PlacedAt.TryGetValue(key, out var previousX);
+            PlacedAt[key] = x;
 
             if (Dealt.TryGetValue(key, out var previous) && previous == state)
             {
+                // Already on the cloth, but somewhere else: the first card making room
+                // for a war card. It slides over rather than reappearing in its new place.
+                if (animate && hadX && !Mathf.Approximately(previousX, x) && WarClientPlugin.Instance != null)
+                {
+                    WarClientPlugin.Instance.StartCoroutine(Slide(slot, previousX, x));
+                }
+
                 return;
             }
 
@@ -395,9 +625,32 @@ namespace War.Client
                 return;
             }
 
-            var delay = sequence++ * DealStagger;
-            DealAnimator.Deal(card, delay, _shoe, DealDuration);
-            finish = Mathf.Max(finish, DealAnimator.FinishTime(delay, DealDuration));
+            var delay = sequence++ * (DealStagger / Speed);
+            DealAnimator.Deal(card, delay, _shoe, DealDuration / Speed);
+            finish = Mathf.Max(finish, DealAnimator.FinishTime(delay, DealDuration / Speed));
+        }
+
+        private static IEnumerator Slide(RectTransform slot, float from, float to)
+        {
+            slot.anchoredPosition = new Vector2(from, 0f);
+            var duration = SlideDuration / Speed;
+
+            for (var t = 0f; t < duration; t += Time.unscaledDeltaTime)
+            {
+                // The next render clears the row, and a destroyed slot reads as null.
+                if (slot == null)
+                {
+                    yield break;
+                }
+
+                slot.anchoredPosition = new Vector2(Mathf.SmoothStep(from, to, t / duration), 0f);
+                yield return null;
+            }
+
+            if (slot != null)
+            {
+                slot.anchoredPosition = new Vector2(to, 0f);
+            }
         }
 
         /// <summary>The big line in the middle of the cloth, and the money under it.</summary>
@@ -457,10 +710,23 @@ namespace War.Client
         private static void ClearActions()
         {
             Clear(_actionRow);
+            _autoRowSpeed = 0f;
         }
+
+        /// <summary>
+        /// The speed the AUTO row was last built at, or 0 when the row on screen is not
+        /// the AUTO row. While it matches, the row is left exactly as it is.
+        /// </summary>
+        private static float _autoRowSpeed;
 
         private static void RenderActions(JObject round)
         {
+            if (_auto)
+            {
+                RenderAutoActions();
+                return;
+            }
+
             ClearActions();
 
             var phase = round?["Phase"]?.ToString() ?? "AwaitingBet";
@@ -478,10 +744,13 @@ namespace War.Client
                 var ante = round["Ante"]?.ToObject<long>() ?? 0;
                 Chip(_actionRow, $"GO TO WAR  +{ante:N0}", 300f, () => Decide("War"), primary: true);
                 Chip(_actionRow, $"SURRENDER  {ante - (ante / 2):N0} BACK", 320f, () => Decide("Surrender"));
+                SpeedChip();
                 return;
             }
 
             var deal = Chip(_actionRow, "DEAL", 200f, Deal, primary: true);
+            Chip(_actionRow, "AUTO", 150f, ToggleAuto);
+            SpeedChip();
 
             // Greyed when the bet cannot be placed, rather than looking ready and then
             // refusing. Still clickable: the refusal explains itself.
@@ -490,11 +759,57 @@ namespace War.Client
             var affordable = within
                 && (!Balances.TryGetValue(_wallet, out var held) || (_ante > 0 && _ante + _tie <= held));
 
-            if (affordable)
+            if (!affordable)
+            {
+                GreyOut(deal);
+            }
+        }
+
+        /// <summary>
+        /// The row while AUTO runs: DEAL greyed and inert, STOP, SPEED -- the same three
+        /// places the idle row has, so STOP lands exactly where AUTO was.
+        ///
+        /// **Built once per run and then left alone**, ties included. Rebuilding it
+        /// every hand, as the manual row is, made it blink out for every deal -- most of
+        /// the time at 6X -- and a press on STOP could land on a button that was destroyed
+        /// before the release, so the click never happened. Only a speed change rebuilds
+        /// it, and that is a click on the row itself. The betting bar, LEAVE and STATS
+        /// are held still for the same reason: the bar hiding on a tie moved the whole
+        /// row up and back.
+        /// </summary>
+        private static void RenderAutoActions()
+        {
+            _betControls.SetActive(true);
+
+            // Escape still closes the table, and stops the run on the way out.
+            _leave.SetActive(false);
+            _statsButton.SetActive(false);
+
+            if (_autoRowSpeed == Speed && _actionRow.childCount > 0)
             {
                 return;
             }
 
+            Clear(_actionRow);
+
+            // The run deals for itself; a second hand dealt by hand mid-run is a tie
+            // refused by the server at best.
+            var deal = Chip(_actionRow, "DEAL", 200f, () => { }, primary: true);
+            GreyOut(deal);
+
+            // No hover either: the sprite swap would light the greyed face back up.
+            var dealButton = deal.GetComponent<Button>();
+            dealButton.transition = Selectable.Transition.None;
+            dealButton.interactable = false;
+
+            Chip(_actionRow, "STOP", 150f, ToggleAuto);
+            SpeedChip();
+
+            _autoRowSpeed = Speed;
+        }
+
+        private static void GreyOut(GameObject deal)
+        {
             var face = deal.GetComponent<Image>();
             if (face != null)
             {
@@ -974,6 +1289,13 @@ namespace War.Client
             }
 
             var showing = !_statsPanel.activeSelf;
+
+            // The next hand would close the sheet the moment it dealt.
+            if (showing)
+            {
+                StopAuto();
+            }
+
             _statsPanel.SetActive(showing);
             _cloth.gameObject.SetActive(!showing);
 

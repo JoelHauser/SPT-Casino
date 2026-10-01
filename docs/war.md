@@ -131,8 +131,10 @@ plugin), the same chips, two `MoneyField` boxes (BET and TIE BET), a STATS sheet
 the felt.
 
 - **Cards are placed, not laid out.** The dealer's row at the top of the cloth, the
-  player's at the bottom, the first card at x -70 and the war card at +70. A layout group
-  would slide the first card sideways when the war card arrived.
+  player's at the bottom. A plain hand sits at x 0, dead centre; a war moves the first
+  card to -70 with a short slide (`Slide`, keyed off `PlacedAt`) and puts the war card at
+  +70, so the pair is centred. The first cut had the first card fixed at -70 always, and in
+  game a plain hand read as off-centre.
 - **The burned cards stay on the felt**, face down at x -330, so three can be counted.
 - **The result sits right of the cards** (x 180..460 on a ~956 px cloth), never on one.
   The rules are printed on the empty felt from the ping, so the cloth cannot promise odds
@@ -145,6 +147,17 @@ the felt.
   again.
 - **A tie hides the betting bar, LEAVE and STATS** and shows GO TO WAR (+ante) and
   SURRENDER (half back). Escape still closes the table; the tie waits.
+- **AUTO and SPEED** (added after the first in-game run, at the user's request). AUTO deals,
+  pauses `AutoPauseSeconds`, deals again; on a tie it goes to war (2.88% beats 3.70%), and
+  surrenders only when the second ante is not there. The next step is only ever scheduled
+  from `Render`'s `After` callback, one `_autoWait` at a time. SPEED cycles 1X/2X/4X/6X
+  and divides every timing: deal, stagger, slide and the AUTO pause.
+- **The AUTO row is built once per run and never rebuilt per hand** (`RenderAutoActions`):
+  greyed DEAL, STOP, SPEED, with the betting bar held visible and LEAVE/STATS hidden.
+  The first version rebuilt the row every hand like the manual one, and in game the
+  buttons flickered and STOP was nearly impossible to hit -- the row was gone during
+  every deal, and a press could land on a button destroyed before the release. STOP
+  pressed mid-deal hides the row at once, so it cannot be pressed again into re-arming.
 - Sounds reuse `CardDeal` (from `DealAnimator`) and `ChipBet` (deal, and going to war).
   No new cues, so the sound manifest is unchanged.
 
@@ -153,8 +166,11 @@ lobby draws a spade, which is its standing fallback.
 
 ## Current state
 
-**2026-10-01.** Shipped as the **1.3.3 pre-release**, the sixth table. **Never run in
-game.**
+**2026-10-01.** First pushed as the **1.3.3 pre-release**, then played in game, fixed and
+re-released as the full **1.3.3** the same day: cards centred, AUTO and SPEED added, the
+AUTO row made to hold still, and the lobby tiles lit on hover (`Casino.Shared.Hover`, the
+tables' own sprite swap -- the default ColorTint on a near-black tile showed nothing).
+The full release was built on Joel's machine against the real `H:\SPT4.1.X`.
 
 - Written on the development box against a stale pre-rewrite `main`, then moved onto
   1.3.2 in a worktree: the War files copied over, the casino wiring redone against the
@@ -173,14 +189,5 @@ game.**
   clashing -- scaled from 1254 to 320 square (Lanczos) to match the other tiles. It
   already had a transparent background.
 
-What to watch the first time it runs:
-
-1. **The cloth layout.** Every position was worked out from the photograph's measured
-   cloth, not seen. A tie prompt that wraps past three lines, a headline that runs into
-   the cloth edge, or the burn pile on the rail would all show here.
-2. **The deal origin.** Cards fly from a marker at the cloth's top right. Whether that
-   reads as a shoe is a matter of looking at it.
-3. **Six lobby tiles.** The lobby wraps at four a row since 1.3.0, so War sits on the
-   second row beside Horse Racing. Not seen.
-4. **Reopening on a waiting tie**, and **a restart mid-tie** -- the server tests cover
-   both, the panel has not been watched doing either.
+Seen in game: the table, AUTO and SPEED. Still covered only by the server tests, never
+watched in the panel: **a server restart mid-tie**.

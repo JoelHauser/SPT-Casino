@@ -383,6 +383,11 @@ namespace Casino.Client
 
                 var chosen = game;
                 tile.gameObject.AddComponent<Button>().onClick.AddListener(() => Enter(chosen));
+
+                // Lit under the cursor the way the tables' buttons are: a lighter face
+                // and a gold edge. The default tint multiplies a near-black face by
+                // near-white, which is no change anybody can see.
+                Casino.Shared.Hover.Rounded(face, 10, Tile, TileEdge, Gold);
             }
 
             return new TileBlock(centreY - (blockHeight * 0.5f), blockTop);
@@ -416,6 +421,7 @@ namespace Casino.Client
             text.color = Ink;
 
             box.gameObject.AddComponent<Button>().onClick.AddListener(() => onClick());
+            Casino.Shared.Hover.Rounded(image, 6, new Color(0.16f, 0.16f, 0.17f, 1f), TileEdge, Gold);
         }
 
         // ------------------------------------------------------------------ pieces
