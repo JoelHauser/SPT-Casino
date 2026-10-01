@@ -432,8 +432,14 @@ was used, on 2026-09-05, to argue that the release could not go out without merg
 the three server mods first. It could. Do not block a release on this again.
 
 ```
-scripts/casino/pack.ps1 -Zip     # releases/casino/SPT_CasinoV1.0.zip
+scripts/casino/pack.ps1 -Zip     # releases/casino/SPT_CasinoV<version>.zip
 ```
+
+**The zip is not committed.** It is written to `releases/casino`, ignored there, and
+uploaded to the GitHub release (`gh release upload <tag> <zip> --clobber`), which is
+where players get it. Until 1.3.3 every zip was also committed, which put 125 MB of
+duplicates in the tree; they were taken out on 2026-10-01 and are still in history.
+Commit the code before packing all the same -- `-Zip` stamps the DLLs with HEAD.
 
 ## One folder, seven assemblies
 

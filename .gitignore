@@ -12,8 +12,6 @@ dist/
 tools/Blackjack.Installer/payload.zip
 dist-installer/
 
-# The console harnesses publish self-contained, so each zip is thirty megabytes
-# and rebuilds from source in seconds. The SPT mod zips are small and are tracked.
-releases/*/Blackjack.Console-*.zip
-releases/*/Poker.Console-*.zip
-releases/*/Roulette.Console-*.zip
+# Release zips live on the GitHub release they belong to, not in the tree. pack.ps1
+# -Zip still writes them here; upload from here. Every one up to 1.3.3 is in history.
+releases/**/*.zip
